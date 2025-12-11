@@ -63,10 +63,33 @@ const elements = {
 
     fraudTableSection: document.getElementById('fraud-table-section'),
     fraudTableBody: document.getElementById('fraud-table-body'),
+    noFraudData: document.getElementById('no-fraud-data'),
 
     toastContainer: document.getElementById('toast-container'),
 
-    electionTitle: document.getElementById('election-title')
+    electionTitle: document.getElementById('election-title'),
+
+    // Admin Tabs
+    adminTabs: document.querySelectorAll('.admin-tab'),
+    tabElection: document.getElementById('tab-election'),
+    tabCandidates: document.getElementById('tab-candidates'),
+    tabMonitoring: document.getElementById('tab-monitoring'),
+    tabTesting: document.getElementById('tab-testing'),
+    testingTabBtn: document.getElementById('testing-tab-btn'),
+
+    // Quick Stats
+    statTotalVotes: document.getElementById('stat-total-votes'),
+    statTotalVoters: document.getElementById('stat-total-voters'),
+    statLeader: document.getElementById('stat-leader'),
+    statStatus: document.getElementById('stat-status'),
+
+    // Candidate Management
+    candidatesList: document.getElementById('candidates-list'),
+    btnAddCandidate: document.getElementById('btn-add-candidate'),
+    addCandidateForm: document.getElementById('add-candidate-form'),
+    newCandidateName: document.getElementById('new-candidate-name'),
+    btnConfirmAddCandidate: document.getElementById('btn-confirm-add-candidate'),
+    btnCancelAddCandidate: document.getElementById('btn-cancel-add-candidate')
 };
 
 function showToast(message, type = 'info') {
@@ -231,10 +254,13 @@ async function castVote(candidateId) {
             showToast('Election status: Deadlock detected!', 'warning');
         }
 
+        // Clear voter session and prompt for new voter after successful vote
         setTimeout(() => {
             button.disabled = false;
             button.innerHTML = originalContent;
-        }, 500);
+            showRegistrationSection();
+            showToast('Please enter new voter information', 'info');
+        }, 1000);
 
     } catch (error) {
         button.disabled = false;
@@ -539,6 +565,7 @@ async function handleAdminLogin(e) {
         elements.adminPanel.classList.remove('hidden');
 
         fetchCandidates();
+        updateQuickStats();
         showToast('Admin access granted', 'success');
     } catch (error) {
         showToast(error.message, 'error');
@@ -772,6 +799,150 @@ function closeFinalResults() {
     if (modal) modal.remove();
 }
 
+function switchAdminTab(tabName) {
+    elements.adminTabs.forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+
+    const tabs = ['election', 'candidates', 'monitoring', 'testing'];
+    tabs.forEach(tab => {
+        const content = document.getElementById(`tab-${tab}`);
+        if (content) {
+            content.classList.toggle('hidden', tab !== tabName);
+            content.classList.toggle('active', tab === tabName);
+        }
+    });
+
+    if (tabName === 'candidates') {
+        renderCandidatesList();
+    }
+}
+
+async function updateQuickStats() {
+    try {
+        const data = await apiCall('/api/results');
+
+        elements.statTotalVotes.textContent = data.totalVotes || 0;
+        elements.statTotalVoters.textContent = data.totalVotes || 0; // Using votes as proxy
+
+        if (data.isTie && data.tiedCandidates?.length > 0) {
+            elements.statLeader.textContent = 'Tie!';
+        } else if (data.leader) {
+            elements.statLeader.textContent = data.leader.name;
+        } else {
+            elements.statLeader.textContent = '--';
+        }
+
+        const status = await apiCall('/api/status');
+        elements.statStatus.textContent = status.electionStatus || 'Active';
+    } catch (error) {
+        console.error('Failed to update quick stats:', error);
+    }
+}
+
+function renderCandidatesList() {
+    if (!elements.candidatesList) return;
+
+    if (state.candidates.length === 0) {
+        elements.candidatesList.innerHTML = `
+            <div class="text-center py-8 text-white/50">
+                <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                <p>No candidates registered</p>
+            </div>
+        `;
+        return;
+    }
+
+    elements.candidatesList.innerHTML = state.candidates.map(candidate => `
+        <div class="candidate-list-item">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold" style="background: ${candidate.color_code}">
+                    ${getInitials(candidate.name)}
+                </div>
+                <div>
+                    <p class="text-white font-medium">${candidate.name}</p>
+                    <p class="text-white/50 text-sm">${candidate.votes || 0} votes</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="deleteCandidate(${candidate.id})" class="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors" title="Delete candidate">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function addCandidate() {
+    const name = elements.newCandidateName?.value?.trim();
+
+    if (!name) {
+        showToast('Please enter a candidate name', 'error');
+        return;
+    }
+
+    try {
+        await apiCall('/api/admin/candidates', {
+            method: 'POST',
+            body: JSON.stringify({ name })
+        });
+
+        showToast(`Candidate "${name}" added!`, 'success');
+        elements.newCandidateName.value = '';
+        toggleAddCandidateForm(false);
+        await fetchCandidates();
+        renderCandidatesList();
+        updateQuickStats();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function deleteCandidate(id) {
+    if (!confirm('Are you sure you want to delete this candidate? This will also remove all their votes.')) {
+        return;
+    }
+
+    try {
+        await apiCall(`/api/admin/ban/${id}`, {
+            method: 'DELETE'
+        });
+
+        showToast('Candidate deleted', 'success');
+        await fetchCandidates();
+        renderCandidatesList();
+        updateQuickStats();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+function toggleAddCandidateForm(show) {
+    if (elements.addCandidateForm) {
+        elements.addCandidateForm.classList.toggle('hidden', !show);
+        if (show && elements.newCandidateName) {
+            elements.newCandidateName.focus();
+        }
+    }
+}
+
+function setupTestingTabToggle() {
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.shiftKey && e.key === 'T') {
+            e.preventDefault();
+            if (elements.testingTabBtn) {
+                const isHidden = elements.testingTabBtn.classList.contains('hidden');
+                elements.testingTabBtn.classList.toggle('hidden', !isHidden);
+                showToast(isHidden ? 'Testing mode enabled' : 'Testing mode disabled', 'info');
+            }
+        }
+    });
+}
+
 elements.btnVoterView.addEventListener('click', () => switchView('voter'));
 elements.btnAnalyticsView.addEventListener('click', () => switchView('analytics'));
 elements.btnAdmin.addEventListener('click', openAdminModal);
@@ -788,12 +959,36 @@ elements.btnCancelElection.addEventListener('click', () => toggleNewElectionForm
 elements.btnCreateElection.addEventListener('click', createNewElection);
 elements.btnEndElection.addEventListener('click', endElection);
 elements.btnReset.addEventListener('click', resetElection);
-elements.btnDetectFraud.addEventListener('click', detectFraud);
-
-elements.fakeVoteCount.addEventListener('input', (e) => {
-    elements.fakeVoteCountDisplay.textContent = e.target.value;
+elements.btnDetectFraud.addEventListener('click', () => {
+    detectFraud();
+    if (elements.noFraudData) {
+        elements.noFraudData.classList.add('hidden');
+    }
 });
-elements.btnInjectVotes.addEventListener('click', injectFakeVotes);
+
+elements.fakeVoteCount?.addEventListener('input', (e) => {
+    if (elements.fakeVoteCountDisplay) {
+        elements.fakeVoteCountDisplay.textContent = e.target.value;
+    }
+});
+elements.btnInjectVotes?.addEventListener('click', injectFakeVotes);
+
+elements.adminTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+        switchAdminTab(tab.dataset.tab);
+    });
+});
+
+elements.btnAddCandidate?.addEventListener('click', () => toggleAddCandidateForm(true));
+elements.btnCancelAddCandidate?.addEventListener('click', () => toggleAddCandidateForm(false));
+elements.btnConfirmAddCandidate?.addEventListener('click', addCandidate);
+
+elements.newCandidateName?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        addCandidate();
+    }
+});
 
 async function init() {
     const savedVoter = sessionStorage.getItem('voter');
@@ -805,11 +1000,14 @@ async function init() {
     await fetchStatus();
     await fetchCandidates();
 
+    setupTestingTabToggle();
+
     startPolling();
 }
 
 window.castVote = castVote;
 window.banCandidate = banCandidate;
 window.closeFinalResults = closeFinalResults;
+window.deleteCandidate = deleteCandidate;
 
 init();

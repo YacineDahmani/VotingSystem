@@ -32,7 +32,7 @@
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 1.5rem;
-    box-shadow: 
+    box-shadow:
         0 4px 6px -1px rgba(0, 0, 0, 0.3),
         0 2px 4px -1px rgba(0, 0, 0, 0.2),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -43,7 +43,7 @@
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 1.5rem;
-    box-shadow: 
+    box-shadow:
         0 25px 50px -12px rgba(0, 0, 0, 0.5),
         inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
@@ -89,8 +89,8 @@
     transition: all 0.2s ease;
 }
 
-.floating-input:focus + .floating-label,
-.floating-input:not(:placeholder-shown) + .floating-label {
+.floating-input:focus+.floating-label,
+.floating-input:not(:placeholder-shown)+.floating-label {
     top: 0.75rem;
     transform: translateY(0);
     font-size: 0.75rem;
@@ -163,6 +163,93 @@
     border: none;
     cursor: pointer;
     transition: all 0.2s ease;
+}
+
+/* Admin Tabs */
+.admin-tabs {
+    gap: 0.25rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.admin-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+}
+
+.admin-tab:hover {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.admin-tab.active {
+    color: white;
+    border-bottom-color: #0ea5e9;
+}
+
+/* Tab Content */
+.tab-content {
+    animation: fadeIn 0.2s ease;
+}
+
+.tab-content.hidden {
+    display: none;
+}
+
+/* Admin Action Buttons */
+.admin-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    border-radius: 1rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.admin-action-btn:hover {
+    transform: translateY(-2px);
+}
+
+/* Stat Cards */
+.stat-card {
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+}
+
+/* Candidate List Item */
+.candidate-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.candidate-list-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
 }
 
 .candidate-card {
@@ -240,6 +327,7 @@
         transform: translateX(100%);
         opacity: 0;
     }
+
     to {
         transform: translateX(0);
         opacity: 1;
@@ -251,6 +339,7 @@
         transform: translateX(0);
         opacity: 1;
     }
+
     to {
         transform: translateX(100%);
         opacity: 0;
@@ -286,6 +375,7 @@
         opacity: 0;
         transform: translateY(10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -312,9 +402,12 @@
 }
 
 @keyframes pulse-glow {
-    0%, 100% {
+
+    0%,
+    100% {
         box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
     }
+
     50% {
         box-shadow: 0 0 40px rgba(245, 158, 11, 0.4);
     }
@@ -379,11 +472,11 @@
     .view-toggle-btn span {
         display: none;
     }
-    
+
     .admin-btn span {
         display: none;
     }
-    
+
     .admin-btn {
         padding: 0.75rem;
     }
