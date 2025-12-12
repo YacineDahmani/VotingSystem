@@ -1,96 +1,99 @@
 ﻿const state = {
-    currentView: 'voter',
-    voter: null,
-    hasVoted: false,
+    currentView: 'entry',
+    election: null, // Active election object
+    voter: null,    // Authenticated voter for current election
     isAdmin: false,
-    candidates: [],
-    results: null,
-    version: null,
     pollInterval: null,
     charts: {
-        doughnut: null,
-        bar: null
-    }
+        results: null
+    },
+    // Admin state
+    adminElections: [],
+    managingElection: null
 };
 
+// ==================== DOM ELEMENTS ====================
+
 const elements = {
+    // Views
+    entryView: document.getElementById('election-entry-view'),
     voterView: document.getElementById('voter-view'),
-    analyticsView: document.getElementById('analytics-view'),
 
-    btnVoterView: document.getElementById('btn-voter-view'),
-    btnAnalyticsView: document.getElementById('btn-analytics-view'),
-    btnAdmin: document.getElementById('btn-admin'),
+    // Nav
+    navTitle: document.getElementById('nav-title'),
+    btnHome: document.getElementById('btn-home'),
 
-    registrationSection: document.getElementById('registration-section'),
-    votingSection: document.getElementById('voting-section'),
-    registrationForm: document.getElementById('registration-form'),
+    // Entry
+    electionCodeForm: document.getElementById('election-code-form'),
+    electionCodeInput: document.getElementById('election-code'),
+    btnAdminLogin: document.getElementById('btn-admin-login'),
+
+    // Voter Flow
+    registrationSection: document.getElementById('voter-registration-section'),
+    registrationForm: document.getElementById('voter-registration-form'),
     voterName: document.getElementById('voter-name'),
     voterAge: document.getElementById('voter-age'),
-    voterGreeting: document.getElementById('voter-greeting'),
+    electionNameDisplay: document.getElementById('election-name-display'),
 
+    votingSection: document.getElementById('voting-section'),
+    electionTitleHeader: document.getElementById('election-title-header'),
+    voterGreeting: document.getElementById('voter-greeting'),
     candidateGrid: document.getElementById('candidate-grid'),
     noCandidates: document.getElementById('no-candidates'),
 
-    statusBanner: document.getElementById('status-banner'),
-    doughnutChart: document.getElementById('doughnut-chart'),
-    barChart: document.getElementById('bar-chart'),
-    totalVotesCenter: document.getElementById('total-votes-center'),
-    leaderboardBody: document.getElementById('leaderboard-body'),
+    // Analytics
+    analyticsSection: document.getElementById('analytics-section'),
+    resultsBanner: document.getElementById('results-banner'),
+    resultsChart: document.getElementById('results-chart'),
+    resultsList: document.getElementById('results-list'),
+    btnRefreshResults: document.getElementById('btn-refresh-results'),
 
+    // Admin Login Modal
     adminModal: document.getElementById('admin-modal'),
     adminModalBackdrop: document.getElementById('admin-modal-backdrop'),
-    adminModalClose: document.getElementById('admin-modal-close'),
     adminLogin: document.getElementById('admin-login'),
-    adminPanel: document.getElementById('admin-panel'),
     adminLoginForm: document.getElementById('admin-login-form'),
     adminPassword: document.getElementById('admin-password'),
+    adminModalClose: document.getElementById('admin-modal-close'),
+
+    // Admin Dashboard
+    adminPanel: document.getElementById('admin-panel'),
     adminPanelClose: document.getElementById('admin-panel-close'),
+    adminElectionsList: document.getElementById('admin-elections-list'),
+    btnCreateElectionModal: document.getElementById('btn-create-election-modal'),
 
-    btnNewElection: document.getElementById('btn-new-election'),
-    btnEndElection: document.getElementById('btn-end-election'),
-    btnReset: document.getElementById('btn-reset'),
-    btnDetectFraud: document.getElementById('btn-detect-fraud'),
-    newElectionForm: document.getElementById('new-election-form'),
-    newElectionName: document.getElementById('new-election-name'),
+    // Create Election Modal
+    electionFormModal: document.getElementById('election-form-modal'),
+    createElectionForm: document.getElementById('create-election-form'),
+    newElectionTitle: document.getElementById('new-election-title'),
+    newElectionDesc: document.getElementById('new-election-desc'),
     newElectionCandidates: document.getElementById('new-election-candidates'),
-    btnCreateElection: document.getElementById('btn-create-election'),
-    btnCancelElection: document.getElementById('btn-cancel-election'),
+    btnCancelCreate: document.getElementById('btn-cancel-create'),
 
-    fakeVoteCandidate: document.getElementById('fake-vote-candidate'),
-    fakeVoteCount: document.getElementById('fake-vote-count'),
-    fakeVoteCountDisplay: document.getElementById('fake-vote-count-display'),
-    btnInjectVotes: document.getElementById('btn-inject-votes'),
+    // Manage Election Modal
+    manageElectionModal: document.getElementById('manage-election-modal'),
+    btnCloseManage: document.getElementById('btn-close-manage'),
+    manageTitle: document.getElementById('manage-title'),
+    manageCode: document.getElementById('manage-code'),
+    btnCopyCode: document.getElementById('btn-copy-code'),
+    btnRegenCode: document.getElementById('btn-regen-code'),
 
-    fraudTableSection: document.getElementById('fraud-table-section'),
-    fraudTableBody: document.getElementById('fraud-table-body'),
-    noFraudData: document.getElementById('no-fraud-data'),
-
-    toastContainer: document.getElementById('toast-container'),
-
-    electionTitle: document.getElementById('election-title'),
-
-    // Admin Tabs
-    adminTabs: document.querySelectorAll('.admin-tab'),
-    tabElection: document.getElementById('tab-election'),
-    tabCandidates: document.getElementById('tab-candidates'),
-    tabMonitoring: document.getElementById('tab-monitoring'),
-    tabTesting: document.getElementById('tab-testing'),
-    testingTabBtn: document.getElementById('testing-tab-btn'),
-
-    // Quick Stats
-    statTotalVotes: document.getElementById('stat-total-votes'),
-    statTotalVoters: document.getElementById('stat-total-voters'),
-    statLeader: document.getElementById('stat-leader'),
-    statStatus: document.getElementById('stat-status'),
-
-    // Candidate Management
-    candidatesList: document.getElementById('candidates-list'),
-    btnAddCandidate: document.getElementById('btn-add-candidate'),
+    manageCandidatesList: document.getElementById('manage-candidates-list'),
     addCandidateForm: document.getElementById('add-candidate-form'),
-    newCandidateName: document.getElementById('new-candidate-name'),
-    btnConfirmAddCandidate: document.getElementById('btn-confirm-add-candidate'),
-    btnCancelAddCandidate: document.getElementById('btn-cancel-add-candidate')
+    addCandidateName: document.getElementById('add-candidate-name'),
+
+    manageTotalVotes: document.getElementById('manage-total-votes'),
+    manageRealVoters: document.getElementById('manage-real-voters'),
+    btnCheckFraud: document.getElementById('btn-check-fraud'),
+    fraudAlertContainer: document.getElementById('fraud-alert-container'),
+
+    btnToggleStatus: document.getElementById('btn-toggle-status'),
+    btnDeleteElection: document.getElementById('btn-delete-election'),
+
+    toastContainer: document.getElementById('toast-container')
 };
+
+// ==================== UTILS ====================
 
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
@@ -105,7 +108,6 @@ function showToast(message, type = 'info') {
 
     toast.innerHTML = `${icons[type]}<span>${message}</span>`;
     elements.toastContainer.appendChild(toast);
-
     setTimeout(() => toast.remove(), 3000);
 }
 
@@ -116,11 +118,7 @@ async function apiCall(endpoint, options = {}) {
             ...options
         });
         const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || 'API Error');
-        }
-
+        if (!response.ok) throw new Error(data.error || 'API Error');
         return data;
     } catch (error) {
         throw error;
@@ -134,382 +132,248 @@ function getInitials(name) {
 function switchView(view) {
     state.currentView = view;
 
-    elements.btnVoterView.classList.toggle('active', view === 'voter');
-    elements.btnAnalyticsView.classList.toggle('active', view === 'analytics');
+    // Toggle main sections
+    elements.entryView.classList.toggle('active', view === 'entry');
+    elements.entryView.classList.toggle('hidden', view !== 'entry');
 
     elements.voterView.classList.toggle('active', view === 'voter');
     elements.voterView.classList.toggle('hidden', view !== 'voter');
-    elements.analyticsView.classList.toggle('active', view === 'analytics');
-    elements.analyticsView.classList.toggle('hidden', view !== 'analytics');
 
-    if (view === 'analytics') {
-        fetchResults();
+    // Toggle nav elements
+    elements.btnHome.classList.toggle('hidden', view === 'entry');
+
+    if (view === 'entry') {
+        if (state.election) {
+            sessionStorage.removeItem(`voter_${state.election.id}`);
+        }
+        state.election = null;
+
+        state.voter = null;
+        elements.electionCodeInput.value = '';
+        stopPolling();
     }
 }
 
-async function handleRegistration(e) {
+// ==================== VOTER FLOW ====================
+
+async function handleCodeSubmit(e) {
+    e.preventDefault();
+    const code = elements.electionCodeInput.value.trim().toUpperCase();
+
+    if (!code) return;
+
+    try {
+        const data = await apiCall('/api/elections/join', {
+            method: 'POST',
+            body: JSON.stringify({ code })
+        });
+
+        state.election = data.election;
+
+        // Check local storage for previous session
+        const storedVoter = sessionStorage.getItem(`voter_${state.election.id}`);
+
+        switchView('voter');
+        elements.electionNameDisplay.textContent = state.election.title;
+        elements.electionTitleHeader.textContent = state.election.title;
+
+        if (storedVoter) {
+            state.voter = JSON.parse(storedVoter);
+            showVotingSection();
+        } else {
+            showRegistrationSection();
+        }
+
+    } catch (error) {
+        showToast(error.message, 'error');
+        elements.electionCodeInput.classList.add('shake');
+        setTimeout(() => elements.electionCodeInput.classList.remove('shake'), 500);
+    }
+}
+
+function showRegistrationSection() {
+    elements.registrationSection.classList.remove('hidden');
+    elements.votingSection.classList.add('hidden');
+    elements.analyticsSection.classList.add('hidden');
+    elements.registrationForm.reset();
+}
+
+function showVotingSection() {
+    elements.registrationSection.classList.add('hidden');
+    elements.votingSection.classList.remove('hidden');
+    elements.voterGreeting.textContent = `Welcome, ${state.voter.name}`;
+
+    fetchElectionCandidates();
+    startPolling(); // Auto-refresh results
+}
+
+async function handleVoterRegistration(e) {
     e.preventDefault();
 
     const name = elements.voterName.value.trim();
     const age = parseInt(elements.voterAge.value);
 
     try {
-        const data = await apiCall('/api/register', {
+        const data = await apiCall(`/api/elections/${state.election.id}/register`, {
             method: 'POST',
             body: JSON.stringify({ name, age })
         });
 
         state.voter = data.voter;
-        sessionStorage.setItem('voter', JSON.stringify(data.voter));
+        sessionStorage.setItem(`voter_${state.election.id}`, JSON.stringify(data.voter));
 
-        showToast(data.message, 'success');
         showVotingSection();
-        fetchCandidates();
+        showToast('Registration successful', 'success');
     } catch (error) {
         showToast(error.message, 'error');
     }
 }
 
-function showVotingSection() {
-    elements.registrationSection.classList.add('hidden');
-    elements.votingSection.classList.remove('hidden');
-    elements.voterGreeting.textContent = `Welcome, ${state.voter.name}! Select a candidate to cast your vote.`;
-}
-
-function showRegistrationSection() {
-    elements.registrationSection.classList.remove('hidden');
-    elements.votingSection.classList.add('hidden');
-    elements.registrationForm.reset();
-    state.voter = null;
-    state.hasVoted = false;
-    sessionStorage.removeItem('voter');
-    sessionStorage.removeItem('hasVoted');
-}
-
-async function fetchCandidates() {
+async function fetchElectionCandidates() {
     try {
-        const data = await apiCall('/api/candidates');
-        state.candidates = data.candidates;
-        renderCandidates();
-        updateFakeVoteCandidateSelect();
+        const data = await apiCall(`/api/elections/${state.election.id}/candidates`);
+        renderCandidateGrid(data.candidates);
+
+        // Also fetch results if available (e.g. current status)
+        fetchResults();
     } catch (error) {
+        console.error(error);
         showToast('Failed to load candidates', 'error');
     }
 }
 
-function renderCandidates() {
-    if (state.candidates.length === 0) {
+function renderCandidateGrid(candidates) {
+    if (candidates.length === 0) {
         elements.candidateGrid.innerHTML = '';
         elements.noCandidates.classList.remove('hidden');
         return;
     }
 
     elements.noCandidates.classList.add('hidden');
-
-    elements.candidateGrid.innerHTML = state.candidates.map(candidate => `
-        <div class="candidate-card glass-card p-6">
+    elements.candidateGrid.innerHTML = candidates.map(c => `
+        <div class="glass-card p-6 hover:translate-y-[-4px] transition-transform">
             <div class="flex items-center gap-4 mb-4">
-                <div class="candidate-avatar" style="background: ${candidate.color_code}">
-                    ${getInitials(candidate.name)}
+                <div class="w-16 h-16 rounded-xl flex items-center justify-center text-xl font-bold text-white shadow-lg" 
+                     style="background: ${c.color_code}">
+                    ${getInitials(c.name)}
                 </div>
                 <div>
-                    <h3 class="text-xl font-bold text-white">${candidate.name}</h3>
-                    <p class="text-white/50 text-sm">Candidate #${candidate.id}</p>
+                    <h3 class="text-xl font-bold text-white">${c.name}</h3>
+                    <p class="text-white/50 text-sm">Targeting Excellence</p>
                 </div>
             </div>
-            
-            <p class="text-white/60 text-sm mb-6 line-clamp-3">
-                Committed to bringing positive change and representing the voice of the people with integrity and dedication.
-            </p>
-            
-            <button 
-                class="vote-btn bg-gradient-to-r from-primary-500 to-accent-600 text-white hover:shadow-lg hover:shadow-primary-500/30"
-                onclick="castVote(${candidate.id})"
-            >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Vote for ${candidate.name}
+            <button onclick="castVote(${c.id})" 
+                    class="w-full py-3 bg-gradient-to-r from-primary-500 to-accent-600 rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-primary-500/30 transition-all flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Vote
             </button>
         </div>
     `).join('');
 }
 
 async function castVote(candidateId) {
-    const button = event.currentTarget;
-    const originalContent = button.innerHTML;
-
-    button.disabled = true;
-    button.innerHTML = '<div class="spinner"></div><span>Casting Vote...</span>';
+    if (!state.voter) return;
 
     try {
-        const data = await apiCall('/api/vote', {
+        const data = await apiCall(`/api/elections/${state.election.id}/vote`, {
             method: 'POST',
             body: JSON.stringify({
                 candidateId,
-                voterId: state.voter?.id
+                voterId: state.voter.id
             })
         });
 
-        showToast(`Vote cast for ${data.candidate.name}!`, 'success');
+        showToast('Vote cast successfully!', 'success');
 
-        if (data.isTie) {
-            showToast('Election status: Deadlock detected!', 'warning');
-        }
-
-        // Clear voter session and prompt for new voter after successful vote
-        setTimeout(() => {
-            button.disabled = false;
-            button.innerHTML = originalContent;
-            showRegistrationSection();
-            showToast('Please enter new voter information', 'info');
-        }, 1000);
+        elements.analyticsSection.classList.remove('hidden');
+        elements.votingSection.classList.add('hidden');
+        fetchResults();
 
     } catch (error) {
-        button.disabled = false;
-        button.innerHTML = originalContent;
         showToast(error.message, 'error');
+        if (error.message.includes('already voted')) {
+            elements.analyticsSection.classList.remove('hidden');
+            elements.votingSection.classList.add('hidden');
+            fetchResults();
+        }
     }
 }
 
 async function fetchResults() {
+    if (!state.election) return;
     try {
-        const data = await apiCall('/api/results');
-
-        if (state.version !== null && data.version !== state.version) {
-            showToast('Election has been reset. Reloading...', 'info');
-            setTimeout(() => {
-                sessionStorage.clear();
-                location.reload();
-            }, 1500);
-            return;
-        }
-
-        state.version = data.version;
-        state.results = data;
-
-        renderStatusBanner(data);
-        renderCharts(data);
-        renderLeaderboard(data);
+        const data = await apiCall(`/api/elections/${state.election.id}/results`);
+        renderResults(data);
     } catch (error) {
-        console.error('Failed to fetch results:', error);
+        console.error('Failed to fetch results', error);
     }
 }
 
-function renderStatusBanner(data) {
-    if (data.totalVotes === 0) {
-        elements.statusBanner.innerHTML = `
-            <div class="status-banner bg-white/5 border border-white/10">
-                <svg class="w-8 h-8 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <div>
-                    <h3 class="text-lg font-semibold text-white">Waiting for Votes</h3>
-                    <p class="text-white/50 text-sm">No votes have been cast yet</p>
-                </div>
-            </div>
-        `;
-        return;
-    }
-
+function renderResults(data) {
     if (data.isTie) {
-        const tiedNames = data.tiedCandidates.map(c => c.name).join(' & ');
-        elements.statusBanner.innerHTML = `
-            <div class="status-banner status-banner-tie">
-                <svg class="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                </svg>
-                <div>
-                    <h3 class="text-lg font-semibold text-amber-400">âš¡ Deadlock / Runoff Required</h3>
-                    <p class="text-white/70 text-sm">${tiedNames} are tied with ${data.tiedCandidates[0].votes} votes each</p>
-                </div>
-            </div>
-        `;
+        elements.resultsBanner.innerHTML = `
+            <div class="p-4 bg-amber-500/20 border border-amber-500/30 rounded-xl flex items-center gap-3">
+                <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <span class="text-white font-medium">Tie detected! Runoff vote recommended.</span>
+            </div>`;
     } else if (data.leader) {
-        elements.statusBanner.innerHTML = `
-            <div class="status-banner status-banner-winner">
-                <svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
-                </svg>
-                <div>
-                    <h3 class="text-lg font-semibold text-green-400">ðŸ† Current Leader: ${data.leader.name}</h3>
-                    <p class="text-white/70 text-sm">${data.leader.votes} votes (${data.leader.percentage}%)</p>
-                </div>
-            </div>
-        `;
+        elements.resultsBanner.innerHTML = `
+            <div class="p-4 bg-green-500/20 border border-green-500/30 rounded-xl flex items-center gap-3">
+                <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
+                <span class="text-white font-medium">Current Leader: ${data.leader.name} (${data.leader.percentage}%)</span>
+            </div>`;
+    } else {
+        elements.resultsBanner.innerHTML = '';
     }
-}
 
-function renderCharts(data) {
+    elements.resultsList.innerHTML = data.candidates.map(c => `
+        <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <div class="flex items-center gap-3">
+                <div class="w-2 h-8 rounded-full" style="background: ${c.color_code}"></div>
+                <span class="text-white font-medium">${c.name}</span>
+            </div>
+            <div class="text-right">
+                <span class="text-white font-bold block">${c.votes}</span>
+                <span class="text-white/50 text-xs">${c.percentage}%</span>
+            </div>
+        </div>
+    `).join('');
+
+    const ctx = elements.resultsChart.getContext('2d');
     const labels = data.candidates.map(c => c.name);
     const votes = data.candidates.map(c => c.votes);
     const colors = data.candidates.map(c => c.color_code);
 
-    elements.totalVotesCenter.innerHTML = `
-        <span class="text-4xl font-bold text-white">${data.totalVotes}</span>
-        <span class="text-white/60 text-sm">Total Votes</span>
-    `;
-
-    if (state.charts.doughnut) {
-        state.charts.doughnut.data.labels = labels;
-        state.charts.doughnut.data.datasets[0].data = votes;
-        state.charts.doughnut.data.datasets[0].backgroundColor = colors;
-        state.charts.doughnut.update('active');
+    if (state.charts.results) {
+        state.charts.results.data.labels = labels;
+        state.charts.results.data.datasets[0].data = votes;
+        state.charts.results.data.datasets[0].backgroundColor = colors;
+        state.charts.results.update();
     } else {
-        state.charts.doughnut = new Chart(elements.doughnutChart, {
+        state.charts.results = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels,
+                labels: labels,
                 datasets: [{
                     data: votes,
                     backgroundColor: colors,
-                    borderColor: 'rgba(15, 23, 42, 0.8)',
-                    borderWidth: 3,
-                    hoverBorderWidth: 0,
-                    hoverOffset: 8
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                cutout: '65%',
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                        titleColor: '#fff',
-                        bodyColor: 'rgba(255, 255, 255, 0.7)',
-                        borderColor: 'rgba(255, 255, 255, 0.1)',
-                        borderWidth: 1,
-                        padding: 12,
-                        cornerRadius: 8,
-                        displayColors: true,
-                        callbacks: {
-                            label: (context) => {
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = total > 0 ? ((context.raw / total) * 100).toFixed(1) : 0;
-                                return ` ${context.raw} votes (${percentage}%)`;
-                            }
-                        }
-                    }
-                },
-                animation: {
-                    animateRotate: true,
-                    animateScale: true
-                }
-            }
-        });
-    }
-
-    if (state.charts.bar) {
-        state.charts.bar.data.labels = labels;
-        state.charts.bar.data.datasets[0].data = votes;
-        state.charts.bar.data.datasets[0].backgroundColor = colors;
-        state.charts.bar.update('active');
-    } else {
-        state.charts.bar = new Chart(elements.barChart, {
-            type: 'bar',
-            data: {
-                labels,
-                datasets: [{
-                    label: 'Votes',
-                    data: votes,
-                    backgroundColor: colors,
-                    borderRadius: 8,
-                    borderSkipped: false
+                    borderWidth: 0
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                indexAxis: 'y',
                 plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                        titleColor: '#fff',
-                        bodyColor: 'rgba(255, 255, 255, 0.7)',
-                        borderColor: 'rgba(255, 255, 255, 0.1)',
-                        borderWidth: 1,
-                        padding: 12,
-                        cornerRadius: 8
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            color: 'rgba(255, 255, 255, 0.05)',
-                            drawBorder: false
-                        },
-                        ticks: {
-                            color: 'rgba(255, 255, 255, 0.5)',
-                            stepSize: 1
-                        }
-                    },
-                    y: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            color: 'rgba(255, 255, 255, 0.7)',
-                            font: {
-                                weight: '500'
-                            }
-                        }
-                    }
-                },
-                animation: {
-                    duration: 500
+                    legend: { display: false }
                 }
             }
         });
     }
 }
 
-function renderLeaderboard(data) {
-    if (data.candidates.length === 0) {
-        elements.leaderboardBody.innerHTML = `
-            <tr>
-                <td colspan="4" class="py-8 text-center text-white/50">No candidates registered</td>
-            </tr>
-        `;
-        return;
-    }
-
-    elements.leaderboardBody.innerHTML = data.candidates.map((candidate, index) => `
-        <tr class="leaderboard-row ${index === 0 ? 'top-1' : ''} ${candidate.fraud_suspected ? 'fraud' : ''}">
-            <td class="py-4 pr-4">
-                <div class="rank-badge">${index + 1}</div>
-            </td>
-            <td class="py-4 pr-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-semibold" style="background: ${candidate.color_code}">
-                        ${getInitials(candidate.name)}
-                    </div>
-                    <span class="text-white font-medium">${candidate.name}</span>
-                    ${candidate.fraud_suspected ? '<span class="fraud-indicator"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>Fraud</span>' : ''}
-                </div>
-            </td>
-            <td class="py-4 pr-4 text-right">
-                <span class="text-white font-semibold">${candidate.votes}</span>
-            </td>
-            <td class="py-4 text-right">
-                <span class="text-white/70">${candidate.percentage}%</span>
-            </td>
-        </tr>
-    `).join('');
-}
-
 function startPolling() {
-    if (state.pollInterval) return;
-
-    state.pollInterval = setInterval(() => {
-        if (state.currentView === 'analytics') {
-            fetchResults();
-        }
-        fetchStatus();
-    }, 3000);
+    if (state.pollInterval) clearInterval(state.pollInterval);
+    state.pollInterval = setInterval(fetchResults, 5000);
 }
 
 function stopPolling() {
@@ -519,22 +383,7 @@ function stopPolling() {
     }
 }
 
-async function fetchStatus() {
-    try {
-        const data = await apiCall('/api/status');
-        elements.electionTitle.textContent = data.electionName || 'Voting System';
-
-        if (state.version !== null && data.version !== state.version) {
-            showToast('Election has been reset. Reloading...', 'info');
-            setTimeout(() => {
-                sessionStorage.clear();
-                location.reload();
-            }, 1500);
-        }
-    } catch (error) {
-        console.error('Failed to fetch status:', error);
-    }
-}
+// ==================== ADMIN DASHBOARD ====================
 
 function openAdminModal() {
     elements.adminModal.classList.remove('hidden');
@@ -546,12 +395,12 @@ function openAdminModal() {
 
 function closeAdminModal() {
     elements.adminModal.classList.add('hidden');
-    state.isAdmin = false;
+    elements.manageElectionModal.classList.add('hidden');
+    elements.electionFormModal.classList.add('hidden');
 }
 
 async function handleAdminLogin(e) {
     e.preventDefault();
-
     const password = elements.adminPassword.value;
 
     try {
@@ -564,450 +413,291 @@ async function handleAdminLogin(e) {
         elements.adminLogin.classList.add('hidden');
         elements.adminPanel.classList.remove('hidden');
 
-        fetchCandidates();
-        updateQuickStats();
-        showToast('Admin access granted', 'success');
+        loadAdminElections();
+        showToast('Welcome back, Admin', 'success');
     } catch (error) {
-        showToast(error.message, 'error');
+        showToast('Invalid password', 'error');
         elements.adminPassword.value = '';
     }
 }
 
-function toggleNewElectionForm(show) {
-    elements.newElectionForm.classList.toggle('hidden', !show);
-}
-
-async function createNewElection() {
-    const electionName = elements.newElectionName.value.trim();
-    const candidatesText = elements.newElectionCandidates.value.trim();
-
-    if (!electionName) {
-        showToast('Please enter an election name', 'error');
-        return;
-    }
-
-    const candidates = candidatesText.split('\n').map(c => c.trim()).filter(c => c);
-
-    if (candidates.length < 2) {
-        showToast('Please add at least 2 candidates', 'error');
-        return;
-    }
-
+async function loadAdminElections() {
     try {
-        await apiCall('/api/admin/reset', {
-            method: 'POST',
-            body: JSON.stringify({ electionName, candidates })
-        });
-
-        showToast('New election created!', 'success');
-        toggleNewElectionForm(false);
-        elements.newElectionName.value = '';
-        elements.newElectionCandidates.value = '';
-        fetchCandidates();
-        fetchStatus();
+        const data = await apiCall('/api/admin/elections');
+        state.adminElections = data.elections;
+        renderAdminElections();
     } catch (error) {
-        showToast(error.message, 'error');
+        showToast('Failed to load elections', 'error');
     }
 }
 
-async function resetElection() {
-    if (!confirm('Are you sure you want to reset the election? This will delete all votes and candidates.')) {
-        return;
-    }
+function renderAdminElections() {
+    elements.adminElectionsList.innerHTML = state.adminElections.map(e => {
+        const statusColors = {
+            'draft': 'bg-gray-500/20 text-gray-400',
+            'open': 'bg-green-500/20 text-green-400',
+            'closed': 'bg-red-500/20 text-red-400'
+        };
 
-    try {
-        await apiCall('/api/admin/reset', {
-            method: 'POST',
-            body: JSON.stringify({})
-        });
-
-        showToast('Election reset successfully', 'success');
-        fetchCandidates();
-        fetchStatus();
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-async function detectFraud() {
-    try {
-        const data = await apiCall('/api/admin/fraud');
-
-        elements.fraudTableSection.classList.remove('hidden');
-
-        elements.fraudTableBody.innerHTML = data.candidates.map(candidate => `
-            <tr class="${candidate.fraud_suspected ? 'bg-red-500/10' : ''}">
-                <td class="py-3 pr-4">
-                    <div class="flex items-center gap-2">
-                        <span class="text-white">${candidate.name}</span>
-                        ${candidate.fraud_suspected ? '<svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>' : ''}
-                    </div>
-                </td>
-                <td class="py-3 pr-4 text-right text-white">${candidate.votes}</td>
-                <td class="py-3 pr-4 text-right text-white">${data.realVoterCount}</td>
-                <td class="py-3 pr-4 text-right">
-                    ${candidate.fraud_suspected ?
-                '<span class="px-2 py-1 bg-red-500/20 text-red-400 rounded text-sm">Fraudulent</span>' :
-                '<span class="px-2 py-1 bg-green-500/20 text-green-400 rounded text-sm">Clean</span>'
-            }
-                </td>
-                <td class="py-3 text-right">
-                    ${candidate.fraud_suspected ?
-                `<button onclick="banCandidate(${candidate.id})" class="px-3 py-1 bg-red-500 hover:bg-red-400 text-white text-sm rounded transition-colors">Ban</button>` :
-                '-'
-            }
-                </td>
-            </tr>
-        `).join('');
-
-        showToast(`Fraud check complete. ${data.candidates.filter(c => c.fraud_suspected).length} suspicious candidates found.`, data.candidates.some(c => c.fraud_suspected) ? 'warning' : 'success');
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-async function banCandidate(id) {
-    if (!confirm('Are you sure you want to ban this candidate?')) {
-        return;
-    }
-
-    try {
-        await apiCall(`/api/admin/ban/${id}`, {
-            method: 'DELETE'
-        });
-
-        showToast('Candidate banned successfully', 'success');
-        fetchCandidates();
-        detectFraud();
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-function updateFakeVoteCandidateSelect() {
-    elements.fakeVoteCandidate.innerHTML = state.candidates.length === 0 ?
-        '<option value="">No candidates</option>' :
-        state.candidates.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-}
-
-async function injectFakeVotes() {
-    const candidateId = parseInt(elements.fakeVoteCandidate.value);
-    const count = parseInt(elements.fakeVoteCount.value);
-
-    if (!candidateId) {
-        showToast('Please select a candidate', 'error');
-        return;
-    }
-
-    try {
-        const data = await apiCall('/api/admin/fake-votes', {
-            method: 'POST',
-            body: JSON.stringify({ candidateId, count })
-        });
-
-        showToast(`Injected ${count} fake votes`, 'warning');
-        fetchCandidates();
-
-        if (data.isTie) {
-            showToast('Tie detected!', 'warning');
-        }
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-async function endElection() {
-    if (!confirm('Are you sure you want to end the election? Voting will be closed and final results displayed.')) {
-        return;
-    }
-
-    try {
-        const data = await apiCall('/api/admin/end-election', {
-            method: 'POST'
-        });
-
-        showToast('Election ended successfully!', 'success');
-        closeAdminModal();
-
-        showFinalResults(data);
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-function showFinalResults(data) {
-    const modal = document.createElement('div');
-    modal.id = 'final-results-modal';
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4';
-    modal.innerHTML = `
-        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm"></div>
-        <div class="relative glass-card p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div class="text-center mb-8">
-                <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
-                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
+        return `
+            <div class="glass-card p-4 hover:bg-white/5 transition-colors cursor-pointer" onclick="manageElection(${e.id})">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="font-bold text-white text-lg">${e.title}</h4>
+                    <span class="px-2 py-1 rounded text-xs font-bold uppercase ${statusColors[e.status]}">${e.status}</span>
                 </div>
-                <h2 class="text-3xl font-bold text-white mb-2">ðŸ† Final Results</h2>
-                <p class="text-white/60">${data.electionName || 'Election'} - Voting Closed</p>
-            </div>
-            
-            ${data.isTie ? `
-                <div class="mb-6 p-4 bg-amber-500/20 border border-amber-500/30 rounded-xl text-center">
-                    <p class="text-amber-400 font-semibold">âš¡ Tie Detected - Runoff Required</p>
-                    <p class="text-white/70 text-sm mt-1">${data.tiedCandidates.map(c => c.name).join(' & ')} are tied</p>
+                <div class="flex items-center gap-4 text-sm text-white/50">
+                    <span class="font-mono bg-white/10 px-2 rounded">${e.code}</span>
+                    <span>${e.total_votes || 0} Votes</span>
+                    <span>${e.candidate_count || 0} Candidates</span>
                 </div>
-            ` : data.leader ? `
-                <div class="mb-6 p-6 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-xl text-center">
-                    <p class="text-green-400 text-sm font-medium mb-2">WINNER</p>
-                    <p class="text-3xl font-bold text-white">${data.leader.name}</p>
-                    <p class="text-white/70 mt-2">${data.leader.votes} votes (${data.leader.percentage}%)</p>
-                </div>
-            ` : ''}
-            
-            <div class="space-y-3 mb-8">
-                <h3 class="text-lg font-semibold text-white">All Results</h3>
-                ${data.candidates.map((c, i) => `
-                    <div class="flex items-center justify-between p-4 rounded-xl ${i === 0 ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/30' : 'bg-white/5'}">                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold" style="background: ${c.color_code}">
-                                ${i + 1}
-                            </div>
-                            <span class="text-white font-medium">${c.name}</span>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-white font-bold">${c.votes}</span>
-                            <span class="text-white/50 ml-2">(${c.percentage}%)</span>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-            
-            <div class="text-center">
-                <p class="text-white/50 text-sm mb-4">Total Votes: ${data.totalVotes}</p>
-                <button onclick="closeFinalResults()" class="px-8 py-3 bg-gradient-to-r from-primary-500 to-accent-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all">
-                    Close
-                </button>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
-}
-
-function closeFinalResults() {
-    const modal = document.getElementById('final-results-modal');
-    if (modal) modal.remove();
-}
-
-function switchAdminTab(tabName) {
-    elements.adminTabs.forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.tab === tabName);
-    });
-
-    const tabs = ['election', 'candidates', 'monitoring', 'testing'];
-    tabs.forEach(tab => {
-        const content = document.getElementById(`tab-${tab}`);
-        if (content) {
-            content.classList.toggle('hidden', tab !== tabName);
-            content.classList.toggle('active', tab === tabName);
-        }
-    });
-
-    if (tabName === 'candidates') {
-        renderCandidatesList();
-    }
-}
-
-async function updateQuickStats() {
-    try {
-        const data = await apiCall('/api/results');
-
-        elements.statTotalVotes.textContent = data.totalVotes || 0;
-        elements.statTotalVoters.textContent = data.totalVotes || 0; // Using votes as proxy
-
-        if (data.isTie && data.tiedCandidates?.length > 0) {
-            elements.statLeader.textContent = 'Tie!';
-        } else if (data.leader) {
-            elements.statLeader.textContent = data.leader.name;
-        } else {
-            elements.statLeader.textContent = '--';
-        }
-
-        const status = await apiCall('/api/status');
-        elements.statStatus.textContent = status.electionStatus || 'Active';
-    } catch (error) {
-        console.error('Failed to update quick stats:', error);
-    }
-}
-
-function renderCandidatesList() {
-    if (!elements.candidatesList) return;
-
-    if (state.candidates.length === 0) {
-        elements.candidatesList.innerHTML = `
-            <div class="text-center py-8 text-white/50">
-                <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                </svg>
-                <p>No candidates registered</p>
             </div>
         `;
-        return;
-    }
-
-    elements.candidatesList.innerHTML = state.candidates.map(candidate => `
-        <div class="candidate-list-item">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold" style="background: ${candidate.color_code}">
-                    ${getInitials(candidate.name)}
-                </div>
-                <div>
-                    <p class="text-white font-medium">${candidate.name}</p>
-                    <p class="text-white/50 text-sm">${candidate.votes || 0} votes</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
-                <button onclick="deleteCandidate(${candidate.id})" class="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors" title="Delete candidate">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-    `).join('');
+    }).join('');
 }
 
-async function addCandidate() {
-    const name = elements.newCandidateName?.value?.trim();
+function openCreateElectionModal() {
+    elements.electionFormModal.classList.remove('hidden');
+    elements.createElectionForm.reset();
+}
 
-    if (!name) {
-        showToast('Please enter a candidate name', 'error');
-        return;
-    }
+async function handleCreateElection(e) {
+    e.preventDefault();
+    console.log('handleCreateElection called'); 
+
+    const title = elements.newElectionTitle.value.trim();
+    const description = elements.newElectionDesc.value.trim();
+    const candidatesText = elements.newElectionCandidates.value.trim();
+    const candidates = candidatesText ? candidatesText.split('\n').map(s => s.trim()).filter(s => s) : [];
+
+    console.log('Form Data:', { title, description, candidates }); // DEBUG
 
     try {
-        await apiCall('/api/admin/candidates', {
+        console.log('Sending API call...'); 
+        await apiCall('/api/admin/elections', {
+            method: 'POST',
+            body: JSON.stringify({ title, description, candidates })
+        });
+        console.log('API call successful'); 
+
+        showToast('Election created successfully', 'success');
+        elements.electionFormModal.classList.add('hidden');
+        loadAdminElections();
+    } catch (error) {
+        console.error('Create failed:', error); 
+        showToast(error.message, 'error');
+    }
+}
+
+async function manageElection(id) {
+    try {
+        const electionList = await apiCall('/api/admin/elections');
+        const election = electionList.elections.find(e => e.id === id);
+        if (!election) return;
+
+        state.managingElection = election;
+
+        elements.manageTitle.textContent = election.title;
+        elements.manageCode.textContent = election.code;
+        elements.manageTotalVotes.textContent = election.total_votes || 0;
+        elements.manageRealVoters.textContent = election.voter_count || 0;
+
+        updateStatusButton(election.status);
+
+        loadManageCandidates(id);
+
+        elements.manageElectionModal.classList.remove('hidden');
+
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+function updateStatusButton(status) {
+    const btn = elements.btnToggleStatus;
+    if (status === 'draft') {
+        btn.textContent = 'Start Election';
+        btn.className = 'w-full py-2 bg-green-500 hover:bg-green-400 text-black font-bold rounded-lg transition-colors';
+        btn.onclick = () => updateElectionStatus('open');
+    } else if (status === 'open') {
+        btn.textContent = 'Close Election';
+        btn.className = 'w-full py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-lg transition-colors';
+        btn.onclick = () => updateElectionStatus('closed');
+    } else {
+        btn.textContent = 'Re-open Election';
+        btn.className = 'w-full py-2 border border-white/20 text-white rounded-lg hover:bg-white/10 transition-colors';
+        btn.onclick = () => updateElectionStatus('open');
+    }
+}
+
+async function updateElectionStatus(status) {
+    if (!state.managingElection) return;
+    try {
+        await apiCall(`/api/admin/elections/${state.managingElection.id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status })
+        });
+        showToast(`Election is now ${status}`, 'success');
+        manageElection(state.managingElection.id);
+        loadAdminElections();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function loadManageCandidates(electionId) {
+    try {
+        const data = await apiCall(`/api/elections/${electionId}/candidates`);
+        elements.manageCandidatesList.innerHTML = data.candidates.map(c => `
+             <div class="flex items-center justify-between bg-white/5 p-2 rounded-lg">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-8 rounded-full" style="background: ${c.color_code}"></div>
+                    <span class="text-white">${c.name}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-white/50 text-sm">${c.votes} votes</span>
+                    <button onclick="adminSimulateVotes(${c.id})" class="text-primary-400 hover:text-primary-300" title="Simulate Votes">
+                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                    </button>
+                    <button onclick="adminDeleteCandidate(${c.id})" class="text-red-400 hover:text-red-300" title="Delete Candidate">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+async function handleAddCandidate(e) {
+    e.preventDefault();
+    if (!state.managingElection) return;
+
+    const name = elements.addCandidateName.value.trim();
+    if (!name) return;
+
+    try {
+        await apiCall(`/api/admin/elections/${state.managingElection.id}/candidates`, {
             method: 'POST',
             body: JSON.stringify({ name })
         });
-
-        showToast(`Candidate "${name}" added!`, 'success');
-        elements.newCandidateName.value = '';
-        toggleAddCandidateForm(false);
-        await fetchCandidates();
-        renderCandidatesList();
-        updateQuickStats();
+        elements.addCandidateName.value = '';
+        loadManageCandidates(state.managingElection.id);
+        showToast('Candidate added', 'success');
     } catch (error) {
         showToast(error.message, 'error');
     }
 }
 
-async function deleteCandidate(id) {
-    if (!confirm('Are you sure you want to delete this candidate? This will also remove all their votes.')) {
+async function adminDeleteCandidate(id) {
+    if (!confirm('Delete this candidate and all their votes?')) return;
+    try {
+        await apiCall(`/api/admin/candidates/${id}`, { method: 'DELETE' });
+        loadManageCandidates(state.managingElection.id);
+        showToast('Candidate deleted', 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function deleteCurrentElection() {
+    if (!state.managingElection) return;
+    const confirmCode = state.managingElection.code.substring(0, 4);
+    const input = prompt(`To delete "${state.managingElection.title}", type the first 4 chars of its code: ${confirmCode}`);
+
+    if (input !== confirmCode) {
+        showToast('Confirmation failed', 'error');
         return;
     }
 
     try {
-        await apiCall(`/api/admin/ban/${id}`, {
-            method: 'DELETE'
-        });
-
-        showToast('Candidate deleted', 'success');
-        await fetchCandidates();
-        renderCandidatesList();
-        updateQuickStats();
+        await apiCall(`/api/admin/elections/${state.managingElection.id}`, { method: 'DELETE' });
+        showToast('Election deleted', 'success');
+        elements.manageElectionModal.classList.add('hidden');
+        loadAdminElections();
     } catch (error) {
         showToast(error.message, 'error');
     }
 }
 
-function toggleAddCandidateForm(show) {
-    if (elements.addCandidateForm) {
-        elements.addCandidateForm.classList.toggle('hidden', !show);
-        if (show && elements.newCandidateName) {
-            elements.newCandidateName.focus();
+window.runFraudDetection = async () => {
+    if (!state.managingElection) return;
+    try {
+        const data = await apiCall(`/api/admin/elections/${state.managingElection.id}/fraud`);
+        const susCandidates = data.candidates.filter(c => c.fraud_suspected);
+
+        if (susCandidates.length > 0) {
+            elements.fraudAlertContainer.innerHTML = `
+                <div class="mt-2 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
+                    <p class="text-red-400 font-bold mb-1">Suspicious Activity Detected</p>
+                    <ul class="text-sm text-white/70 list-disc list-inside">
+                        ${susCandidates.map(c => `<li>${c.name} has more votes than real voters</li>`).join('')}
+                    </ul>
+                </div>
+           `;
+        } else {
+            elements.fraudAlertContainer.innerHTML = `
+                <div class="mt-2 p-3 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm">
+                    No fraud detected.
+                </div>
+           `;
+            setTimeout(() => elements.fraudAlertContainer.innerHTML = '', 3000);
         }
+    } catch (error) {
+        showToast(error.message, 'error');
     }
-}
+};
 
-function setupTestingTabToggle() {
-    document.addEventListener('keydown', (e) => {
-        if (e.ctrlKey && e.shiftKey && e.key === 'T') {
-            e.preventDefault();
-            if (elements.testingTabBtn) {
-                const isHidden = elements.testingTabBtn.classList.contains('hidden');
-                elements.testingTabBtn.classList.toggle('hidden', !isHidden);
-                showToast(isHidden ? 'Testing mode enabled' : 'Testing mode disabled', 'info');
-            }
-        }
-    });
-}
+elements.electionCodeForm.addEventListener('submit', handleCodeSubmit);
+elements.registrationForm.addEventListener('submit', handleVoterRegistration);
+elements.btnHome.addEventListener('click', () => switchView('entry'));
+elements.btnRefreshResults.addEventListener('click', fetchResults);
 
-elements.btnVoterView.addEventListener('click', () => switchView('voter'));
-elements.btnAnalyticsView.addEventListener('click', () => switchView('analytics'));
-elements.btnAdmin.addEventListener('click', openAdminModal);
-
-elements.registrationForm.addEventListener('submit', handleRegistration);
-
-elements.adminModalBackdrop.addEventListener('click', closeAdminModal);
+elements.btnAdminLogin.addEventListener('click', openAdminModal);
 elements.adminModalClose.addEventListener('click', closeAdminModal);
 elements.adminPanelClose.addEventListener('click', closeAdminModal);
 elements.adminLoginForm.addEventListener('submit', handleAdminLogin);
 
-elements.btnNewElection.addEventListener('click', () => toggleNewElectionForm(true));
-elements.btnCancelElection.addEventListener('click', () => toggleNewElectionForm(false));
-elements.btnCreateElection.addEventListener('click', createNewElection);
-elements.btnEndElection.addEventListener('click', endElection);
-elements.btnReset.addEventListener('click', resetElection);
-elements.btnDetectFraud.addEventListener('click', () => {
-    detectFraud();
-    if (elements.noFraudData) {
-        elements.noFraudData.classList.add('hidden');
+elements.btnCreateElectionModal.addEventListener('click', openCreateElectionModal);
+elements.btnCancelCreate.addEventListener('click', () => elements.electionFormModal.classList.add('hidden'));
+elements.createElectionForm.addEventListener('submit', handleCreateElection);
+
+elements.btnCloseManage.addEventListener('click', () => elements.manageElectionModal.classList.add('hidden'));
+elements.addCandidateForm.addEventListener('submit', handleAddCandidate);
+elements.btnCheckFraud.addEventListener('click', window.runFraudDetection);
+elements.btnDeleteElection.addEventListener('click', deleteCurrentElection);
+
+elements.btnCopyCode.addEventListener('click', () => {
+    navigator.clipboard.writeText(elements.manageCode.textContent);
+    showToast('Code copied to clipboard', 'info');
+});
+
+elements.btnRegenCode.addEventListener('click', async () => {
+    if (!state.managingElection || !confirm('Regenerate code? The old code will stop working.')) return;
+    try {
+        const data = await apiCall(`/api/admin/elections/${state.managingElection.id}/regenerate-code`, { method: 'POST' });
+        elements.manageCode.textContent = data.code;
+        showToast('New code generated', 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
     }
 });
 
-elements.fakeVoteCount?.addEventListener('input', (e) => {
-    if (elements.fakeVoteCountDisplay) {
-        elements.fakeVoteCountDisplay.textContent = e.target.value;
-    }
-});
-elements.btnInjectVotes?.addEventListener('click', injectFakeVotes);
-
-elements.adminTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-        switchAdminTab(tab.dataset.tab);
-    });
-});
-
-elements.btnAddCandidate?.addEventListener('click', () => toggleAddCandidateForm(true));
-elements.btnCancelAddCandidate?.addEventListener('click', () => toggleAddCandidateForm(false));
-elements.btnConfirmAddCandidate?.addEventListener('click', addCandidate);
-
-elements.newCandidateName?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        addCandidate();
-    }
-});
-
-async function init() {
-    const savedVoter = sessionStorage.getItem('voter');
-    if (savedVoter) {
-        state.voter = JSON.parse(savedVoter);
-        showVotingSection();
-    }
-
-    await fetchStatus();
-    await fetchCandidates();
-
-    setupTestingTabToggle();
-
-    startPolling();
-}
-
+// Init
 window.castVote = castVote;
-window.banCandidate = banCandidate;
-window.closeFinalResults = closeFinalResults;
-window.deleteCandidate = deleteCandidate;
+window.adminDeleteCandidate = adminDeleteCandidate;
+window.adminSimulateVotes = async (candidateId) => {
+    const count = parseInt(prompt('How many fake votes to add? (1-1000)', '10'));
+    if (!count || isNaN(count)) return;
 
-init();
+    try {
+        await apiCall(`/api/admin/elections/${state.managingElection.id}/fake-votes`, {
+            method: 'POST',
+            body: JSON.stringify({ candidateId, count })
+        });
+        showToast(`Added ${count} fake votes`, 'success');
+        manageElection(state.managingElection.id); // Refresh
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+};

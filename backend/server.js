@@ -16,29 +16,60 @@ db.initializeDatabase().then(() => {
     console.error('Database initialization error:', err);
 });
 
+// ==================== PUBLIC ENDPOINTS ====================
 
 app.get('/api/status', async (req, res) => {
     try {
-        const [electionName, electionStatus, isTie, version] = await Promise.all([
-            db.getSetting('election_name'),
-            db.getSetting('election_status'),
-            db.getSetting('is_tie'),
-            db.getSetting('version')
-        ]);
-
         res.json({
-            electionName,
-            electionStatus,
-            isTie: isTie === 'true',
-            version: parseInt(version) || 1
+            status: 'online',
+            system: 'VotingSystem v2.0'
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.post('/api/register', async (req, res) => {
+// Join election via code
+app.post('/api/elections/join', async (req, res) => {
     try {
+        const { code } = req.body;
+        if (!code) return res.status(400).json({ error: 'Election code is required' });
+
+        const election = await db.getElectionByCode(code);
+
+        if (!election) {
+            return res.status(404).json({ error: 'Election not found. Please check the code.' });
+        }
+
+        if (election.status === 'closed') {
+            return res.status(403).json({ error: 'This election is closed.' });
+        }
+
+        if (election.status === 'draft') {
+            return res.status(403).json({ error: 'This election has not started yet.' });
+        }
+
+        res.json({ success: true, election });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get candidates for an election
+app.get('/api/elections/:id/candidates', async (req, res) => {
+    try {
+        const electionId = parseInt(req.params.id);
+        const candidates = await db.getCandidatesByElection(electionId);
+        res.json({ candidates });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Register voter for an election (check age/name)
+app.post('/api/elections/:id/register', async (req, res) => {
+    try {
+        const electionId = parseInt(req.params.id);
         const { name, age } = req.body;
 
         if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -49,79 +80,68 @@ app.post('/api/register', async (req, res) => {
             return res.status(400).json({ error: 'You must be at least 18 years old to vote' });
         }
 
-        const voter = await db.addVoter(name.trim(), age, false);
+        // We don't check for existing voter name here to allow same names,
+        // duplicate prevention is done via session/local storage on client 
+        // and per-session voting. In a real system, we'd have auth.
+        // The unique constraint in DB is (election_id, voter_id), 
+        // so we just return success and let client handle the voting step.
+
+        // Just create a voter record for this session
+        const voter = await db.addVoter(electionId, name.trim(), age, false);
+
         res.json({
             success: true,
             voter,
-            message: 'Age verified! You can vote'
+            message: 'Registration successful'
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.get('/api/candidates', async (req, res) => {
+// Cast vote
+app.post('/api/elections/:id/vote', async (req, res) => {
     try {
-        const candidates = await db.getAllCandidates();
-        res.json({ candidates });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/vote', async (req, res) => {
-    try {
+        const electionId = parseInt(req.params.id);
         const { candidateId, voterId } = req.body;
 
-        if (!candidateId) {
-            return res.status(400).json({ error: 'Candidate ID is required' });
+        if (!candidateId || !voterId) {
+            return res.status(400).json({ error: 'Missing candidate or voter ID' });
         }
 
         const candidate = await db.getCandidateById(candidateId);
-        if (!candidate) {
-            return res.status(404).json({ error: 'Candidate not found' });
+        if (!candidate || candidate.election_id !== electionId) {
+            return res.status(400).json({ error: 'Invalid candidate for this election' });
         }
 
-        await db.incrementVote(candidateId);
+        await db.recordVote(electionId, voterId, candidateId);
 
-        const tieResult = await db.checkForTie();
-        const updatedCandidate = await db.getCandidateById(candidateId);
+        const results = await db.getElectionResults(electionId);
 
         res.json({
             success: true,
             message: `Vote cast for ${candidate.name}`,
-            candidate: updatedCandidate,
-            ...tieResult
+            isTie: results.isTie
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(400).json({ error: err.message }); // 400 for duplicate vote
     }
 });
 
-app.get('/api/results', async (req, res) => {
+// Get results (public, but frontend may restrict visibility)
+app.get('/api/elections/:id/results', async (req, res) => {
     try {
-        const candidates = await db.getAllCandidates();
-        const tieResult = await db.checkForTie();
-        const totalVotes = candidates.reduce((sum, c) => sum + c.votes, 0);
-        const version = await db.getSetting('version');
-
-        const resultsWithPercentages = candidates.map(c => ({
-            ...c,
-            percentage: totalVotes > 0 ? ((c.votes / totalVotes) * 100).toFixed(1) : 0
-        }));
-
-        res.json({
-            candidates: resultsWithPercentages,
-            totalVotes,
-            version: parseInt(version) || 1,
-            ...tieResult
-        });
+        const electionId = parseInt(req.params.id);
+        const results = await db.getElectionResults(electionId);
+        res.json(results);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
+// ==================== ADMIN ENDPOINTS ====================
 
+// Admin Login
 app.post('/api/admin/login', async (req, res) => {
     try {
         const { password } = req.body;
@@ -137,154 +157,156 @@ app.post('/api/admin/login', async (req, res) => {
     }
 });
 
-app.post('/api/admin/reset', async (req, res) => {
+// Get all elections
+app.get('/api/admin/elections', async (req, res) => {
     try {
-        const { electionName, candidates } = req.body;
+        const elections = await db.getAllElections();
 
-        await db.resetElection();
+        // Enhance with stats
+        const electionsWithStats = await Promise.all(elections.map(async (e) => {
+            const stats = await db.getElectionStats(e.id);
+            return { ...e, ...stats };
+        }));
 
-        if (electionName) {
-            await db.setSetting('election_name', electionName);
-        }
+        res.json({ elections: electionsWithStats });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
+// Create election
+app.post('/api/admin/elections', async (req, res) => {
+    try {
+        const { title, description, candidates } = req.body;
+
+        if (!title) return res.status(400).json({ error: 'Election title is required' });
+
+        const election = await db.createElection(title, description);
+
+        // Add initial candidates if provided
         if (candidates && Array.isArray(candidates)) {
             for (const name of candidates) {
-                await db.addCandidate(name);
+                if (name && name.trim()) {
+                    await db.addCandidateToElection(election.id, name.trim());
+                }
             }
         }
 
-        const version = await db.getSetting('version');
-
-        res.json({
-            success: true,
-            message: 'Election reset successfully',
-            version: parseInt(version)
-        });
+        res.json({ success: true, election });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.delete('/api/admin/ban/:id', async (req, res) => {
+// Update election details
+app.put('/api/admin/elections/:id', async (req, res) => {
     try {
-        const { id } = req.params;
-        const candidate = await db.getCandidateById(parseInt(id));
+        const id = parseInt(req.params.id);
+        const updates = req.body;
 
-        if (!candidate) {
-            return res.status(404).json({ error: 'Candidate not found' });
-        }
+        await db.updateElection(id, updates);
+        const election = await db.getElectionById(id);
 
-        await db.deleteCandidate(parseInt(id));
-
-        res.json({
-            success: true,
-            message: `Candidate ${candidate.name} has been banned`
-        });
+        res.json({ success: true, election });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.post('/api/admin/fake-votes', async (req, res) => {
+// Update election status
+app.patch('/api/admin/elections/:id/status', async (req, res) => {
     try {
-        const { candidateId, count } = req.body;
+        const id = parseInt(req.params.id);
+        const { status } = req.body;
 
-        if (!candidateId || !count || count < 1 || count > 100) {
-            return res.status(400).json({ error: 'Invalid candidate ID or vote count (1-100)' });
-        }
-
-        const result = await db.addFakeVotes(candidateId, count);
-        const updatedCandidate = await db.getCandidateById(candidateId);
-        const tieResult = await db.checkForTie();
-
-        res.json({
-            success: true,
-            message: `Added ${count} fake votes`,
-            candidate: updatedCandidate,
-            ...tieResult
-        });
+        await db.updateElectionStatus(id, status);
+        res.json({ success: true, status });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.get('/api/admin/fraud', async (req, res) => {
+// Regenerate code
+app.post('/api/admin/elections/:id/regenerate-code', async (req, res) => {
     try {
-        const fraudData = await db.detectFraud();
-        res.json(fraudData);
+        const id = parseInt(req.params.id);
+        const newCode = await db.regenerateElectionCode(id);
+        res.json({ success: true, code: newCode });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.post('/api/admin/candidates', async (req, res) => {
+// Delete election
+app.delete('/api/admin/elections/:id', async (req, res) => {
     try {
+        const id = parseInt(req.params.id);
+        await db.deleteElection(id);
+        res.json({ success: true, message: 'Election deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Add candidate to election
+app.post('/api/admin/elections/:id/candidates', async (req, res) => {
+    try {
+        const electionId = parseInt(req.params.id);
         const { name } = req.body;
 
-        if (!name || typeof name !== 'string' || name.trim().length === 0) {
-            return res.status(400).json({ error: 'Candidate name is required' });
-        }
+        if (!name) return res.status(400).json({ error: 'Candidate name is required' });
 
-        const candidate = await db.addCandidate(name.trim());
-        res.json({
-            success: true,
-            candidate
-        });
+        const candidate = await db.addCandidateToElection(electionId, name);
+        res.json({ success: true, candidate });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.patch('/api/admin/settings', async (req, res) => {
+// Delete candidate
+app.delete('/api/admin/candidates/:id', async (req, res) => {
     try {
-        const { electionName, electionStatus } = req.body;
-
-        if (electionName) {
-            await db.setSetting('election_name', electionName);
-        }
-
-        if (electionStatus && ['OPEN', 'CLOSED', 'PAUSED'].includes(electionStatus)) {
-            await db.setSetting('election_status', electionStatus);
-        }
-
-        res.json({ success: true, message: 'Settings updated' });
+        const id = parseInt(req.params.id);
+        await db.deleteCandidate(id);
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.post('/api/admin/end-election', async (req, res) => {
+// Inject fake votes (testing/demo)
+app.post('/api/admin/elections/:id/fake-votes', async (req, res) => {
     try {
-        await db.setSetting('election_status', 'CLOSED');
+        const electionId = parseInt(req.params.id);
+        const { candidateId, count } = req.body;
 
-        const candidates = await db.getAllCandidates();
-        const tieResult = await db.checkForTie();
-        const totalVotes = candidates.reduce((sum, c) => sum + c.votes, 0);
-        const electionName = await db.getSetting('election_name');
+        await db.addFakeVotes(electionId, candidateId, count);
+        const results = await db.getElectionResults(electionId);
 
-        const resultsWithPercentages = candidates.map(c => ({
-            ...c,
-            percentage: totalVotes > 0 ? ((c.votes / totalVotes) * 100).toFixed(1) : '0.0'
-        }));
-
-        res.json({
-            success: true,
-            message: 'Election ended successfully',
-            electionName,
-            candidates: resultsWithPercentages,
-            totalVotes,
-            ...tieResult,
-            electionStatus: 'CLOSED'
-        });
+        res.json({ success: true, ...results });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
+// Fraud detection
+app.get('/api/admin/elections/:id/fraud', async (req, res) => {
+    try {
+        const electionId = parseInt(req.params.id);
+        const data = await db.detectFraud(electionId);
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// Serve frontend
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
+    res.sendFile(path.join(__dirname, '../frontend/index.html'));
 });
 
 app.listen(PORT, () => {
     console.log(`🗳️  Voting System running at http://localhost:${PORT}`);
+    console.log(`Prepared for multiple elections.`);
 });
