@@ -40,6 +40,7 @@ const elements = {
     voterGreeting: document.getElementById('voter-greeting'),
     candidateGrid: document.getElementById('candidate-grid'),
     noCandidates: document.getElementById('no-candidates'),
+    electionTimer: document.getElementById('election-timer'),
 
     // Analytics
     analyticsSection: document.getElementById('analytics-section'),
@@ -68,6 +69,8 @@ const elements = {
     newElectionTitle: document.getElementById('new-election-title'),
     newElectionDesc: document.getElementById('new-election-desc'),
     newElectionCandidates: document.getElementById('new-election-candidates'),
+    newElectionStart: document.getElementById('new-election-start'),
+    newElectionEnd: document.getElementById('new-election-end'),
     btnCancelCreate: document.getElementById('btn-cancel-create'),
 
     // Manage Election Modal
@@ -205,6 +208,62 @@ function showVotingSection() {
 
     fetchElectionCandidates();
     startPolling(); // Auto-refresh results
+    startTimer(); // Start countdown
+}
+
+let timerInterval;
+
+function startTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    updateTimer();
+    timerInterval = setInterval(updateTimer, 1000);
+}
+
+function updateTimer() {
+    if (!state.election) return;
+    const { start_date, end_date, status } = state.election;
+    const now = new Date().getTime();
+
+    const timerEl = elements.electionTimer;
+    timerEl.classList.remove('hidden');
+
+    if (status === 'closed') {
+        timerEl.textContent = 'ELECTION ENDED';
+        timerEl.className = 'mt-4 inline-block px-4 py-2 bg-red-500/20 text-red-400 rounded-full font-mono font-bold';
+        return;
+    }
+
+    if (start_date) {
+        const start = new Date(start_date).getTime();
+        if (now < start) {
+            const diff = start - now;
+            timerEl.textContent = `Starts in: ${formatTime(diff)}`;
+            timerEl.className = 'mt-4 inline-block px-4 py-2 bg-amber-500/20 text-amber-400 rounded-full font-mono font-bold';
+            return;
+        }
+    }
+
+    if (end_date) {
+        const end = new Date(end_date).getTime();
+        if (now < end) {
+            const diff = end - now;
+            timerEl.textContent = `Time left: ${formatTime(diff)}`;
+            timerEl.className = 'mt-4 inline-block px-4 py-2 bg-green-500/20 text-green-400 rounded-full font-mono font-bold';
+        } else {
+            timerEl.textContent = 'Time Expired - Closing...';
+            timerEl.className = 'mt-4 inline-block px-4 py-2 bg-red-500/20 text-red-400 rounded-full font-mono font-bold';
+        }
+    } else {
+        timerEl.textContent = 'LIVE';
+        timerEl.className = 'mt-4 inline-block px-4 py-2 bg-green-500/20 text-green-400 rounded-full font-mono font-bold';
+    }
+}
+
+function formatTime(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 async function handleVoterRegistration(e) {
@@ -212,11 +271,12 @@ async function handleVoterRegistration(e) {
 
     const name = elements.voterName.value.trim();
     const age = parseInt(elements.voterAge.value);
+    const identifier = document.getElementById('voter-id').value.trim();
 
     try {
         const data = await apiCall(`/api/elections/${state.election.id}/register`, {
             method: 'POST',
-            body: JSON.stringify({ name, age })
+            body: JSON.stringify({ name, age, identifier })
         });
 
         state.voter = data.voter;
@@ -303,6 +363,16 @@ async function fetchResults() {
     if (!state.election) return;
     try {
         const data = await apiCall(`/api/elections/${state.election.id}/results`);
+        // Update local election state if changed (e.g. closed)
+        if (data.election && state.election) {
+            if (data.election.status !== state.election.status) {
+                state.election.status = data.election.status;
+                updateTimer();
+                if (state.election.status === 'closed') {
+                    showToast('Election has ended', 'info');
+                }
+            }
+        }
         renderResults(data);
     } catch (error) {
         console.error('Failed to fetch results', error);
@@ -310,17 +380,34 @@ async function fetchResults() {
 }
 
 function renderResults(data) {
-    if (data.isTie) {
+    const isEnded = data.election.status === 'closed';
+
+    if (!isEnded) {
+        elements.resultsBanner.innerHTML = `
+            <div class="p-4 bg-blue-500/20 border border-blue-500/30 rounded-xl flex items-center gap-3">
+                <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="text-white">
+                    <p class="font-bold">Provisional Results</p>
+                    <p class="text-sm opacity-70">Results are provisional until the election ends.</p>
+                </div>
+            </div>`;
+    } else if (data.isTie) {
         elements.resultsBanner.innerHTML = `
             <div class="p-4 bg-amber-500/20 border border-amber-500/30 rounded-xl flex items-center gap-3">
-                <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                <span class="text-white font-medium">Tie detected! Runoff vote recommended.</span>
+                <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="text-white">
+                    <p class="font-bold">Tie Detected</p>
+                    <p class="text-sm opacity-70">A runoff election has been automatically created.</p>
+                </div>
             </div>`;
     } else if (data.leader) {
         elements.resultsBanner.innerHTML = `
             <div class="p-4 bg-green-500/20 border border-green-500/30 rounded-xl flex items-center gap-3">
                 <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
-                <span class="text-white font-medium">Current Leader: ${data.leader.name} (${data.leader.percentage}%)</span>
+                <div class="text-white">
+                    <p class="font-bold">Winner: ${data.leader.name}</p>
+                    <p class="text-sm opacity-70">With ${data.leader.votes} votes (${data.leader.percentage}%)</p>
+                </div>
             </div>`;
     } else {
         elements.resultsBanner.innerHTML = '';
@@ -462,28 +549,30 @@ function openCreateElectionModal() {
 
 async function handleCreateElection(e) {
     e.preventDefault();
-    console.log('handleCreateElection called'); 
+    console.log('handleCreateElection called');
 
     const title = elements.newElectionTitle.value.trim();
     const description = elements.newElectionDesc.value.trim();
     const candidatesText = elements.newElectionCandidates.value.trim();
+    const start_date = elements.newElectionStart.value;
+    const end_date = elements.newElectionEnd.value;
     const candidates = candidatesText ? candidatesText.split('\n').map(s => s.trim()).filter(s => s) : [];
 
-    console.log('Form Data:', { title, description, candidates }); // DEBUG
+    console.log('Form Data:', { title, description, candidates, start_date, end_date }); // DEBUG
 
     try {
-        console.log('Sending API call...'); 
+        console.log('Sending API call...');
         await apiCall('/api/admin/elections', {
             method: 'POST',
-            body: JSON.stringify({ title, description, candidates })
+            body: JSON.stringify({ title, description, candidates, start_date, end_date })
         });
-        console.log('API call successful'); 
+        console.log('API call successful');
 
         showToast('Election created successfully', 'success');
         elements.electionFormModal.classList.add('hidden');
         loadAdminElections();
     } catch (error) {
-        console.error('Create failed:', error); 
+        console.error('Create failed:', error);
         showToast(error.message, 'error');
     }
 }
@@ -700,4 +789,4 @@ window.adminSimulateVotes = async (candidateId) => {
     } catch (error) {
         showToast(error.message, 'error');
     }
-};
+}

@@ -23,6 +23,7 @@ function generateElectionCode() {
 function initializeDatabase() {
     return new Promise((resolve, reject) => {
         db.serialize(() => {
+            // Tables
             db.run(`
                 CREATE TABLE IF NOT EXISTS elections (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,6 +33,7 @@ function initializeDatabase() {
                     status TEXT DEFAULT 'draft',
                     start_date DATETIME,
                     end_date DATETIME,
+                    round INTEGER DEFAULT 1,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             `);
@@ -55,9 +57,11 @@ function initializeDatabase() {
                     election_id INTEGER,
                     name TEXT NOT NULL,
                     age INTEGER,
+                    identifier TEXT,
                     is_fake BOOLEAN DEFAULT 0,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (election_id) REFERENCES elections(id) ON DELETE CASCADE
+                    FOREIGN KEY (election_id) REFERENCES elections(id) ON DELETE CASCADE,
+                    UNIQUE(election_id, identifier)
                 )
             `);
 
@@ -81,6 +85,21 @@ function initializeDatabase() {
                     value TEXT
                 )
             `);
+
+            // Schema Migrations (safely add columns if missing in existing DB)
+            const migrations = [
+                'ALTER TABLE elections ADD COLUMN round INTEGER DEFAULT 1',
+                'ALTER TABLE voters ADD COLUMN identifier TEXT'
+            ];
+
+            migrations.forEach(query => {
+                db.run(query, (err) => {
+                    // Ignore "duplicate column name" errors
+                    if (err && !err.message.includes('duplicate column name')) {
+                        console.warn('Migration warning:', err.message);
+                    }
+                });
+            });
 
             const defaults = [
                 ['admin_password', process.env.ADMIN_PASSWORD || 'admin']
@@ -116,7 +135,7 @@ function setSetting(key, value) {
 
 // ==================== ELECTIONS ====================
 
-function createElection(title, description = '', startDate = null, endDate = null) {
+function createElection(title, description = '', startDate = null, endDate = null, round = 1) {
     return new Promise(async (resolve, reject) => {
         try {
             let code = generateElectionCode();
@@ -130,9 +149,9 @@ function createElection(title, description = '', startDate = null, endDate = nul
             }
 
             db.run(
-                `INSERT INTO elections (title, description, code, status, start_date, end_date) 
-                 VALUES (?, ?, ?, 'draft', ?, ?)`,
-                [title, description, code, startDate, endDate],
+                `INSERT INTO elections (title, description, code, status, start_date, end_date, round) 
+                 VALUES (?, ?, ?, 'draft', ?, ?, ?)`,
+                [title, description, code, startDate, endDate, round],
                 function (err) {
                     if (err) reject(err);
                     else resolve({
@@ -142,7 +161,8 @@ function createElection(title, description = '', startDate = null, endDate = nul
                         code,
                         status: 'draft',
                         start_date: startDate,
-                        end_date: endDate
+                        end_date: endDate,
+                        round
                     });
                 }
             );
@@ -329,14 +349,20 @@ function incrementVote(candidateId) {
 
 // ==================== VOTERS & VOTING ====================
 
-function addVoter(electionId, name, age, isFake = false) {
+function addVoter(electionId, name, age, identifier = null, isFake = false) {
     return new Promise((resolve, reject) => {
         db.run(
-            'INSERT INTO voters (election_id, name, age, is_fake) VALUES (?, ?, ?, ?)',
-            [electionId, name, age, isFake ? 1 : 0],
+            'INSERT INTO voters (election_id, name, age, identifier, is_fake) VALUES (?, ?, ?, ?, ?)',
+            [electionId, name, age, identifier, isFake ? 1 : 0],
             function (err) {
-                if (err) reject(err);
-                else resolve({ id: this.lastID, election_id: electionId, name, age });
+                if (err) {
+                    if (err.message.includes('UNIQUE constraint failed')) {
+                        reject(new Error('This ID has already been used to vote in this election.'));
+                    } else {
+                        reject(err);
+                    }
+                }
+                else resolve({ id: this.lastID, election_id: electionId, name, age, identifier });
             }
         );
     });
@@ -403,8 +429,24 @@ function countRealVoters(electionId) {
 function getElectionResults(electionId) {
     return new Promise(async (resolve, reject) => {
         try {
-            const candidates = await getCandidatesByElection(electionId);
             const election = await getElectionById(electionId);
+            if (!election) return reject(new Error('Election not found'));
+
+            // Auto-Close Logic
+            const now = new Date();
+            let justClosed = false;
+
+            if (election.status === 'open' && election.end_date) {
+                const endDate = new Date(election.end_date);
+                if (now > endDate) {
+                    console.log(`[Auto-Close] Closing election ${electionId} (Time expired)`);
+                    await updateElectionStatus(electionId, 'closed');
+                    election.status = 'closed';
+                    justClosed = true;
+                }
+            }
+
+            const candidates = await getCandidatesByElection(electionId);
             const totalVotes = candidates.reduce((sum, c) => sum + c.votes, 0);
 
             const resultsWithPercentages = candidates.map(c => ({
@@ -419,6 +461,8 @@ function getElectionResults(electionId) {
             if (candidates.length >= 2 && candidates[0].votes > 0) {
                 const maxVotes = candidates[0].votes;
                 const topCandidates = candidates.filter(c => c.votes === maxVotes);
+
+                // Tie if more than 1 candidate has maxVotes
                 isTie = topCandidates.length > 1;
 
                 if (isTie) {
@@ -431,6 +475,12 @@ function getElectionResults(electionId) {
                 }
             }
 
+            // Auto-Runoff Logic
+            if (justClosed && isTie) {
+                console.log(`[Auto-Runoff] Tie detected in election ${electionId}, creating runoff...`);
+                await createRunoffElection(election, tiedCandidates);
+            }
+
             resolve({
                 election,
                 candidates: resultsWithPercentages,
@@ -441,6 +491,38 @@ function getElectionResults(electionId) {
             });
         } catch (err) {
             reject(err);
+        }
+    });
+}
+
+function createRunoffElection(originalElection, tiedCandidates) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const newTitle = `[Runoff] ${originalElection.title}`;
+            // Set start now, end in 24h by default for runoff (or same duration as original)
+            // For simplicity, let's default to 1 hour for runoffs in this demo context
+            const now = new Date();
+            const endDate = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour
+
+            const runoff = await createElection(
+                newTitle,
+                `Runoff for election #${originalElection.id}`,
+                now.toISOString(),
+                endDate.toISOString(),
+                (originalElection.round || 1) + 1
+            );
+
+            // Copy tied candidates
+            for (const cand of tiedCandidates) {
+                await addCandidateToElection(runoff.id, cand.name);
+            }
+
+            // Auto-open the runoff
+            await updateElectionStatus(runoff.id, 'open');
+            resolve(runoff);
+        } catch (e) {
+            console.error('Failed to create runoff', e);
+            resolve(null); // Don't fail the results fetch
         }
     });
 }

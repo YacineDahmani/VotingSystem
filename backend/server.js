@@ -70,7 +70,7 @@ app.get('/api/elections/:id/candidates', async (req, res) => {
 app.post('/api/elections/:id/register', async (req, res) => {
     try {
         const electionId = parseInt(req.params.id);
-        const { name, age } = req.body;
+        const { name, age, identifier } = req.body;
 
         if (!name || typeof name !== 'string' || name.trim().length === 0) {
             return res.status(400).json({ error: 'Name is required' });
@@ -80,14 +80,12 @@ app.post('/api/elections/:id/register', async (req, res) => {
             return res.status(400).json({ error: 'You must be at least 18 years old to vote' });
         }
 
-        // We don't check for existing voter name here to allow same names,
-        // duplicate prevention is done via session/local storage on client 
-        // and per-session voting. In a real system, we'd have auth.
-        // The unique constraint in DB is (election_id, voter_id), 
-        // so we just return success and let client handle the voting step.
+        if (!identifier || typeof identifier !== 'string') {
+            return res.status(400).json({ error: 'Voter ID is required' });
+        }
 
         // Just create a voter record for this session
-        const voter = await db.addVoter(electionId, name.trim(), age, false);
+        const voter = await db.addVoter(electionId, name.trim(), age, identifier.trim(), false);
 
         res.json({
             success: true,
@@ -112,6 +110,19 @@ app.post('/api/elections/:id/vote', async (req, res) => {
         const candidate = await db.getCandidateById(candidateId);
         if (!candidate || candidate.election_id !== electionId) {
             return res.status(400).json({ error: 'Invalid candidate for this election' });
+        }
+
+        const election = await db.getElectionById(electionId);
+        if (election.status !== 'open') {
+            return res.status(403).json({ error: 'Election is not open' });
+        }
+
+        const now = new Date();
+        if (election.start_date && now < new Date(election.start_date)) {
+            return res.status(403).json({ error: 'Election has not started yet' });
+        }
+        if (election.end_date && now > new Date(election.end_date)) {
+            return res.status(403).json({ error: 'Election has ended' });
         }
 
         await db.recordVote(electionId, voterId, candidateId);
@@ -177,11 +188,11 @@ app.get('/api/admin/elections', async (req, res) => {
 // Create election
 app.post('/api/admin/elections', async (req, res) => {
     try {
-        const { title, description, candidates } = req.body;
+        const { title, description, candidates, start_date, end_date } = req.body;
 
         if (!title) return res.status(400).json({ error: 'Election title is required' });
 
-        const election = await db.createElection(title, description);
+        const election = await db.createElection(title, description, start_date, end_date);
 
         // Add initial candidates if provided
         if (candidates && Array.isArray(candidates)) {
