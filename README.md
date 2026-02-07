@@ -64,6 +64,6 @@ Admin features are accessible via the `/admin` route or the "Admin Access" butto
 
 ## 📝 Notes
 
-- The system uses an SQLite database (`voting_v2.db`) which is automatically generated in the `backend` folder on the first run.
+- The system uses an SQLite database (`voting.db`) which is automatically generated in the `backend` folder on the first run.
 - Ensure both backend and frontend are running simultaneously for full functionality.
 - The backend is configured to serve the production build of the frontend from the `frontend/dist` folder if available.
