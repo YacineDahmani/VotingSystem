@@ -1,59 +1,69 @@
-# Voting System (Web Version)
+# Modern Voting System
 
-This project is a web-based implementation of a voting system, serving as the modern evolution of a previous C-based program (`votingsystem.c`). It features a Node.js/Express backend with an SQLite database and a vanilla JavaScript/HTML/CSS frontend.
+A feature-rich, full-stack web application for managing and participating in secure elections. This project is a modern evolution of a classic voting system, rebuilt with a React frontend and a Node.js/SQLite backend.
 
-## Project Structure
+## 🚀 Key Features
 
-- **frontend/**: Contains the user interface (HTML, CSS, JavaScript).
-- **backend/**: Contains the server logic (Node.js), database handling, and API endpoints.
+- **Election Management**: Create and manage multiple elections simultaneously.
+- **Secure Access**: Per-election join codes for voters and admin-only dashboard access.
+- **Automated Timers**: Schedule elections with precise start and end times.
+- **Smart Runoffs**: Automated tie-breaking logic with runoff election support.
+- **Interactive Results**: Real-time data visualization using Recharts.
+- **Modern UI**: Fully responsive design built with React 19, Tailwind CSS, and Lucide icons.
+- **Fraud Detection**: Admin tools to monitor and manage voting integrity.
 
-## Features
+## 🛠️ Tech Stack
 
-- **Voter Registration**: Users can register with their name and age (must be 18+).
-- **Voting**: Secure voting mechanism where users select a candidate.
-- **Real-time Results**: View current vote counts and percentages.
-- **Admin Dashboard**: Special capabilities for election management (reset election, ban candidates, fake votes for testing, fraud detection).
+### Frontend
+- **Framework**: React 19 (Vite)
+- **Styling**: Tailwind CSS
+- **Data Fetching**: TanStack Query (React Query)
+- **Routing**: React Router 7
+- **Visualization**: Recharts
+- **Icons**: Lucide React
 
-## Prerequisites
+### Backend
+- **Runtime**: Node.js
+- **Framework**: Express.js
+- **Database**: SQLite3
+- **Communication**: REST API with CORS enabled
 
-- [Node.js](https://nodejs.org/) (v14 or higher recommended)
-- npm (Node Package Manager)
+## 📂 Project Structure
 
-## Installation & Setup
+- **`frontend/`**: React application source code, components, and assets.
+- **`backend/`**: Node.js server, database schema, and API logic.
 
-1.  Clone the repository:
-    ```bash
-    git clone <repository-url>
-    cd VotingSystem
-    ```
+## 📥 Installation & Setup
 
-2.  Navigate to the backend directory and install dependencies:
-    ```bash
-    cd backend
-    npm install
-    ```
+### 1. Clone the repository
+```bash
+git clone <repository-url>
+cd VotingSystem
+```
 
-## Running the Application
+### 2. Backend Setup
+```bash
+cd backend
+npm install
+npm start
+```
+The backend will run on `http://localhost:3000`.
 
-1.  Start the server from the `backend` directory:
-    ```bash
-    npm start
-    ```
-    Or directly:
-    ```bash
-    node server.js
-    ```
+### 3. Frontend Setup
+```bash
+cd ../frontend
+npm install
+npm run dev
+```
+The frontend will typically be available at `http://localhost:5173`.
 
-2.  Open your web browser and visit:
-    ```
-    http://localhost:3000
-    ```
+## 🔐 Admin Access
 
-## Admin Access
+Admin features are accessible via the `/admin` route or the "Admin Access" button on the landing page. 
+- **Default Password**: `admin` (Can be configured via `ADMIN_PASSWORD` environment variable)
 
-The default admin password is configured in the database initialization (default: `admin`).
+## 📝 Notes
 
-## Notes
-
-- The system uses an SQLite database (`voting.db`) which is created automatically in the `backend` folder if it doesn't exist.
-- `.gitignore` is configured to exclude the database file and `node_modules`.
+- The system uses an SQLite database (`voting_v2.db`) which is automatically generated in the `backend` folder on the first run.
+- Ensure both backend and frontend are running simultaneously for full functionality.
+- The backend is configured to serve the production build of the frontend from the `frontend/dist` folder if available.
