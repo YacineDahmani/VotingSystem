@@ -157,13 +157,31 @@ export default function VotingBooth() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Live Results</CardTitle>
+                        <CardTitle>{election.status === 'closed' ? 'Final Results' : 'Election Status'}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <ResultsChart candidates={candidates} totalVotes={electionData.totalVotes} realVoterCount={electionData.totalVotes} />
-                        {/* passing totalVotes as realVoterCount just for vis if backend doesn't send it in this payload, 
-                        actually fetchElection (results) returns electionData which might NOT have realVoterCount unless we fetch it. 
-                        Safe default. */}
+                        {election.status === 'closed' ? (
+                            <ResultsChart candidates={candidates} totalVotes={electionData.totalVotes} realVoterCount={electionData.totalVotes} />
+                        ) : (
+                            <div className="text-center py-12 space-y-4">
+                                <div className="bg-slate-800/50 rounded-full p-4 w-16 h-16 mx-auto flex items-center justify-center mb-4">
+                                    <span className="text-2xl">🔒</span>
+                                </div>
+                                <h3 className="text-xl font-semibold text-slate-200">Results Hidden</h3>
+                                <p className="text-slate-400 max-w-md mx-auto">
+                                    To ensure fairness, detailed results are hidden until the election concludes.
+                                </p>
+                                <div className="pt-4">
+                                    <div className="inline-block bg-slate-800 px-6 py-3 rounded-lg border border-slate-700">
+                                        <p className="text-sm text-slate-500 uppercase tracking-wider font-semibold">Total Votes Cast</p>
+                                        <p className="text-3xl font-bold text-sky-500">{electionData.totalVotes}</p>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-slate-600 pt-4">
+                                    Please check back after <strong>{new Date(election.end_date).toLocaleString()}</strong>
+                                </p>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
