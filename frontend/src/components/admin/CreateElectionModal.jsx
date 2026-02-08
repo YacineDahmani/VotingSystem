@@ -7,12 +7,20 @@ import { X } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
 
 export function CreateElectionModal({ isOpen, onClose }) {
-    const [formData, setFormData] = useState({
-        title: '',
-        description: '',
-        candidates: '',
-        start_date: '',
-        end_date: ''
+    const [formData, setFormData] = useState(() => {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        return {
+            title: '',
+            description: '',
+            candidates: '',
+            start_date: now.toISOString().slice(0, 16),
+            end_date: tomorrow.toISOString().slice(0, 16)
+        };
     });
 
     const createMutation = useCreateElection();
