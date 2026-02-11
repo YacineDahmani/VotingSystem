@@ -1,6 +1,6 @@
 # Modern Voting System
 
-A feature-rich, full-stack web application for managing and participating in secure elections. This project is a modern evolution of a classic voting system, rebuilt with a React frontend and a Node.js/SQLite backend.
+A feature-rich, full-stack web application for managing and participating in secure elections. This project is a modern evolution of a classic voting system, rebuilt with a React frontend and a Node.js/SQLite backend, Inspired by the voting system I made with C 
 
 ## 🚀 Key Features
 
