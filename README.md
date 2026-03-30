@@ -1,29 +1,62 @@
 # Voting System
 
-A full-stack voting experience built around the "Analog Swiss" The interface is designed as a tactile ceremony: a sliding voter strip, gravity-style ballot drop, a pendulum waiting room, and a blueprint-like admin surface.
+An immersive full-stack voting experience inspired by the "Analog Swiss" concept. The interface is built like a physical ceremony: a sliding voter strip, a gravity-style ballot drop, a pendulum waiting room, and a blueprint-like admin console.
 
 ## Overview
 
-The app is split into two distinct journeys.
+The app is split into two main journeys:
 
 - Voter flow: enter identity details, submit a unique code, cast a ballot, then wait on the pendulum view while results settle.
 - Admin flow: unlock the blueprint layer with a master key, tune influence, inject test votes when needed, and close polls to reveal the outcome.
 
-## Visual Direction
+## Project Structure
 
-- User palette: eggshell white with strong black typography and inset paper-like depth.
-- Admin palette: blueprint blue with technical grid lines and architectural controls.
-- Motion language: horizontal strip slides, drag-and-drop ballot deposits, pendulum kicks, and an unfolding reveal for results.
+```text
+VotingSystem/
+├─ backend/
+│  ├─ server.js
+│  ├─ database.js
+│  ├─ middleware/
+│  ├─ routes/
+│  └─ services/
+├─ frontend/
+│  ├─ src/
+│  │  ├─ App.jsx
+│  │  ├─ components/
+│  │  ├─ features/
+│  │  ├─ hooks/
+│  │  ├─ lib/
+│  │  └─ styles/
+│  ├─ public/
+│  └─ vite.config.js
+├─ README.md
+```
 
-## Repository Layout
+## Tech Stack
 
-- [backend/](backend/) contains the Node.js server, routes, middleware, and realtime services.
-- [frontend/](frontend/) contains the Vite React application, feature modules, hooks, and styles.
-- [The Analog Swiss Voting System.txt](The%20Analog%20Swiss%20Voting%20System.txt) is the UX source spec for the current design direction.
+- Backend: Node.js, Express, Socket.IO, SQLite
+- Frontend: React, Vite
+- Authentication and election state are handled through the backend API and realtime events
 
-## Local Setup
+## Setup
 
-1. Install backend dependencies and start the API:
+### 1. Configure the admin master key
+
+The backend requires `ADMIN_MASTER_KEY` at startup. This value becomes the default admin password and is also stored in the database on first run.
+
+Example for PowerShell:
+
+```powershell
+$env:ADMIN_MASTER_KEY='your-admin-code-here'
+```
+
+You can also set `JWT_SECRET` if you want to replace the development default token secret:
+
+```powershell
+$env:JWT_SECRET='your-jwt-secret'
+```
+
+### 2. Start the backend
 
 ```bash
 cd backend
@@ -31,7 +64,9 @@ npm install
 npm start
 ```
 
-2. Install frontend dependencies and start the UI:
+The API runs on `http://localhost:3000` by default.
+
+### 3. Start the frontend
 
 ```bash
 cd frontend
@@ -39,11 +74,21 @@ npm install
 npm run dev
 ```
 
-3. Open the frontend in the browser, then verify the backend is available to the frontend API layer.
+Open the Vite URL shown in the terminal, then verify the frontend can reach the backend API.
 
-## GitHub Repository
+## Admin Code
 
-This project is intended to live at [YacineDahmani/VotingSystem](https://github.com/YacineDahmani/VotingSystem).
+The admin code is not hard-coded in the frontend. It is controlled by the `ADMIN_MASTER_KEY` environment variable on the backend.
+
+- Set `ADMIN_MASTER_KEY` before launching the server.
+- Use the same value whenever you want the default admin password to be created or refreshed in a clean database.
+- If the variable is missing, the backend exits during startup with a clear error.
+
+## Visual Direction
+
+- User palette: eggshell white with strong black typography and inset paper-like depth.
+- Admin palette: blueprint blue with technical grid lines and architectural controls.
+- Motion language: horizontal strip slides, drag-and-drop ballot deposits, pendulum kicks, and an unfolding reveal for results.
 
 ## Notes
 
