@@ -149,8 +149,29 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
 
             await db.addFakeVotes(electionId, candidateId, parsedCount);
             const results = await emitElectionUpdate(electionId, 'vote:kick');
+            const integrity = await db.getElectionIntegrityReport(electionId);
 
-            return res.json({ success: true, ...results });
+            return res.json({ success: true, ...results, integrity });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.get('/elections/:id/integrity-report', async (req, res) => {
+        try {
+            const electionId = Number.parseInt(req.params.id, 10);
+            const data = await db.getElectionIntegrityReport(electionId);
+            return res.json(data);
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.get('/elections/:id/fake-voters', async (req, res) => {
+        try {
+            const electionId = Number.parseInt(req.params.id, 10);
+            const data = await db.getFakeVoterAudit(electionId);
+            return res.json(data);
         } catch (err) {
             return res.status(500).json({ error: err.message });
         }

@@ -21,6 +21,7 @@ export default function CreateElectionView() {
   const [openImmediately, setOpenImmediately] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdSession, setCreatedSession] = useState(null);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -70,7 +71,11 @@ export default function CreateElectionView() {
         await updateElectionStatus(electionId, 'open');
       }
 
-      navigate('/admin');
+      setCreatedSession({
+        id: electionId,
+        title: response.election.title,
+        code: response.election.code,
+      });
     } catch (err) {
       setError(err.message || 'Unable to create election');
     } finally {
@@ -176,6 +181,37 @@ export default function CreateElectionView() {
             Cancel
           </button>
         </div>
+
+        {createdSession ? (
+          <div className="border border-green-700/40 bg-green-50 p-6">
+            <p className="label-md text-green-800 tracking-widest">SESSION CREATED</p>
+            <h3 className="font-muse text-3xl mt-2">{createdSession.title}</h3>
+            <p className="mt-3 text-sm text-gray-700">Share this session code with voters:</p>
+            <p className="font-bold text-2xl tracking-[0.2em] mt-1">{createdSession.code}</p>
+            <div className="mt-4 flex gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(createdSession.code);
+                  } catch {
+                    setError('Unable to copy session code');
+                  }
+                }}
+                className="border border-gray-300 px-5 py-2 uppercase text-xs tracking-widest"
+              >
+                Copy Code
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/admin')}
+                className="bg-[var(--primary)] text-white px-5 py-2 uppercase text-xs tracking-widest"
+              >
+                Go To Session Manager
+              </button>
+            </div>
+          </div>
+        ) : null}
       </form>
     </div>
   );

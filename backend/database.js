@@ -608,6 +608,117 @@ function detectFraud(electionId) {
     });
 }
 
+function getElectionIntegrityReport(electionId) {
+    return new Promise((resolve, reject) => {
+        db.get(
+            `SELECT
+                (SELECT COUNT(*) FROM voters WHERE election_id = ? AND is_fake = 0) AS real_voter_count,
+                (SELECT COUNT(*) FROM voters WHERE election_id = ? AND is_fake = 1) AS fake_voter_count,
+                (SELECT COUNT(*) FROM votes WHERE election_id = ?) AS total_votes,
+                (SELECT COUNT(*) FROM votes vt INNER JOIN voters v ON v.id = vt.voter_id WHERE vt.election_id = ? AND v.is_fake = 0) AS real_votes,
+                (SELECT COUNT(*) FROM votes vt INNER JOIN voters v ON v.id = vt.voter_id WHERE vt.election_id = ? AND v.is_fake = 1) AS fake_votes`,
+            [electionId, electionId, electionId, electionId, electionId],
+            (summaryErr, summaryRow) => {
+                if (summaryErr) {
+                    reject(summaryErr);
+                    return;
+                }
+
+                db.all(
+                    `SELECT
+                        c.id,
+                        c.name,
+                        c.votes,
+                        c.fraud_suspected,
+                        SUM(CASE WHEN v.is_fake = 0 THEN 1 ELSE 0 END) AS real_votes,
+                        SUM(CASE WHEN v.is_fake = 1 THEN 1 ELSE 0 END) AS fake_votes,
+                        COUNT(vt.id) AS total_votes
+                     FROM candidates c
+                     LEFT JOIN votes vt ON vt.candidate_id = c.id AND vt.election_id = ?
+                     LEFT JOIN voters v ON v.id = vt.voter_id
+                     WHERE c.election_id = ?
+                     GROUP BY c.id
+                     ORDER BY total_votes DESC, c.name ASC`,
+                    [electionId, electionId],
+                    (candidateErr, candidateRows) => {
+                        if (candidateErr) {
+                            reject(candidateErr);
+                            return;
+                        }
+
+                        const realVoterCount = summaryRow?.real_voter_count || 0;
+                        const fakeVoterCount = summaryRow?.fake_voter_count || 0;
+                        const totalVotes = summaryRow?.total_votes || 0;
+                        const realVotes = summaryRow?.real_votes || 0;
+                        const fakeVotes = summaryRow?.fake_votes || 0;
+
+                        resolve({
+                            electionId,
+                            realVoterCount,
+                            fakeVoterCount,
+                            totalVotes,
+                            realVotes,
+                            fakeVotes,
+                            overflow: Math.max(0, totalVotes - realVoterCount),
+                            integrityStatus: fakeVotes > 0 ? 'suspect' : 'clean',
+                            candidates: (candidateRows || []).map((row) => ({
+                                id: row.id,
+                                name: row.name,
+                                votes: row.votes,
+                                fraud_suspected: !!row.fraud_suspected,
+                                realVotes: row.real_votes || 0,
+                                fakeVotes: row.fake_votes || 0,
+                                totalVotes: row.total_votes || 0,
+                            })),
+                        });
+                    }
+                );
+            }
+        );
+    });
+}
+
+function getFakeVoterAudit(electionId) {
+    return new Promise((resolve, reject) => {
+        db.all(
+            `SELECT
+                v.id AS voter_id,
+                v.identifier,
+                v.created_at AS voter_created_at,
+                vt.id AS vote_id,
+                vt.created_at AS vote_created_at,
+                vt.candidate_id,
+                c.name AS candidate_name
+             FROM voters v
+             LEFT JOIN votes vt ON vt.voter_id = v.id AND vt.election_id = v.election_id
+             LEFT JOIN candidates c ON c.id = vt.candidate_id
+             WHERE v.election_id = ? AND v.is_fake = 1
+             ORDER BY datetime(v.created_at) DESC, v.id DESC`,
+            [electionId],
+            (err, rows) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+
+                resolve({
+                    electionId,
+                    totalFakeVoters: (rows || []).length,
+                    records: (rows || []).map((row) => ({
+                        voterId: row.voter_id,
+                        identifier: row.identifier,
+                        voterCreatedAt: row.voter_created_at,
+                        voteId: row.vote_id,
+                        voteCreatedAt: row.vote_created_at,
+                        candidateId: row.candidate_id,
+                        candidateName: row.candidate_name,
+                    })),
+                });
+            }
+        );
+    });
+}
+
 function addFakeVotes(electionId, candidateId, count) {
     return new Promise(async (resolve, reject) => {
         const runStatement = (query, params = []) => new Promise((res, rej) => {
@@ -693,5 +804,7 @@ module.exports = {
     getElectionResults,
     detectFraud,
     addFakeVotes,
+    getElectionIntegrityReport,
+    getFakeVoterAudit,
     CHART_COLORS
 };

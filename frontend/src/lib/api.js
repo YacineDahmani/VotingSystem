@@ -112,6 +112,14 @@ export function detectFraud(electionId) {
   return request(`/api/admin/elections/${electionId}/fraud`);
 }
 
+export function getIntegrityReport(electionId) {
+  return request(`/api/admin/elections/${electionId}/integrity-report`);
+}
+
+export function getFakeVoters(electionId) {
+  return request(`/api/admin/elections/${electionId}/fake-voters`);
+}
+
 export function updateElectionStatus(electionId, status) {
   return request(`/api/admin/elections/${electionId}/status`, {
     method: 'PATCH',

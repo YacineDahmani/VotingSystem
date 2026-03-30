@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getActiveElection, getResults } from '../../lib/api';
+import { getActiveElection, getIntegrityReport, getResults } from '../../lib/api';
 import { VOTER_PHASES, clearSession, getSession, isAdminSession, setVoterPhase } from '../../store/session';
 
 export default function ResultsView() {
   const navigate = useNavigate();
   const session = useMemo(() => getSession(), []);
   const [results, setResults] = useState(null);
+  const [integrity, setIntegrity] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -36,6 +37,11 @@ export default function ResultsView() {
 
         if (!isAdminSession(session)) {
           setVoterPhase(VOTER_PHASES.RESULTS);
+        } else {
+          const integrityResponse = await getIntegrityReport(electionId);
+          if (mounted) {
+            setIntegrity(integrityResponse);
+          }
         }
 
         setResults(response);
@@ -66,6 +72,7 @@ export default function ResultsView() {
   }
 
   const distribution = (results?.candidates || []).map((candidate, index) => ({
+    id: candidate.id,
     name: candidate.name,
     percentage: `${candidate.percentage}%`,
     width: `${candidate.percentage}%`,
@@ -111,6 +118,15 @@ export default function ResultsView() {
       </div>
 
       <div className="w-full max-w-6xl mx-auto px-12 relative z-10">
+        {isAdminSession(session) && integrity ? (
+          <div className={`mb-10 border px-6 py-4 ${integrity.integrityStatus === 'clean' ? 'border-green-700 bg-green-50' : 'border-red-700 bg-red-50'}`}>
+            <p className="label-md tracking-widest">INTEGRITY CHECK</p>
+            <p className="text-sm mt-2">
+              Status: <strong>{integrity.integrityStatus === 'clean' ? 'CLEAN' : 'RIGGED'}</strong> | Real Votes: {integrity.realVotes} | Fake Votes: {integrity.fakeVotes}
+            </p>
+          </div>
+        ) : null}
+
         {/* Header section */}
         <div className="mb-24">
           <p className="label-md text-[var(--secondary)] mb-12 tracking-widest font-bold">
@@ -146,6 +162,15 @@ export default function ResultsView() {
                   <h4 className="font-muse italic text-3xl text-gray-500">{candidate.name}</h4>
                   <span className="font-bold text-lg">{candidate.percentage}</span>
                 </div>
+                {isAdminSession(session) && integrity?.candidates ? (
+                  <p className="label-md text-[0.6rem] text-gray-500 mb-2">
+                    {(() => {
+                      const integrityCandidate = integrity.candidates.find((item) => item.id === candidate.id);
+                      if (!integrityCandidate) return 'Real: 0 | Fake: 0';
+                      return `Real: ${integrityCandidate.realVotes} | Fake: ${integrityCandidate.fakeVotes}`;
+                    })()}
+                  </p>
+                ) : null}
                 {/* Carved bar background */}
                 <div className="h-10 w-full bg-[var(--surface-container-high)] shadow-[var(--layer-recessed)] relative overflow-hidden">
                    <div 

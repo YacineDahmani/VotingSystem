@@ -1,53 +1,105 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { deleteCandidate, getAdminElections, getCandidates, injectFakeVotes, updateElectionStatus } from '../../lib/api';
+import {
+  deleteCandidate,
+  deleteElection,
+  getAdminElections,
+  getCandidates,
+  getFakeVoters,
+  getIntegrityReport,
+  injectFakeVotes,
+  regenerateElectionCode,
+  updateElectionStatus,
+} from '../../lib/api';
 import { getSession, isAdminSession } from '../../store/session';
+
+const FILTERS = ['all', 'open', 'draft', 'closed'];
 
 export default function BlueprintGrid() {
   const navigate = useNavigate();
   const session = useMemo(() => getSession(), []);
-  const [election, setElection] = useState(null);
-  const [stats, setStats] = useState({ totalVotes: 0, voterCount: 0 });
+
+  const [elections, setElections] = useState([]);
+  const [selectedElectionId, setSelectedElectionId] = useState(null);
+  const [filter, setFilter] = useState('all');
+
   const [candidates, setCandidates] = useState([]);
-  const [influenceMap, setInfluenceMap] = useState({});
-  const [deletingCandidateId, setDeletingCandidateId] = useState(null);
+  const [injectionMap, setInjectionMap] = useState({});
+  const [integrity, setIntegrity] = useState(null);
+  const [fakeVoterAudit, setFakeVoterAudit] = useState([]);
+
   const [loading, setLoading] = useState(true);
+  const [busyAction, setBusyAction] = useState('');
   const [error, setError] = useState('');
 
-  const loadAdminData = async () => {
-    const electionListResponse = await getAdminElections();
-    const elections = electionListResponse.elections || [];
-    const selectedElection =
-      elections.find((item) => item.status === 'open') ||
-      elections[0] ||
-      null;
+  const filteredElections = useMemo(() => {
+    if (filter === 'all') return elections;
+    return elections.filter((item) => item.status === filter);
+  }, [elections, filter]);
 
-    if (!selectedElection) {
-      setElection(null);
+  const selectedElection = useMemo(
+    () => elections.find((item) => item.id === selectedElectionId) || null,
+    [elections, selectedElectionId]
+  );
+
+  const loadElections = async (preferredElectionId = null) => {
+    const electionListResponse = await getAdminElections();
+    const nextElections = electionListResponse.elections || [];
+    setElections(nextElections);
+
+    if (!nextElections.length) {
+      setSelectedElectionId(null);
+      return null;
+    }
+
+    const preferred = preferredElectionId
+      ? nextElections.find((item) => item.id === preferredElectionId)
+      : null;
+    const open = nextElections.find((item) => item.status === 'open');
+    const fallback = nextElections[0];
+    const nextSelected = preferred || open || fallback;
+
+    setSelectedElectionId(nextSelected?.id || null);
+    return nextSelected;
+  };
+
+  const loadElectionDetails = async (electionId) => {
+    if (!electionId) {
       setCandidates([]);
-      setStats({ totalVotes: 0, voterCount: 0 });
+      setIntegrity(null);
+      setFakeVoterAudit([]);
       return;
     }
 
-    setElection(selectedElection);
-    setStats({
-      totalVotes: selectedElection.totalVotes || 0,
-      voterCount: selectedElection.voterCount || 0,
-    });
+    const [candidateResponse, integrityResponse, fakeVoterResponse] = await Promise.all([
+      getCandidates(electionId),
+      getIntegrityReport(electionId),
+      getFakeVoters(electionId),
+    ]);
 
-    const candidateResponse = await getCandidates(selectedElection.id);
     const nextCandidates = candidateResponse.candidates || [];
     setCandidates(nextCandidates);
+    setIntegrity(integrityResponse || null);
+    setFakeVoterAudit(fakeVoterResponse?.records || []);
 
-    setInfluenceMap((previous) => {
+    setInjectionMap((previous) => {
       const next = { ...previous };
       nextCandidates.forEach((candidate) => {
         if (next[candidate.id] === undefined) {
-          next[candidate.id] = 30;
+          next[candidate.id] = 10;
         }
       });
       return next;
     });
+  };
+
+  const refreshAll = async (preferredElectionId = null) => {
+    const selected = await loadElections(preferredElectionId || selectedElectionId);
+    if (selected?.id) {
+      await loadElectionDetails(selected.id);
+    } else {
+      await loadElectionDetails(null);
+    }
   };
 
   useEffect(() => {
@@ -61,7 +113,7 @@ export default function BlueprintGrid() {
           return;
         }
 
-        await loadAdminData();
+        await refreshAll();
       } catch (err) {
         if (!mounted) return;
         setError(err.message || 'Unable to load admin controls');
@@ -77,188 +129,287 @@ export default function BlueprintGrid() {
     };
   }, [session]);
 
-  const handleInject = async (candidateId) => {
-    if (!election) return;
+  useEffect(() => {
+    if (!selectedElectionId) return;
 
-    const influence = influenceMap[candidateId] || 20;
-    const count = Math.max(1, Math.round(influence / 20));
+    loadElectionDetails(selectedElectionId).catch((err) => {
+      setError(err.message || 'Unable to load election details');
+    });
+  }, [selectedElectionId]);
 
+  const withBusy = async (label, fn) => {
     try {
       setError('');
-      await injectFakeVotes(election.id, { candidateId, count });
-      await loadAdminData();
+      setBusyAction(label);
+      await fn();
     } catch (err) {
-      setError(err.message || 'Injection failed');
+      setError(err.message || 'Action failed');
+    } finally {
+      setBusyAction('');
     }
   };
 
-  const handleClosePolls = async () => {
-    if (!election) return;
-    try {
-      await updateElectionStatus(election.id, 'closed');
-      await loadAdminData();
-    } catch (err) {
-      setError(err.message || 'Unable to close polls');
-    }
+  const handleInject = async (candidateId, candidateName) => {
+    if (!selectedElection) return;
+
+    const rawCount = Number.parseInt(String(injectionMap[candidateId] ?? 10), 10);
+    const count = Math.max(1, Math.min(10000, Number.isNaN(rawCount) ? 1 : rawCount));
+    const confirmed = window.confirm(`Inject ${count} votes into ${candidateName}?`);
+    if (!confirmed) return;
+
+    await withBusy('inject', async () => {
+      await injectFakeVotes(selectedElection.id, { candidateId, count });
+      await refreshAll(selectedElection.id);
+    });
   };
 
   const handleDeleteCandidate = async (candidateId, candidateName) => {
-    if (!election) return;
+    if (!selectedElection) return;
 
-    const confirmed = window.confirm(`Remove ${candidateName} from this election?`);
+    const confirmed = window.confirm(`Remove ${candidateName} from this session?`);
     if (!confirmed) return;
 
-    try {
-      setError('');
-      setDeletingCandidateId(candidateId);
+    await withBusy('delete-candidate', async () => {
       await deleteCandidate(candidateId);
-      await loadAdminData();
-    } catch (err) {
-      setError(err.message || 'Unable to remove candidate');
-    } finally {
-      setDeletingCandidateId(null);
+      await refreshAll(selectedElection.id);
+    });
+  };
+
+  const handleRegenerateCode = async () => {
+    if (!selectedElection) return;
+    await withBusy('regen-code', async () => {
+      await regenerateElectionCode(selectedElection.id);
+      await refreshAll(selectedElection.id);
+    });
+  };
+
+  const handleStatusChange = async (status) => {
+    if (!selectedElection) return;
+    await withBusy(`status-${status}`, async () => {
+      await updateElectionStatus(selectedElection.id, status);
+      await refreshAll(selectedElection.id);
+    });
+  };
+
+  const handleDeleteSession = async () => {
+    if (!selectedElection) return;
+
+    const confirmed = window.confirm(`Delete session "${selectedElection.title}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    await withBusy('delete-session', async () => {
+      await deleteElection(selectedElection.id);
+      await refreshAll(null);
+    });
+  };
+
+  const copySessionCode = async () => {
+    if (!selectedElection?.code) return;
+
+    try {
+      await navigator.clipboard.writeText(selectedElection.code);
+    } catch {
+      setError('Unable to copy session code to clipboard');
     }
   };
 
-  const fakeVoteOverflow = Math.max(0, (stats.totalVotes || 0) - (stats.voterCount || 0));
+  const setInjectionCount = (candidateId, value) => {
+    const parsed = Number.parseInt(String(value), 10);
+    const safe = Number.isNaN(parsed) ? 1 : Math.max(1, Math.min(10000, parsed));
+    setInjectionMap((current) => ({ ...current, [candidateId]: safe }));
+  };
+
+  const bumpInjectionCount = (candidateId, delta) => {
+    const currentValue = Number.parseInt(String(injectionMap[candidateId] ?? 10), 10);
+    const base = Number.isNaN(currentValue) ? 1 : currentValue;
+    setInjectionCount(candidateId, base + delta);
+  };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-white">Loading blueprint...</div>;
+    return <div className="min-h-screen flex items-center justify-center text-white">Loading admin manager...</div>;
   }
 
   return (
-    <div className="min-h-screen text-[var(--on-primary)] relative z-10 -mt-24 pt-32 px-12 pb-24">
-      {/* Header */}
-      <div className="mb-12">
-        <p className="label-md text-white/50 mb-2 tracking-[0.2em]">OPERATIONAL OVERVIEW</p>
-        <h2 className="font-muse font-bold text-7xl text-white">The Blueprint.</h2>
-      </div>
-
-      <div className="grid grid-cols-12 gap-8">
-        
-        {/* Left Panel: Ledger Status */}
-        <div className="col-span-3 bg-white text-[var(--primary)] p-8 relative flex flex-col justify-between shadow-2xl">
-          {/* Tape corner detail */}
-          <div className="absolute top-0 right-0 w-8 h-8 bg-transparent border-t-[16px] border-r-[16px] border-[var(--surface-container-high)] opacity-50" />
-          
-          <div>
-            <p className="label-md text-gray-400 mb-6">SESSION IDENTITY</p>
-            <h3 className="font-muse italic text-2xl">{election ? `EL-${election.id}` : 'NO ACTIVE SESSION'}</h3>
-          </div>
-
-          <div className="space-y-8 mt-48">
-            <div className="flex justify-between items-end border-b border-gray-200 pb-2">
-              <span className="label-md text-gray-500 text-[0.65rem]">AGGREGATE INTENT</span>
-              <span className="font-bold text-4xl leading-none">{stats.totalVotes}</span>
-            </div>
-            <div className="flex justify-between items-end border-b border-gray-200 pb-2">
-              <span className="label-md text-gray-500 text-[0.65rem] text-red-700">UNIQUE CODES ISSUED</span>
-              <span className="font-bold text-3xl leading-none text-red-700">{stats.voterCount}</span>
-            </div>
-            <div className="flex justify-between items-end border-b border-gray-200 pb-2">
-              <span className="label-md text-gray-500 text-[0.65rem]">BALANCE WARNING</span>
-              <span className={`font-bold text-2xl leading-none ${fakeVoteOverflow > 0 ? 'text-red-700' : 'text-green-700'}`}>
-                {fakeVoteOverflow > 0 ? `+${fakeVoteOverflow}` : 'STABLE'}
-              </span>
-            </div>
-          </div>
+    <div className="min-h-screen text-[var(--on-primary)] relative z-10 -mt-24 pt-32 px-8 pb-20">
+      <div className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <p className="label-md text-white/50 mb-2 tracking-[0.2em]">ADMIN CONTROL ROOM</p>
+          <h2 className="font-muse font-bold text-6xl text-white">Session Manager</h2>
         </div>
-
-        {/* Center/Right: Sliders Grid */}
-        <div className="col-span-9 grid grid-cols-3 gap-8 content-start">
-          {candidates.map((candidate, idx) => (
-            <div
-              key={candidate.id}
-              className="bg-white text-[var(--primary)] p-8 relative flex flex-col justify-between h-72 shadow-lg transition-transform"
-              style={{ transform: `perspective(800px) rotateX(${((influenceMap[candidate.id] || 20) - 50) / 10}deg)` }}
-            >
-               <div className="absolute top-0 right-0 w-6 h-6 bg-transparent border-t-[12px] border-r-[12px] border-[var(--surface-container-high)] opacity-50" />
-               <button
-                 onClick={() => handleInject(candidate.id)}
-                 className="absolute top-4 right-4 text-gray-400 hover:text-black"
-                 aria-label={`Inject votes into ${candidate.name}`}
-               >
-                 +
-               </button>
-               <button
-                 onClick={() => handleDeleteCandidate(candidate.id, candidate.name)}
-                 disabled={deletingCandidateId === candidate.id}
-                 className="absolute top-4 left-4 text-gray-400 hover:text-red-700 disabled:opacity-40"
-                 aria-label={`Remove ${candidate.name}`}
-               >
-                 {deletingCandidateId === candidate.id ? '...' : 'x'}
-               </button>
-
-               <div>
-                 <span className="font-muse font-bold text-[5rem] text-gray-200 leading-none -ml-2">{String(idx + 1).padStart(2, '0')}</span>
-                 <h4 className="font-muse text-2xl mt-4 leading-none">{candidate.name}</h4>
-                 <p className="label-md text-gray-400 text-[0.55rem] mt-2">CURRENT VOTES: {candidate.votes}</p>
-               </div>
-
-               <div className="mt-8">
-                 <div className="flex justify-between items-center mb-4">
-                   <p className="label-md text-gray-400 text-[0.5rem] tracking-wider">INFLUENCE DRAFT</p>
-                   <p className="label-md text-gray-500 text-[0.5rem]">{influenceMap[candidate.id] || 20}%</p>
-                 </div>
-                 <p className="label-md text-gray-500 text-[0.5rem] mb-2">
-                   Injection batch: {Math.max(1, Math.round((influenceMap[candidate.id] || 20) / 20))} votes
-                 </p>
-                 <div className="h-1 bg-gray-200 w-full relative">
-                    <div className="h-full bg-black absolute top-0 left-0" style={{ width: `${influenceMap[candidate.id] || 20}%` }} />
-                    <input
-                      type="range"
-                      min="1"
-                      max="100"
-                      value={influenceMap[candidate.id] || 20}
-                      onChange={(event) => {
-                        const value = parseInt(event.target.value, 10);
-                        setInfluenceMap((current) => ({ ...current, [candidate.id]: value }));
-                      }}
-                      className="absolute top-1/2 left-0 w-full -translate-y-1/2 opacity-0 cursor-ew-resize"
-                    />
-                 </div>
-               </div>
-            </div>
-          ))}
-
-          {/* Empty Add Slot */}
+        <div className="flex gap-3 flex-wrap">
           <button
             type="button"
             onClick={() => navigate('/admin/new')}
-            className="border-2 border-dashed border-white/20 p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-white/5 transition-colors h-72"
+            className="bg-white text-[var(--primary)] px-6 py-3 uppercase text-xs tracking-widest"
           >
-             <div className="text-white/40 mb-4">+</div>
-             <p className="label-md text-white/40 tracking-widest text-center">INITIALIZE NEW ENTRY</p>
+            Create Session
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/results')}
+            className="border border-white/60 text-white px-6 py-3 uppercase text-xs tracking-widest hover:bg-white/10 transition-colors"
+          >
+            View Results
           </button>
         </div>
       </div>
 
-      {/* Rigging Protocol Banner */}
-      <div className="mt-12 bg-white text-[var(--primary)] p-12 flex items-center justify-between shadow-xl relative overflow-hidden">
-        <span className="font-muse text-[15rem] leading-none text-gray-100 absolute left-[60%] top-1/2 -translate-y-1/2 select-none pointer-events-none">A</span>
-        
-        <div className="max-w-xl z-10">
-          <h3 className="font-muse italic text-4xl mb-4">The Rigging Protocol</h3>
-          <p className="text-sm text-gray-600 leading-relaxed font-sans">
-            System parameters currently isolated. Influence sliders define the weight of each injection burst, and the plus marker spawns paper scraps directly into candidate tallies.
-          </p>
-          {error ? <p className="label-md text-red-700 mt-4">{error}</p> : null}
-        </div>
+      <div className="grid grid-cols-12 gap-6">
+        <aside className="col-span-12 lg:col-span-4 bg-white text-[var(--primary)] p-6 shadow-xl">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-muse italic text-3xl">Voting Sessions</h3>
+            <span className="label-md text-gray-500">{filteredElections.length}</span>
+          </div>
 
-        <div className="flex flex-col gap-4 z-10 items-end">
-           <button onClick={handleClosePolls} className="bg-red-700 text-white px-8 py-4 uppercase text-xs tracking-widest hover:-translate-y-1 transition-transform shadow-[var(--layer-hover)]">
-             Close Polls
-           </button>
-           <button className="text-[var(--primary)] underline underline-offset-4 decoration-2 text-xs tracking-widest font-bold uppercase hover:text-[var(--secondary)] hover:decoration-[var(--secondary)]">
-             Election: {election ? election.title : 'Unavailable'}
-           </button>
-        </div>
-      </div>
+          <div className="flex gap-2 mb-5 flex-wrap">
+            {FILTERS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setFilter(item)}
+                className={`px-3 py-1 text-[0.65rem] uppercase tracking-wider border ${filter === item ? 'bg-[var(--primary)] text-white' : 'border-gray-300 text-gray-600'}`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
 
-      {/* Footer Details */}
-      <div className="flex justify-between items-center mt-12 text-white/30">
-         <span className="label-md text-[0.55rem]">© 2024 THE EDITORIAL BALLOT — ALL DRAFTS RESERVED</span>
-         <span className="label-md text-[0.55rem]">TERMINAL: 882.11.0 &nbsp;&nbsp;&nbsp; LAT: 52.5200° N, LON: 13.4050° E</span>
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            {filteredElections.map((item) => {
+              const isSelected = item.id === selectedElectionId;
+              return (
+                <button
+                  type="button"
+                  key={item.id}
+                  onClick={() => setSelectedElectionId(item.id)}
+                  className={`w-full text-left border p-4 transition-colors ${isSelected ? 'border-[var(--primary)] bg-[var(--surface-container-low)]' : 'border-gray-200 hover:bg-gray-50'}`}
+                >
+                  <div className="flex justify-between items-start gap-3">
+                    <p className="font-semibold text-sm">{item.title}</p>
+                    <span className={`text-[0.55rem] uppercase tracking-widest ${item.status === 'open' ? 'text-green-700' : item.status === 'closed' ? 'text-gray-500' : 'text-amber-700'}`}>
+                      {item.status}
+                    </span>
+                  </div>
+                  <p className="label-md text-gray-500 mt-2">Session Code: {item.code}</p>
+                  <p className="label-md text-gray-400 mt-1">
+                    Votes {item.totalVotes || 0} | Real IDs {item.voterCount || 0}
+                  </p>
+                </button>
+              );
+            })}
+            {!filteredElections.length ? <p className="text-sm text-gray-500">No sessions for this filter.</p> : null}
+          </div>
+        </aside>
+
+        <section className="col-span-12 lg:col-span-8 space-y-6">
+          <div className="bg-white text-[var(--primary)] p-6 shadow-xl">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="label-md text-gray-500">Selected Session</p>
+                <h3 className="font-muse italic text-4xl">{selectedElection ? selectedElection.title : 'None selected'}</h3>
+                <p className="label-md text-gray-500 mt-2">Code: {selectedElection?.code || '-'}</p>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <button type="button" onClick={copySessionCode} className="border border-gray-300 px-3 py-2 text-[0.65rem] uppercase tracking-widest" disabled={!selectedElection}>Copy Code</button>
+                <button type="button" onClick={handleRegenerateCode} className="border border-gray-300 px-3 py-2 text-[0.65rem] uppercase tracking-widest" disabled={!selectedElection || !!busyAction}>Regenerate Code</button>
+                <button type="button" onClick={() => handleStatusChange('open')} className="border border-green-700 text-green-700 px-3 py-2 text-[0.65rem] uppercase tracking-widest" disabled={!selectedElection || !!busyAction}>Open</button>
+                <button type="button" onClick={() => handleStatusChange('closed')} className="border border-gray-700 text-gray-700 px-3 py-2 text-[0.65rem] uppercase tracking-widest" disabled={!selectedElection || !!busyAction}>Close</button>
+                <button type="button" onClick={() => handleStatusChange('draft')} className="border border-amber-700 text-amber-700 px-3 py-2 text-[0.65rem] uppercase tracking-widest" disabled={!selectedElection || !!busyAction}>Draft</button>
+                <button type="button" onClick={handleDeleteSession} className="border border-red-700 text-red-700 px-3 py-2 text-[0.65rem] uppercase tracking-widest" disabled={!selectedElection || !!busyAction}>Delete</button>
+              </div>
+            </div>
+            {error ? <p className="label-md text-red-700 mt-4">{error}</p> : null}
+          </div>
+
+          <div className="bg-white text-[var(--primary)] p-6 shadow-xl">
+            <h4 className="font-muse italic text-3xl mb-4">Integrity Console</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="border border-gray-200 p-4"><p className="label-md text-gray-500">Total Votes</p><p className="text-3xl font-bold">{integrity?.totalVotes || 0}</p></div>
+              <div className="border border-gray-200 p-4"><p className="label-md text-gray-500">Real Votes</p><p className="text-3xl font-bold text-green-700">{integrity?.realVotes || 0}</p></div>
+              <div className="border border-gray-200 p-4"><p className="label-md text-gray-500">Fake Votes</p><p className="text-3xl font-bold text-red-700">{integrity?.fakeVotes || 0}</p></div>
+              <div className="border border-gray-200 p-4"><p className="label-md text-gray-500">Validity</p><p className={`text-2xl font-bold ${integrity?.integrityStatus === 'clean' ? 'text-green-700' : 'text-red-700'}`}>{integrity?.integrityStatus === 'clean' ? 'CLEAN' : 'RIGGED'}</p></div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(integrity?.candidates || []).map((item) => (
+                <div key={item.id} className="border border-gray-200 p-4">
+                  <div className="flex justify-between items-center">
+                    <p className="font-semibold">{item.name}</p>
+                    {item.fakeVotes > 0 ? <span className="text-[0.6rem] uppercase tracking-widest text-red-700">rigged</span> : <span className="text-[0.6rem] uppercase tracking-widest text-green-700">valid</span>}
+                  </div>
+                  <p className="label-md text-gray-500 mt-2">Real: {item.realVotes} | Fake: {item.fakeVotes} | Total: {item.totalVotes}</p>
+                </div>
+              ))}
+            </div>
+
+            <p className="label-md text-gray-500 mt-4">Fake voter records tracked: {fakeVoterAudit.length}</p>
+          </div>
+
+          <div className="bg-white text-[var(--primary)] p-6 shadow-xl">
+            <h4 className="font-muse italic text-3xl mb-4">Injection Controls</h4>
+            <p className="text-sm text-gray-600 mb-5">
+              Set an exact number of votes to inject. Use quick-step buttons for larger stress tests.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {candidates.map((candidate) => (
+                <div key={candidate.id} className="border border-gray-200 p-4">
+                  <div className="flex justify-between items-center">
+                    <p className="font-semibold">{candidate.name}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCandidate(candidate.id, candidate.name)}
+                      disabled={!!busyAction}
+                      className="text-red-700 text-xs uppercase tracking-widest"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <p className="label-md text-gray-500 mt-1">Current votes: {candidate.votes}</p>
+                  <label className="label-md text-gray-500 mt-3 block">Inject Count</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10000"
+                    value={injectionMap[candidate.id] ?? 10}
+                    onChange={(event) => setInjectionCount(candidate.id, event.target.value)}
+                    className="w-full mt-2 border border-gray-300 px-3 py-2"
+                  />
+                  <div className="mt-3 flex gap-2 flex-wrap">
+                    {[10, 25, 50, 100].map((step) => (
+                      <button
+                        key={step}
+                        type="button"
+                        onClick={() => bumpInjectionCount(candidate.id, step)}
+                        className="border border-gray-300 px-2 py-1 text-[0.65rem] uppercase tracking-widest"
+                      >
+                        +{step}
+                      </button>
+                    ))}
+                    {[10, 25].map((step) => (
+                      <button
+                        key={`minus-${step}`}
+                        type="button"
+                        onClick={() => bumpInjectionCount(candidate.id, -step)}
+                        className="border border-gray-300 px-2 py-1 text-[0.65rem] uppercase tracking-widest"
+                      >
+                        -{step}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleInject(candidate.id, candidate.name)}
+                    disabled={!!busyAction}
+                    className="mt-3 bg-[var(--primary)] text-white w-full py-2 uppercase text-xs tracking-widest"
+                  >
+                    Inject
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

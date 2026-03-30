@@ -32,32 +32,64 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
 
     router.post('/session/identity', async (req, res) => {
         try {
-            const { name, age, code } = req.body;
-            const normalizedCode = typeof code === 'string' ? code.trim() : '';
+            const {
+                name,
+                age,
+                sessionCode,
+                voterIdCode,
+                adminKey,
+                code,
+            } = req.body;
 
-            if (!normalizedCode) {
-                return res.status(400).json({ error: 'Unique code is required' });
+            const normalizedAdminKey = typeof adminKey === 'string'
+                ? adminKey.trim()
+                : (typeof code === 'string' ? code.trim() : '');
+
+            if (normalizedAdminKey) {
+                if (normalizedAdminKey === adminMasterKey) {
+                    const token = issueAuthToken({ role: 'admin' });
+                    return res.json({ role: 'admin', success: true, token });
+                }
+
+                return res.status(401).json({ error: 'Wrong admin key' });
             }
 
-            if (normalizedCode === adminMasterKey) {
-                const token = issueAuthToken({ role: 'admin' });
-                return res.json({ role: 'admin', success: true, token });
+            const normalizedSessionCode = typeof sessionCode === 'string' ? sessionCode.trim().toUpperCase() : '';
+            const normalizedVoterIdCode = typeof voterIdCode === 'string'
+                ? voterIdCode.trim()
+                : (typeof code === 'string' ? code.trim() : '');
+
+            if (!normalizedSessionCode) {
+                return res.status(400).json({ error: 'Session code is required' });
+            }
+
+            if (!normalizedVoterIdCode) {
+                return res.status(400).json({ error: 'Voter ID code is required' });
             }
 
             if (!name || typeof name !== 'string' || name.trim().length < 2) {
                 return res.status(400).json({ error: 'Name is required' });
             }
 
-            if (!age || typeof age !== 'number' || age < 18) {
+            const parsedAge = Number.parseInt(age, 10);
+            if (Number.isNaN(parsedAge) || parsedAge < 18) {
                 return res.status(400).json({ error: 'You must be at least 18 years old to vote' });
             }
 
-            const election = await db.getActiveElection();
+            const election = await db.getElectionByCode(normalizedSessionCode);
             if (!election) {
-                return res.status(403).json({ error: 'No active election is currently open' });
+                return res.status(404).json({ error: 'Election not found. Please check the session code.' });
             }
 
-            const voter = await db.addVoter(election.id, name.trim(), age, normalizedCode, false);
+            if (election.status === 'closed') {
+                return res.status(403).json({ error: 'This election is closed.' });
+            }
+
+            if (election.status === 'draft') {
+                return res.status(403).json({ error: 'This election has not started yet.' });
+            }
+
+            const voter = await db.addVoter(election.id, name.trim(), parsedAge, normalizedVoterIdCode, false);
             const token = issueAuthToken({
                 role: 'voter',
                 voterId: voter.id,
@@ -70,6 +102,7 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 election,
                 voter,
                 token,
+                sessionCode: election.code,
             });
         } catch (err) {
             return res.status(400).json({ error: err.message });

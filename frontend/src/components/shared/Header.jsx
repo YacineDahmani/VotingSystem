@@ -1,5 +1,4 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Settings } from 'lucide-react';
 import { clsx } from 'clsx';
 import { clearSession, getSession, isAdminSession, isVoterSession } from '../../store/session';
 
@@ -12,11 +11,7 @@ export default function Header() {
   let navItems = [{ label: 'ENTRY', path: '/' }];
 
   if (isAdminSession(session)) {
-    navItems = [
-      { label: 'ADMIN', path: '/admin' },
-      { label: 'CREATE', path: '/admin/new' },
-      { label: 'RESULTS', path: '/results' },
-    ];
+    navItems = [];
   } else if (isVoterSession(session)) {
     navItems = [
       { label: 'BALLOT', path: '/ballot' },
@@ -36,33 +31,42 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed top-0 w-full z-50 px-12 py-8 flex items-center justify-between pointer-events-none">
+    <header
+      className={clsx(
+        "fixed top-0 w-full z-50 px-4 md:px-10 py-4 md:py-6 flex items-center justify-between pointer-events-none border-b",
+        isAdmin
+          ? "bg-[rgba(20,42,63,0.86)] backdrop-blur-md border-white/15"
+          : "bg-[rgba(249,249,249,0.88)] backdrop-blur-md border-black/5"
+      )}
+    >
       <div className="pointer-events-auto">
         <h1 className={clsx("text-2xl font-muse font-bold tracking-tight", isAdmin ? "text-white" : "text-[var(--primary)]")}>
           The Editorial Ballot
         </h1>
       </div>
 
-      <nav className="pointer-events-auto flex items-center space-x-12">
-        <ul className="flex space-x-8">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <li key={item.path}>
-                <Link
-                  to={item.path}
-                  className={clsx(
-                    "label-md transition-colors duration-300",
-                    isAdmin ? "text-white/50 hover:text-white" : "text-[var(--primary-container)] hover:text-[var(--primary)]",
-                    isActive && (isAdmin ? "text-white font-bold" : "text-[var(--primary)] font-bold")
-                  )}
-                >
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+      <nav className="pointer-events-auto flex items-center space-x-6 md:space-x-8">
+        {navItems.length ? (
+          <ul className="hidden md:flex space-x-8">
+            {navItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <li key={item.path}>
+                  <Link
+                    to={item.path}
+                    className={clsx(
+                      "label-md transition-colors duration-300",
+                      isAdmin ? "text-white/50 hover:text-white" : "text-[var(--primary-container)] hover:text-[var(--primary)]",
+                      isActive && (isAdmin ? "text-white font-bold" : "text-[var(--primary)] font-bold")
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
 
         {isAdminSession(session) ? (
           <button
@@ -74,15 +78,6 @@ export default function Header() {
             Exit Admin
           </button>
         ) : null}
-        
-        <button
-          onClick={handleSettingsClick}
-          className={clsx("transition-colors duration-300 hover:rotate-90", isAdmin ? "text-white" : "text-[var(--primary)]")}
-          aria-label={isAdminSession(session) ? 'Exit admin room' : 'Open entry'}
-          title={isAdminSession(session) ? 'Exit admin room' : 'Back to entry'}
-        >
-          <Settings size={20} />
-        </button>
       </nav>
     </header>
   );
