@@ -70,6 +70,25 @@
   }
 }
 
+@keyframes floatingPaper {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  33% {
+    transform: translate(2px, -4px) rotate(1deg);
+  }
+  66% {
+    transform: translate(-2px, 2px) rotate(-1deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+.floating-paper {
+  animation: floatingPaper 15s ease-in-out infinite;
+}
+
 .pendulum-swing {
   transform-origin: top center;
   animation: pendulumSwing var(--pendulum-duration, 2.2s) ease-in-out infinite;
@@ -81,7 +100,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pendulum-swing,
-  .pendulum-bob {
+  .pendulum-bob,
+  .floating-paper {
     animation: none;
   }
 }

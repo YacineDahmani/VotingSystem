@@ -271,38 +271,48 @@ export default function IdentityArchive() {
 
   return (
     <div
-      className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden"
+      className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#f7f7f7]"
       style={isFlipping ? { transform: 'rotateY(180deg)', opacity: 0, transition: 'transform 0.6s ease, opacity 0.6s ease' } : { transition: 'transform 0.6s ease, opacity 0.6s ease' }}
     >
       
       {/* Background massive BALLOT watermark */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
-        <span className="font-muse text-[30vw] leading-none text-black/[0.03] whitespace-nowrap">
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden z-0">
+        <span className="font-muse text-[clamp(10rem,22vw,30rem)] leading-[0.8] text-black/[0.02] whitespace-nowrap uppercase tracking-tighter">
           BALLOT
         </span>
       </div>
 
+      {/* Decorative Paper Fold Bottom Right */}
+      <div className="absolute bottom-0 right-0 w-64 h-64 md:w-96 md:h-96 pointer-events-none z-0 overflow-hidden floating-paper">
+        <div className="absolute inset-0 bg-gradient-to-tl from-black/10 via-black/5 to-transparent transform rotate-12 scale-150 translate-x-1/4 translate-y-1/4 shadow-2xl skew-x-12 mix-blend-multiply" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-white/40 via-transparent to-transparent shadow-inner" />
+        {/* Soft diagonal highlight lines to mimic fold */}
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_40%,rgba(255,255,255,0.8)_45%,rgba(0,0,0,0.05)_50%,transparent_55%)] blur-[2px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_60%,rgba(255,255,255,0.6)_62%,rgba(0,0,0,0.03)_65%,transparent_70%)] blur-[3px]" />
+      </div>
+
       {/* Main Content */}
-      <div className="relative z-10 w-full max-w-2xl flex flex-col items-center">
-        <div className="text-center mb-12">
-          <p className="label-md text-[var(--tertiary-container)] mb-4 tracking-widest font-bold">VERIFICATION PHASE</p>
-          <h2 className="font-muse text-5xl text-[var(--primary)]">Identity Archive</h2>
+      <div className="relative z-10 w-full max-w-2xl flex flex-col items-center mt-12">
+        <div className="text-center mb-8">
+          <p className="label-md text-gray-500 mb-2 tracking-[0.2em] font-bold text-[0.65rem]">VERIFICATION PHASE</p>
+          <h2 className="font-muse text-[2.5rem] md:text-5xl text-black">Identity Archive</h2>
         </div>
 
         <div
-          className="paper-float w-full p-16 flex flex-col items-center"
+          className="bg-white/70 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/60 w-full max-w-xl p-10 md:p-14 flex flex-col items-center relative"
           style={isShaking ? { transform: 'translateX(-4px)', transition: 'transform 0.4s ease' } : {}}
         >
-          <div className="w-full mb-6">
-            <p className="label-md text-gray-500 mb-3">ENTRY MODE</p>
-            <div className="grid grid-cols-2 gap-3">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-black/5 to-transparent"></div>
+          
+          <div className="w-full mb-8 relative z-20">
+            <div className="flex items-center gap-6 mb-4">
               <button
                 type="button"
                 onClick={() => {
                   setEntryMode('voter');
                   setError('');
                 }}
-                className={`py-3 uppercase text-xs tracking-widest border ${entryMode === 'voter' ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'border-gray-300 text-gray-600'}`}
+                className={`uppercase text-[0.65rem] tracking-[0.2em] pb-1 border-b-2 transition-all duration-300 ${entryMode === 'voter' ? 'text-black border-black font-bold' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
                 disabled={isSubmitting}
               >
                 Voter Entry
@@ -313,7 +323,7 @@ export default function IdentityArchive() {
                   setEntryMode('admin');
                   setError('');
                 }}
-                className={`py-3 uppercase text-xs tracking-widest border ${entryMode === 'admin' ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'border-gray-300 text-gray-600'}`}
+                className={`uppercase text-[0.65rem] tracking-[0.2em] pb-1 border-b-2 transition-all duration-300 ${entryMode === 'admin' ? 'text-black border-black font-bold' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
                 disabled={isSubmitting}
               >
                 Admin Entry
@@ -321,22 +331,20 @@ export default function IdentityArchive() {
             </div>
           </div>
 
-          <div className="w-full border-t border-dashed border-gray-300 mb-6" />
-
           {entryMode === 'voter' ? (
             <>
-              <div className="w-full mb-8 overflow-hidden">
+              <div className="w-full mb-8 overflow-hidden relative z-20">
                 <div
                   className="flex"
-                  style={{ transform: `translateX(-${stepIndex * 100}%)`, transition: 'transform 0.42s cubic-bezier(0.22, 1, 0.36, 1)' }}
+                  style={{ transform: `translateX(-${stepIndex * 100}%)`, transition: 'transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)' }}
                 >
                   {steps.map((step) => (
-                    <div key={step.label} className="w-full shrink-0 pr-2">
-                      <label className="label-md text-gray-500 mb-4 pl-1 block">{step.label}</label>
+                    <div key={step.label} className="w-full shrink-0 px-1">
+                      <label className="uppercase text-[0.6rem] tracking-[0.2em] text-gray-400 mb-3 block">{step.label}</label>
                       <input
                         type={step.type}
                         placeholder={step.placeholder}
-                        className={`w-full p-6 text-xl tracking-widest font-grotesque ${step.type === 'date' ? '' : 'uppercase'} bg-[var(--surface-container-high)] shadow-[var(--layer-recessed)] text-[var(--primary)] placeholder-gray-400 focus:outline-none focus:bg-[var(--surface-container-highest)] transition-colors`}
+                        className={`w-full p-4 md:p-5 text-lg md:text-xl tracking-widest font-muse ${step.type === 'date' ? '' : 'uppercase'} bg-[#f0f0f0] text-black placeholder-gray-400 focus:outline-none focus:bg-[#e8e8e8] transition-colors border-none`}
                         value={step.value}
                         onChange={(e) => step.onChange(e.target.value)}
                         onKeyDown={handleKeyDown}
@@ -347,41 +355,43 @@ export default function IdentityArchive() {
                 </div>
               </div>
 
-              <div className="w-full flex items-center justify-between mb-4">
-                <p className="label-md text-gray-400">STEP {stepIndex + 1} / {steps.length}</p>
-                {error ? <p className="label-md text-red-700">{error}</p> : null}
+              <div className="w-full flex items-center justify-between mb-6 h-4 relative z-20">
+                <p className="uppercase text-[0.6rem] tracking-[0.2em] text-gray-400">STEP {stepIndex + 1}</p>
+                {error ? <p className="uppercase text-[0.6rem] tracking-[0.1em] text-red-600 absolute right-0 bg-white/90 pl-2">{error}</p> : null}
               </div>
 
-              <div className="w-full flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  disabled={isSubmitting || stepIndex === 0}
-                  className="px-6 py-4 border border-gray-300 text-[var(--primary)] label-md tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  PREVIOUS
-                </button>
+              <div className="w-full flex items-center justify-end relative z-20">
+                {stepIndex > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    disabled={isSubmitting}
+                    className="mr-auto text-[0.65rem] uppercase tracking-[0.2em] text-gray-400 hover:text-black transition-colors"
+                  >
+                    Previous
+                  </button>
+                )}
 
                 <button
                   onClick={handleAdvance}
                   disabled={isSubmitting}
-                  className="group bg-[var(--primary)] text-white px-8 py-5 flex items-center gap-4 hover:shadow-[var(--layer-hover)] hover:-translate-y-[2px] transition-all duration-300"
+                  className="group bg-[#1a1c1c] text-white px-6 py-4 flex items-center gap-4 hover:bg-black transition-all duration-300"
                 >
-                  <span className="label-md text-white tracking-widest">
+                  <span className="text-[0.65rem] uppercase tracking-[0.2em]">
                     {isSubmitting ? 'VERIFYING' : stepIndex < steps.length - 1 ? 'NEXT SEQUENCE' : 'ENTER CHAMBER'}
                   </span>
-                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
             </>
           ) : (
             <>
-              <div className="w-full mb-4">
-                <label className="label-md text-gray-500 mb-2 pl-1 block">ADMIN MASTER KEY</label>
+              <div className="w-full mb-6 relative z-20">
+                <label className="uppercase text-[0.6rem] tracking-[0.2em] text-gray-400 mb-3 block">ADMIN MASTER KEY</label>
                 <input
                   type="password"
-                  placeholder="ENTER ADMIN MASTER KEY"
-                  className="w-full p-6 text-xl tracking-widest font-grotesque uppercase bg-[var(--surface-container-high)] shadow-[var(--layer-recessed)] text-[var(--primary)] placeholder-gray-400 focus:outline-none focus:bg-[var(--surface-container-highest)] transition-colors"
+                  placeholder=""
+                  className="w-full p-4 text-xl tracking-widest font-muse uppercase bg-[#f0f0f0] text-black placeholder-gray-400 focus:outline-none focus:bg-[#e8e8e8] transition-colors border-none"
                   value={adminKey}
                   onChange={(event) => setAdminKey(event.target.value)}
                   onKeyDown={handleKeyDown}
@@ -389,22 +399,21 @@ export default function IdentityArchive() {
                 />
               </div>
 
-              <div className="w-full flex items-center justify-between mb-4">
-                <p className="label-md text-gray-400">ADMIN ACCESS</p>
-                {error ? <p className="label-md text-red-700">{error}</p> : null}
+              <div className="w-full flex justify-end h-4 mb-6 relative z-20">
+                {error ? <p className="uppercase text-[0.6rem] tracking-[0.1em] text-red-600">{error}</p> : null}
               </div>
 
-              <div className="w-full flex justify-end">
+              <div className="w-full flex justify-end relative z-20">
                 <button
                   type="button"
                   onClick={handleAdminAccess}
                   disabled={isSubmitting}
-                  className="group bg-[var(--primary)] text-white px-8 py-5 flex items-center gap-4 hover:shadow-[var(--layer-hover)] hover:-translate-y-[2px] transition-all duration-300 disabled:opacity-50"
+                  className="group bg-[#1a1c1c] text-white px-6 py-4 flex items-center gap-4 hover:bg-black transition-all duration-300 disabled:opacity-50"
                 >
-                  <span className="label-md text-white tracking-widest">
-                    {isSubmitting ? 'VERIFYING' : 'ENTER ADMIN ROOM'}
+                  <span className="text-[0.65rem] uppercase tracking-[0.2em] text-white">
+                    {isSubmitting ? 'VERIFYING' : 'ENTER CHAMBER'}
                   </span>
-                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
             </>
@@ -412,12 +421,12 @@ export default function IdentityArchive() {
         </div>
 
         {/* Footer Meta */}
-        <div className="w-full max-w-2xl flex justify-between items-center mt-8 text-gray-400">
+        <div className="w-full max-w-xl flex justify-between items-center mt-6 text-gray-400 z-10 pl-2">
           <div className="flex items-center gap-2">
-            <Shield size={14} />
-            <span className="label-md text-[0.6rem]">PROTOCOL SECURED</span>
+            <Shield size={12} className="text-gray-400" />
+            <span className="text-[0.55rem] uppercase tracking-[0.2em]">PROTOCOL SECURED</span>    
           </div>
-          <span className="label-md text-[0.6rem]">SERIAL: A-2949-V01</span>
+          <span className="text-[0.55rem] uppercase tracking-[0.2em]">SERIAL: A-2949-V01</span>    
         </div>
       </div>
     </div>

@@ -11,7 +11,6 @@ export default function PendulumView() {
   const { pushToast } = useToast();
   const [totalVotes, setTotalVotes] = useState(0);
   const [kickEnergy, setKickEnergy] = useState(8);
-  const [lastSyncAt, setLastSyncAt] = useState(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [electionEndAt, setElectionEndAt] = useState(null);
   const [timeRemainingLabel, setTimeRemainingLabel] = useState('Schedule pending');
@@ -32,7 +31,6 @@ export default function PendulumView() {
         if (!mounted) return;
         setTotalVotes(results.totalVotes || 0);
         setElectionEndAt(results.election?.end_date || null);
-        setLastSyncAt(new Date().toISOString());
         if (results.election?.status === 'closed') {
           setVoterPhase(VOTER_PHASES.RESULTS);
           pushToast({
@@ -66,7 +64,6 @@ export default function PendulumView() {
     socket.on('election:update', (payload) => {
       if (payload?.electionId !== session.electionId) return;
       setTotalVotes(payload.totalVotes || 0);
-      setLastSyncAt(new Date().toISOString());
     });
 
     socket.on('vote:kick', (payload) => {
@@ -101,13 +98,13 @@ export default function PendulumView() {
 
   useEffect(() => {
     if (!electionEndAt) {
-      setTimeRemainingLabel('No end time scheduled');
+      setTimeout(() => setTimeRemainingLabel('No end time scheduled'), 0);
       return undefined;
     }
 
     const endTime = new Date(electionEndAt);
     if (Number.isNaN(endTime.getTime())) {
-      setTimeRemainingLabel('Invalid end time');
+      setTimeout(() => setTimeRemainingLabel('Invalid end time'), 0);
       return undefined;
     }
 
@@ -155,98 +152,108 @@ export default function PendulumView() {
     navigate('/');
   };
 
-  const syncLabel = lastSyncAt
-    ? new Date(lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    : 'Pending';
-
   const swingAmplitude = Math.min(Math.max(kickEnergy, 6), 22);
   const swingDuration = Math.max(1.4, 2.8 - kickEnergy * 0.06);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-between pt-24 pb-12 overflow-hidden relative bg-[var(--surface)] text-[var(--primary)]">
-      
-      {/* Subtle details */}
-      <div className="absolute top-32 left-12">
-        <h2 className="font-muse text-5xl italic text-[var(--primary)] mb-2">The Pendulum</h2>
-        <p className="label-md text-gray-500 tracking-[0.2em] mt-4">SECTION: 04</p>
-        <p className="label-md text-gray-500 tracking-[0.2em]">STATUS: VOTE RECORDED</p>
+    <div className="min-h-screen flex flex-col items-center justify-between pt-0 pb-12 overflow-hidden relative bg-[#f7f7f7] text-[#1a1c1c]">
+
+      {/* Grid Background Pattern */}
+      <div className="absolute inset-0 z-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+
+      {/* Massive subtle typography in background */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none overflow-hidden z-0 pl-12 -space-y-12 opacity-40">
+        <span className="font-muse text-[clamp(8rem,18vw,26rem)] leading-[0.8] text-black/[0.015] whitespace-nowrap uppercase tracking-tighter mix-blend-multiply ml-24">
+          WAITING
+        </span>
+        <span className="font-muse text-[clamp(8rem,18vw,26rem)] leading-[0.8] text-black/[0.015] whitespace-nowrap uppercase tracking-tighter mix-blend-multiply -ml-24">
+          ROOM
+        </span>
       </div>
 
-      <div className="absolute top-32 right-12 flex flex-col items-end gap-3 z-20">
-        <div className="bg-[var(--surface-container-lowest)] border border-black/10 px-5 py-3 shadow-[var(--layer-recessed)]">
-          <p className="label-md text-[0.62rem] tracking-[0.16em] text-gray-500">LIVE CHANNEL</p>
-          <div className="mt-1 flex items-center justify-end gap-2">
-            <span className={`w-2 h-2 rounded-full ${isSocketConnected ? 'bg-green-600' : 'bg-amber-600 animate-pulse'}`} />
-            <p className={`text-xs font-bold uppercase tracking-widest ${isSocketConnected ? 'text-green-700' : 'text-amber-700'}`}>
-              {isSocketConnected ? 'Connected' : 'Reconnecting'}
+      {/* Decorative Paper Fold Bottom Right */}
+      <div className="absolute bottom-0 right-0 w-64 h-64 md:w-96 md:h-96 pointer-events-none z-0 overflow-hidden floating-paper">
+        <div className="absolute inset-0 bg-gradient-to-tl from-black/10 via-black/5 to-transparent transform rotate-12 scale-150 translate-x-1/4 translate-y-1/4 shadow-2xl skew-x-12 mix-blend-multiply" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-white/40 via-transparent to-transparent shadow-inner" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_40%,rgba(255,255,255,0.8)_45%,rgba(0,0,0,0.05)_50%,transparent_55%)] blur-[2px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_60%,rgba(255,255,255,0.6)_62%,rgba(0,0,0,0.03)_65%,transparent_70%)] blur-[3px]" />
+      </div>
+
+      {/* Subtle details */}
+      <div className="w-full flex justify-between items-start px-6 md:px-12 relative z-20 mt-4 md:mt-0">
+        <div>
+          <h2 className="font-muse text-[2.5rem] italic text-[#1a1c1c] mb-2 font-normal leading-none">The Pendulum</h2>
+          <p className="text-[0.65rem] uppercase tracking-[0.2em] text-gray-400 mt-4">SECTION: 04 / STATUS: PROCESSING</p>
+        </div>
+
+        <div className="flex flex-col items-end gap-3">
+          <div className="flex items-center gap-2 mt-2">
+            <span className={`w-1.5 h-1.5 rounded-full ${isSocketConnected ? 'bg-black' : 'bg-red-600 animate-pulse'}`} />
+            <p className="text-[0.55rem] uppercase tracking-[0.2em] text-gray-400">
+              {isSocketConnected ? 'LIVE CHANNEL' : 'RECONNECTING'}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={handleLeaveWaiting}
+            className="mt-4 px-6 py-3 bg-[#1a1c1c] text-white hover:bg-black text-[0.65rem] uppercase tracking-[0.2em] transition-colors duration-300 font-bold shadow-md hover:-translate-y-px"
+          >
+            Leave Waiting Area
+          </button>
         </div>
-        <div className="bg-[var(--surface-container-lowest)] border border-black/10 px-5 py-3 min-w-[220px] text-right shadow-[var(--layer-recessed)]">
-          <p className="label-md text-[0.62rem] tracking-[0.16em] text-gray-500">VOTING ENDS IN</p>
-          <p className="text-sm mt-1 font-bold uppercase tracking-[0.12em] text-[var(--primary)]">{timeRemainingLabel}</p>
-        </div>
-        <button
-          type="button"
-          onClick={handleLeaveWaiting}
-          className="border border-[var(--primary)] mt-2 px-5 py-2 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors duration-300"
-        >
-          Leave Waiting Area
-        </button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center mt-16 w-full relative">
+      <div className="flex-1 flex flex-col items-center justify-center mt-16 w-full relative z-10">
         
         {/* The Pendulum Assembly */}
         <div className="relative flex flex-col items-center h-[350px] w-full z-10">
           {/* Top Anchor */}
-          <div className="w-4 h-4 rounded-sm bg-[var(--primary)] z-20 shadow-md" />
+          <div className="w-4 h-4 bg-[#1a1c1c] z-20 shadow-md rounded-sm" />
           
           {/* Swinging Arm and Bob */}
           <div
-            className="pendulum-swing flex flex-col items-center absolute top-2"
+            className="flex flex-col items-center absolute top-2 origin-top"
             style={{
-              '--pendulum-amplitude': `${swingAmplitude}deg`,
-              '--pendulum-duration': `${swingDuration}s`,
-              transformOrigin: 'top center',
+              animation: `pendulumSwing ${swingDuration}s ease-in-out infinite`,
+              '--pendulum-amplitude': `${swingAmplitude}deg`
             }}
           >
             {/* The String */}
-            <div className="w-[3px] h-[280px] bg-[var(--primary)]" />
+            <div className="w-[3px] h-[280px] bg-[#1a1c1c]" />
             
             {/* The Weight (Bob) */}
-            <div 
-              className="pendulum-bob w-10 h-10 bg-[var(--primary)] rotate-45 shadow-xl transition-all duration-300"
-              style={{ '--pendulum-duration': `${swingDuration}s` }} 
+            <div
+              className="w-10 h-10 bg-[#1a1c1c] shadow-xl rotate-45 flex-shrink-0"
+              style={{
+                animation: `pendulumBobGlow ${swingDuration}s ease-in-out infinite`
+              }}
             />
           </div>
         </div>
 
-        {/* The Counter Background */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03]">
-          <div className="font-muse font-bold text-[35rem] leading-none tracking-tighter">
+        {/* The Foreground Number */}
+        <div className="z-10 w-full text-center -mt-8 flex flex-col items-center">
+          <div className="font-muse font-bold text-[10rem] md:text-[14rem] leading-none text-[#1a1c1c] tracking-tighter">
             {totalVotes}
           </div>
-        </div>
-
-        {/* The Counter Foreground */}
-        <div className="z-10 w-full text-center mt-12 bg-[var(--surface)]/60 backdrop-blur-md py-8 border-y border-black/5">
-          <div className="font-muse font-bold text-8xl md:text-9xl leading-none text-[var(--primary)] tracking-tighter">
-            {totalVotes}
+          <div className="flex flex-col items-center mt-2 border-t border-black/10 pt-4 px-12">
+            <p className="text-[0.65rem] uppercase tracking-[0.2em] text-gray-500 font-bold mb-6">
+              Total Votes Cast Live
+            </p>
+            <p className="text-[0.55rem] uppercase tracking-[0.2em] text-gray-400">
+              VOTING ENDS IN
+            </p>
+            <p className="text-sm mt-1 font-bold uppercase tracking-[0.15em] text-[#1a1c1c]">
+              {timeRemainingLabel}
+            </p>
           </div>
-          <p className="label-md mt-6 text-gray-500 tracking-[0.2em]">
-            Total votes synchronized
-          </p>
-          <p className="label-md mt-2 text-gray-400 tracking-[0.12em]">
-            Last sync at: {syncLabel}
-          </p>
         </div>
 
         {/* Sub-labels */}
-        <div className="w-full max-w-4xl px-12 flex justify-between items-center mt-auto pt-16 opacity-40">
-          <span className="label-md text-[0.6rem] tracking-[0.2em] border-b border-black/20 pb-1">SYNCHRONIZING ARCHIVE</span>
-          <span className="label-md text-[0.6rem] tracking-[0.2em] border-b border-black/20 pb-1">V01-BLLT</span>
-          <span className="label-md text-[0.6rem] tracking-[0.2em] border-b border-black/20 pb-1">ACTIVE LEDGER</span>
+        <div className="w-full max-w-2xl px-8 flex justify-between items-center mt-24 opacity-60 relative z-20">
+          <span className="text-[0.55rem] uppercase tracking-[0.2em] border-b border-black/10 pb-1 text-gray-500">SYNCHRONIZING ARCHIVE</span>
+          <span className="text-[0.55rem] uppercase tracking-[0.2em] border-b border-black/10 pb-1 text-gray-500">V01-BLLT</span>
+          <span className="text-[0.55rem] uppercase tracking-[0.2em] border-b border-black/10 pb-1 text-gray-500">ACTIVE LEDGER</span>
         </div>
       </div>
     </div>

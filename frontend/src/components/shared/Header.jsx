@@ -14,12 +14,23 @@ export default function Header() {
   let navItems = [];
 
   if (isAdminSession(session)) {
-    navItems = [];
+    navItems = [
+      { label: 'ADMIN', path: '/admin', disabled: false },
+      { label: 'RESULTS', path: '/results', disabled: false },
+    ];
   } else if (isVoterSession(session)) {
     navItems = [
+      { label: 'ENTRY', path: '/', disabled: false },
       { label: 'BALLOT', path: '/ballot', disabled: hasVoted || phase === 'results' },
       { label: 'WAITING', path: '/waiting', disabled: !hasVoted || phase === 'results' },
       { label: 'RESULTS', path: '/results', disabled: phase !== 'results' },
+    ];
+  } else {
+    navItems = [
+      { label: 'ENTRY', path: '/', disabled: false },
+      { label: 'WAITING', path: '/waiting', disabled: true },
+      { label: 'ADMIN', path: '/admin', disabled: true },
+      { label: 'RESULTS', path: '/results', disabled: true },
     ];
   }
 
@@ -36,10 +47,10 @@ export default function Header() {
   return (
     <header
       className={clsx(
-        "fixed top-0 w-full z-50 px-4 md:px-8 py-3 md:py-4 flex items-center justify-between pointer-events-none border-b",
+        "fixed top-0 w-full z-50 px-6 md:px-12 py-5 flex items-center justify-between pointer-events-none transition-colors duration-300",
         isAdmin
-          ? "bg-[rgba(20,42,63,0.86)] backdrop-blur-md border-white/15"
-          : "bg-[rgba(249,249,249,0.88)] backdrop-blur-md border-black/5"
+          ? "bg-[rgba(20,42,63,0.86)] backdrop-blur-md text-white border-b border-white/10"
+          : "bg-white/90 backdrop-blur-md text-[var(--primary)] border-b border-black/5 shadow-sm"
       )}
     >
       <div className="pointer-events-auto flex items-center">
@@ -48,37 +59,30 @@ export default function Header() {
             type="button"
             onClick={() => navigate('/')}
             className={clsx(
-              'text-left rounded-sm px-2 py-1 transition-colors',
-              isAdmin ? 'hover:bg-white/10' : 'hover:bg-black/5'
+              'text-left rounded-sm transition-colors',
+              isAdmin ? 'hover:text-white/80' : 'hover:text-black/70'
             )}
             aria-label="Return to home"
             title="Return to home"
           >
-            <h1 className={clsx('text-2xl font-muse font-bold tracking-tight', isAdmin ? 'text-white' : 'text-[var(--primary)]')}>
+            <h1 className={clsx('text-[1.35rem] font-muse font-bold tracking-tight', isAdmin ? 'text-white' : 'text-black')}>
               The Editorial Ballot
             </h1>
           </button>
         ) : (
-          <h1 className={clsx('text-2xl font-muse font-bold tracking-tight px-2 py-1', isAdmin ? 'text-white' : 'text-[var(--primary)]')}>
+          <h1 className={clsx('text-[1.35rem] font-muse font-bold tracking-tight', isAdmin ? 'text-white' : 'text-black')}>
             The Editorial Ballot
           </h1>
         )}
       </div>
 
-      <nav className="pointer-events-auto flex items-center gap-4 md:gap-6">
+      <nav className="pointer-events-auto absolute left-1/2 -translate-x-1/2 flex items-center gap-8 md:gap-12">
         {navItems.length ? (
-          <ul className={clsx(
-            'hidden md:flex items-center border-[1.5px]',
-            isAdmin ? 'border-white/30 bg-white/5' : 'border-[var(--primary)] bg-white/70'
-          )}>
-            {navItems.map((item, index) => {
+          <ul className="hidden md:flex items-center gap-10">
+            {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
-                <li key={item.path} className={clsx(
-                  "flex",
-                  index > 0 && "border-l",
-                  isAdmin ? "border-white/30" : "border-[var(--primary)]"
-                )}>
+                <li key={item.path} className="flex">
                   {item.disabled ? (
                     <button
                       type="button"
@@ -86,8 +90,8 @@ export default function Header() {
                       aria-disabled="true"
                       title="This section is locked until its phase is active"
                       className={clsx(
-                        'flex px-5 py-2 label-md transition-colors duration-300 cursor-not-allowed opacity-40',
-                        isAdmin ? 'text-white/40' : 'text-[var(--primary-container)]'
+                        'flex uppercase text-[0.65rem] tracking-[0.2em] transition-colors duration-300 cursor-not-allowed opacity-40',
+                        isAdmin ? 'text-white/40' : 'text-gray-400'
                       )}
                     >
                       {item.label}
@@ -96,9 +100,9 @@ export default function Header() {
                     <Link
                       to={item.path}
                       className={clsx(
-                        'flex px-5 py-2 label-md transition-all duration-300',
-                        isAdmin ? 'text-white/60 hover:text-white hover:bg-white/10' : 'text-[var(--primary-container)] hover:bg-black/5',
-                        isActive && (isAdmin ? 'text-white font-bold bg-white/15' : 'text-white font-bold bg-[var(--primary)] hover:bg-[var(--primary)]')
+                        'flex uppercase text-[0.65rem] tracking-[0.2em] transition-all duration-300',
+                        isAdmin ? 'text-white/60 hover:text-white' : 'text-gray-500 hover:text-black',
+                        isActive && (isAdmin ? 'text-white font-bold' : 'text-black font-bold')
                       )}
                     >
                       {item.label}
@@ -109,7 +113,9 @@ export default function Header() {
             })}
           </ul>
         ) : null}
+      </nav>
 
+      <div className="pointer-events-auto flex items-center justify-end w-32">
         {isAdminSession(session) ? (
           <button
             onClick={handleSettingsClick}
@@ -119,8 +125,11 @@ export default function Header() {
           >
             Exit Admin
           </button>
-        ) : null}
-      </nav>
+        ) : (
+          /* Removed settings icon logic as per requirements */
+          <div className="w-6 h-6"></div>
+        )}
+      </div>
     </header>
   );
 }
