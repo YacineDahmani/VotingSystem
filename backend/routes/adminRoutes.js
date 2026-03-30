@@ -1,5 +1,62 @@
 const express = require('express');
 
+function normalizeText(value) {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeDateValue(value) {
+    if (!value) {
+        return null;
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return null;
+    }
+
+    return parsed.toISOString();
+}
+
+function normalizeCandidateList(candidates) {
+    if (!Array.isArray(candidates)) {
+        return [];
+    }
+
+    return candidates
+        .map((candidate) => {
+            if (typeof candidate === 'string') {
+                return {
+                    name: normalizeText(candidate),
+                    description: '',
+                };
+            }
+
+            if (candidate && typeof candidate === 'object') {
+                return {
+                    name: normalizeText(candidate.name),
+                    description: normalizeText(candidate.description),
+                };
+            }
+
+            return { name: '', description: '' };
+        })
+        .filter((candidate) => !!candidate.name)
+        .sort((a, b) => a.name.localeCompare(b.name) || a.description.localeCompare(b.description));
+}
+
+function buildElectionSignature({ title, description, startDate, endDate, candidates }) {
+    return JSON.stringify({
+        title: normalizeText(title).toLowerCase(),
+        description: normalizeText(description).toLowerCase(),
+        startDate: normalizeDateValue(startDate),
+        endDate: normalizeDateValue(endDate),
+        candidates: normalizeCandidateList(candidates).map((candidate) => ({
+            name: candidate.name.toLowerCase(),
+            description: candidate.description.toLowerCase(),
+        })),
+    });
+}
+
 function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionUpdate, adminMasterKey }) {
     const router = express.Router();
 
@@ -42,20 +99,80 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
                 candidates,
                 start_date: startDate,
                 end_date: endDate,
+                replace_existing: replaceExisting,
             } = req.body;
 
             if (!title) {
                 return res.status(400).json({ error: 'Election title is required' });
             }
 
+            const normalizedCandidates = normalizeCandidateList(candidates);
+            if (!normalizedCandidates.length) {
+                return res.status(400).json({ error: 'At least one candidate is required' });
+            }
+
+            const requestedSignature = buildElectionSignature({
+                title,
+                description,
+                startDate,
+                endDate,
+                candidates: normalizedCandidates,
+            });
+
+            const existingElections = await db.getAllElections();
+            const duplicateMatches = [];
+
+            for (const existingElection of existingElections) {
+                const existingCandidates = await db.getCandidatesByElection(existingElection.id);
+                const existingSignature = buildElectionSignature({
+                    title: existingElection.title,
+                    description: existingElection.description,
+                    startDate: existingElection.start_date,
+                    endDate: existingElection.end_date,
+                    candidates: existingCandidates,
+                });
+
+                if (existingSignature === requestedSignature) {
+                    duplicateMatches.push(existingElection);
+                }
+            }
+
+            if (duplicateMatches.length && !replaceExisting) {
+                const latestDuplicate = duplicateMatches[0];
+                return res.status(409).json({
+                    error: 'A matching voting session already exists. Clear or replace it before creating another one.',
+                    duplicateSession: {
+                        id: latestDuplicate.id,
+                        title: latestDuplicate.title,
+                        code: latestDuplicate.code,
+                        status: latestDuplicate.status,
+                    },
+                });
+            }
+
+            if (duplicateMatches.length && replaceExisting) {
+                for (const duplicate of duplicateMatches) {
+                    await db.deleteElection(duplicate.id);
+                }
+            }
+
             const election = await db.createElection(title, description, startDate, endDate);
 
-            if (Array.isArray(candidates)) {
-                for (const name of candidates) {
-                    if (name && name.trim()) {
-                        await db.addCandidateToElection(election.id, name.trim());
-                    }
-                }
+            for (const candidate of normalizedCandidates) {
+                await db.addCandidateToElection(election.id, candidate.name, candidate.description || '');
+            }
+
+            if (replaceExisting && duplicateMatches.length) {
+                return res.json({
+                    success: true,
+                    election,
+                    replaced: duplicateMatches.map((item) => ({
+                        id: item.id,
+                        title: item.title,
+                        code: item.code,
+                        status: item.status,
+                    })),
+                });
             }
 
             return res.json({ success: true, election });
@@ -114,13 +231,13 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
     router.post('/elections/:id/candidates', async (req, res) => {
         try {
             const electionId = Number.parseInt(req.params.id, 10);
-            const { name } = req.body;
+            const { name, description = '' } = req.body;
 
             if (!name) {
                 return res.status(400).json({ error: 'Candidate name is required' });
             }
 
-            const candidate = await db.addCandidateToElection(electionId, name);
+            const candidate = await db.addCandidateToElection(electionId, name, description);
             return res.json({ success: true, candidate });
         } catch (err) {
             return res.status(500).json({ error: err.message });

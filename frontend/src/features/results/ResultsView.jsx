@@ -2,13 +2,32 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getActiveElection, getIntegrityReport, getResults } from '../../lib/api';
-import { VOTER_PHASES, clearSession, getSession, isAdminSession, setVoterPhase } from '../../store/session';
+import { VOTER_PHASES, clearSession, getSession, isAdminSession, setSession, setVoterPhase } from '../../store/session';
+
+function isElectionFinished(election) {
+  if (!election) {
+    return false;
+  }
+
+  if (election.status === 'closed') {
+    return true;
+  }
+
+  if (!election.end_date) {
+    return false;
+  }
+
+  const endDate = new Date(election.end_date);
+  return !Number.isNaN(endDate.getTime()) && Date.now() >= endDate.getTime();
+}
 
 export default function ResultsView() {
   const navigate = useNavigate();
   const MotionDiv = motion.div;
   const session = useMemo(() => getSession(), []);
   const adminView = isAdminSession(session);
+  const guestResultsView = !adminView && !session?.token && !!session?.resultsElectionId;
+  const endedNotice = session?.resultsNotice || '';
   const [results, setResults] = useState(null);
   const [integrity, setIntegrity] = useState(null);
   const [error, setError] = useState('');
@@ -18,7 +37,7 @@ export default function ResultsView() {
 
     async function loadResults() {
       try {
-        let electionId = session.electionId;
+        let electionId = session.electionId || session.resultsElectionId;
         if (!electionId) {
           const active = await getActiveElection();
           electionId = active?.election?.id;
@@ -31,15 +50,22 @@ export default function ResultsView() {
         const response = await getResults(electionId);
         if (!mounted) return;
 
-        if (!adminView && response?.election?.status !== 'closed') {
+        setSession({
+          electionStatus: response?.election?.status,
+          electionEndAt: response?.election?.end_date || null,
+        });
+
+        if (!adminView && !guestResultsView && !isElectionFinished(response?.election)) {
           setVoterPhase(VOTER_PHASES.WAITING);
           navigate('/waiting');
           return;
         }
 
-        if (!adminView) {
+        if (!adminView && !guestResultsView) {
           setVoterPhase(VOTER_PHASES.RESULTS);
-        } else {
+        }
+
+        if (adminView) {
           try {
             const integrityResponse = await getIntegrityReport(electionId);
             if (mounted) {
@@ -64,7 +90,7 @@ export default function ResultsView() {
     return () => {
       mounted = false;
     };
-  }, [adminView, navigate, session]);
+  }, [adminView, guestResultsView, navigate, session]);
 
   if (!results && !error) {
     return <div className="min-h-screen flex items-center justify-center">Compiling final scroll...</div>;
@@ -74,7 +100,7 @@ export default function ResultsView() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="label-md text-red-700">{error}</p>
-        <button onClick={() => navigate('/')} className="px-6 py-3 bg-[var(--primary)] text-white label-md">Return to entry</button>
+        <button onClick={() => navigate('/')} className="px-6 py-3 bg-[var(--primary)] text-white label-md transition-all duration-200 hover:bg-black hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">Return to entry</button>
       </div>
     );
   }
@@ -98,7 +124,7 @@ export default function ResultsView() {
 
     return {
       group: item.age_group,
-      stat: `${item.total} verified votes`,
+      stat: `${item.total} recorded votes`,
       type,
     };
   });
@@ -131,6 +157,13 @@ export default function ResultsView() {
       </div>
 
       <div className="w-full max-w-6xl mx-auto px-12 relative z-10">
+        {endedNotice ? (
+          <div className="mb-8 border border-amber-700 bg-amber-50 px-6 py-4">
+            <p className="label-md tracking-widest text-amber-900">SESSION UPDATE</p>
+            <p className="text-sm mt-2 text-amber-900">{endedNotice}</p>
+          </div>
+        ) : null}
+
         {adminView && integrity ? (
           <div className={`mb-10 border px-6 py-4 ${integrity.integrityStatus === 'clean' ? 'border-green-700 bg-green-50' : 'border-red-700 bg-red-50'}`}>
             <p className="label-md tracking-widest">INTEGRITY CHECK</p>
@@ -147,7 +180,7 @@ export default function ResultsView() {
               <button
                 type="button"
                 onClick={() => navigate('/admin')}
-                className="border border-[var(--primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest hover:bg-[var(--surface-container-low)]"
+                className="border border-[var(--primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100 hover:-translate-y-0.5 shadow-sm active:translate-y-0"
               >
                 Back To Admin
               </button>
@@ -155,7 +188,7 @@ export default function ResultsView() {
             <button
               type="button"
               onClick={handleExitResults}
-              className="bg-[var(--primary)] text-white px-4 py-2 text-[0.65rem] uppercase tracking-widest"
+              className="bg-[var(--primary)] text-white px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-black hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
             >
               Exit Results
             </button>
@@ -246,7 +279,7 @@ export default function ResultsView() {
                {!adminView ? (
                  <button
                    onClick={handleRunoffContinue}
-                   className="bg-[var(--primary)] text-white px-6 py-3 uppercase text-xs tracking-widest"
+                   className="bg-[var(--primary)] text-white px-6 py-3 uppercase text-xs tracking-widest transition-all duration-200 hover:bg-black hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
                  >
                    Return To Entry For Runoff
                  </button>

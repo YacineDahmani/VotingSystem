@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { getResults } from '../../lib/api';
 import { useToast } from '../../components/ui/useToast';
-import { VOTER_PHASES, clearSession, getSession, markWaitingDismissed, setVoterPhase } from '../../store/session';
+import { VOTER_PHASES, clearSession, getSession, markWaitingDismissed, setSession, setVoterPhase } from '../../store/session';
 
 export default function PendulumView() {
   const navigate = useNavigate();
@@ -14,6 +14,7 @@ export default function PendulumView() {
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [electionEndAt, setElectionEndAt] = useState(null);
   const [timeRemainingLabel, setTimeRemainingLabel] = useState('Schedule pending');
+  const [timerEnded, setTimerEnded] = useState(false);
 
   useEffect(() => {
     if (!session.electionId) {
@@ -31,7 +32,15 @@ export default function PendulumView() {
         if (!mounted) return;
         setTotalVotes(results.totalVotes || 0);
         setElectionEndAt(results.election?.end_date || null);
-        if (results.election?.status === 'closed') {
+
+        setSession({
+          electionStatus: results.election?.status,
+          electionEndAt: results.election?.end_date || null,
+        });
+
+        const endAt = results.election?.end_date ? new Date(results.election.end_date) : null;
+        const hasEndedByTime = !!endAt && !Number.isNaN(endAt.getTime()) && Date.now() >= endAt.getTime();
+        if (results.election?.status === 'closed' || hasEndedByTime) {
           setVoterPhase(VOTER_PHASES.RESULTS);
           pushToast({
             type: 'success',
@@ -74,6 +83,7 @@ export default function PendulumView() {
     socket.on('election:closed', (payload) => {
       if (payload?.electionId !== session.electionId) return;
       setVoterPhase(VOTER_PHASES.RESULTS);
+      setSession({ electionStatus: 'closed' });
       pushToast({
         type: 'success',
         title: 'Voting Closed',
@@ -98,12 +108,14 @@ export default function PendulumView() {
 
   useEffect(() => {
     if (!electionEndAt) {
+      setTimerEnded(false);
       setTimeout(() => setTimeRemainingLabel('No end time scheduled'), 0);
       return undefined;
     }
 
     const endTime = new Date(electionEndAt);
     if (Number.isNaN(endTime.getTime())) {
+      setTimerEnded(false);
       setTimeout(() => setTimeRemainingLabel('Invalid end time'), 0);
       return undefined;
     }
@@ -129,10 +141,12 @@ export default function PendulumView() {
     const updateTimeRemaining = () => {
       const remaining = endTime.getTime() - Date.now();
       if (remaining <= 0) {
+        setTimerEnded(true);
         setTimeRemainingLabel('Voting window ended');
         return;
       }
 
+      setTimerEnded(false);
       setTimeRemainingLabel(formatRemaining(remaining));
     };
 
@@ -150,6 +164,11 @@ export default function PendulumView() {
       message: 'You can return later from the entry screen using the same voter ID and session code.',
     });
     navigate('/');
+  };
+
+  const handleGoToResults = () => {
+    setVoterPhase(VOTER_PHASES.RESULTS);
+    navigate('/results');
   };
 
   const swingAmplitude = Math.min(Math.max(kickEnergy, 6), 22);
@@ -196,7 +215,7 @@ export default function PendulumView() {
           <button
             type="button"
             onClick={handleLeaveWaiting}
-            className="mt-4 px-6 py-3 bg-[#1a1c1c] text-white hover:bg-black text-[0.65rem] uppercase tracking-[0.2em] transition-colors duration-300 font-bold shadow-md hover:-translate-y-px"
+            className="mt-4 px-6 py-3 bg-[#1a1c1c] text-white text-[0.65rem] uppercase tracking-[0.2em] transition-all duration-200 hover:bg-black hover:-translate-y-0.5 shadow-md active:translate-y-0 font-bold"
           >
             Leave Waiting Area
           </button>
@@ -246,6 +265,15 @@ export default function PendulumView() {
             <p className="text-sm mt-1 font-bold uppercase tracking-[0.15em] text-[#1a1c1c]">
               {timeRemainingLabel}
             </p>
+            {timerEnded ? (
+              <button
+                type="button"
+                onClick={handleGoToResults}
+                className="mt-4 px-6 py-3 border border-[#1a1c1c] text-[#1a1c1c] text-[0.65rem] uppercase tracking-[0.2em] transition-all duration-200 hover:bg-[#1a1c1c] hover:text-white hover:-translate-y-0.5 shadow-sm active:translate-y-0 font-bold"
+              >
+                Go To Results
+              </button>
+            ) : null}
           </div>
         </div>
 

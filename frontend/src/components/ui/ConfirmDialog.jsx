@@ -28,7 +28,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="border border-gray-300 px-5 py-2 text-xs uppercase tracking-widest text-gray-700"
+            className="border border-gray-300 px-5 py-2 text-xs uppercase tracking-widest text-gray-700 transition-all duration-200 hover:bg-gray-100 shadow-sm active:translate-y-0.5"
           >
             {cancelLabel}
           </button>
@@ -36,7 +36,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className={`px-5 py-2 text-xs uppercase tracking-widest ${confirmClass}`}
+            className={`px-5 py-2 text-xs uppercase tracking-widest transition-transform duration-200 shadow-md hover:-translate-y-0.5 active:translate-y-0 ${confirmClass}`}
           >
             {busy ? 'Working...' : confirmLabel}
           </button>

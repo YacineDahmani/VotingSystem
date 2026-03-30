@@ -16,14 +16,14 @@ async function ensureDefaultElection(db) {
     );
 
     const seedCandidates = [
-        'Julian Thorne',
-        'Elena Vance',
-        'Marcus Aris',
-        'Sienna Blake',
+        { name: 'Yacine Dahmani', description: 'Progressive policies for a better tomorrow.' },
+        { name: 'Abdelmadjid Tebboune', description: 'Experience and stability you can trust.' },
+        { name: 'Donald Trump', description: 'A fresh perspective on economic reform.' },
+        { name: 'Lionel Messi', description: 'Dedicated to education and healthcare.' },
     ];
 
-    for (const candidateName of seedCandidates) {
-        await db.addCandidateToElection(election.id, candidateName);
+    for (const candidate of seedCandidates) {
+        await db.addCandidateToElection(election.id, candidate.name, candidate.description);
     }
 
     await db.updateElectionStatus(election.id, 'open');

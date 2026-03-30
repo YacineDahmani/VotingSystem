@@ -57,8 +57,25 @@ function calculateAgeFromBirthdate(birthdate) {
     return years;
 }
 
-function resolveVoterPhase(electionStatus, hasVoted) {
-    if (electionStatus === 'closed') {
+function hasElectionEnded(election) {
+    if (!election) {
+        return false;
+    }
+
+    if (election.status === 'closed') {
+        return true;
+    }
+
+    if (!election.end_date) {
+        return false;
+    }
+
+    const endDate = new Date(election.end_date);
+    return !Number.isNaN(endDate.getTime()) && Date.now() >= endDate.getTime();
+}
+
+function resolveVoterPhase(election, hasVoted) {
+    if (hasElectionEnded(election)) {
         return 'results';
     }
 
@@ -155,15 +172,26 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 return res.status(404).json({ error: 'Election not found. Please check the session code.' });
             }
 
+            const existingVoter = await db.findVoterByIdentifier(election.id, normalizedVoterIdCode);
+
+            if (hasElectionEnded(election) && (!existingVoter || existingVoter.is_fake)) {
+                return res.status(403).json({
+                    error: 'This voting session has already ended.',
+                    election,
+                    reason: 'ended',
+                });
+            }
+
             if (election.status === 'closed') {
-                return res.status(403).json({ error: 'This election is closed.' });
+                if (!existingVoter || existingVoter.is_fake) {
+                    return res.status(403).json({ error: 'This election is closed.' });
+                }
             }
 
             if (election.status === 'draft') {
                 return res.status(403).json({ error: 'This election has not started yet.' });
             }
 
-            const existingVoter = await db.findVoterByIdentifier(election.id, normalizedVoterIdCode);
             let voter = existingVoter;
 
             if (!existingVoter) {
@@ -179,7 +207,7 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
 
             const voterProgress = await db.getVoterProgress(voter.id, election.id);
             const hasVoted = !!voterProgress?.has_voted || await db.hasVoted(election.id, voter.id);
-            const phase = resolveVoterPhase(election.status, hasVoted);
+            const phase = resolveVoterPhase(election, hasVoted);
 
             const token = issueAuthToken({
                 role: 'voter',
@@ -217,12 +245,28 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 return res.status(404).json({ error: 'Election not found. Please check the code.' });
             }
 
+            if (hasElectionEnded(election)) {
+                return res.status(403).json({
+                    error: 'This voting session has already ended.',
+                    election,
+                    reason: 'ended',
+                });
+            }
+
             if (election.status === 'closed') {
-                return res.status(403).json({ error: 'This election is closed.' });
+                return res.status(403).json({
+                    error: 'This voting session has already ended.',
+                    election,
+                    reason: 'closed',
+                });
             }
 
             if (election.status === 'draft') {
-                return res.status(403).json({ error: 'This election has not started yet.' });
+                return res.status(403).json({
+                    error: 'This election has not started yet.',
+                    election,
+                    reason: 'draft',
+                });
             }
 
             return res.json({ success: true, election });

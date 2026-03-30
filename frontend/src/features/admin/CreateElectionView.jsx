@@ -2,14 +2,8 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createElection, updateElectionStatus } from '../../lib/api';
 import { useToast } from '../../components/ui/useToast';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { getSession, isAdminSession } from '../../store/session';
-
-function parseCandidates(input) {
-  return input
-    .split(/\r?\n|,/)
-    .map((name) => name.trim())
-    .filter(Boolean);
-}
 
 export default function CreateElectionView() {
   const navigate = useNavigate();
@@ -19,11 +13,79 @@ export default function CreateElectionView() {
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [candidatesInput, setCandidatesInput] = useState('');
+  const [candidates, setCandidates] = useState([{ name: '', description: '' }]);
   const [openImmediately, setOpenImmediately] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdSession, setCreatedSession] = useState(null);
+  const [replacePrompt, setReplacePrompt] = useState(null);
+
+  const buildPayload = () => {
+    const trimmedTitle = title.trim();
+    const validCandidates = candidates
+      .map(c => ({ name: c.name.trim(), description: c.description.trim() }))
+      .filter(c => c.name);
+
+    return {
+      title: trimmedTitle,
+      description: description.trim(),
+      candidates: validCandidates,
+      start_date: startDate ? new Date(startDate).toISOString() : null,
+      end_date: endDate ? new Date(endDate).toISOString() : null,
+    };
+  };
+
+  const submitElection = async (payload, { replaceExisting = false } = {}) => {
+    const response = await createElection({
+      ...payload,
+      replace_existing: replaceExisting,
+    });
+    const electionId = response?.election?.id;
+
+    if (!electionId) {
+      throw new Error('Election creation returned an invalid response.');
+    }
+
+    if (openImmediately) {
+      await updateElectionStatus(electionId, 'open');
+    }
+
+    setCreatedSession({
+      id: electionId,
+      title: response.election.title,
+      code: response.election.code,
+    });
+
+    if (replaceExisting && Array.isArray(response?.replaced) && response.replaced.length) {
+      pushToast({
+        type: 'success',
+        title: 'Session Replaced',
+        message: `Replaced ${response.replaced.length} existing matching session(s).`,
+      });
+      return;
+    }
+
+    pushToast({
+      type: 'success',
+      title: 'Session Created',
+      message: `Election ${response.election.title} is ready.`,
+    });
+  };
+
+  const addCandidate = () => {
+    setCandidates([...candidates, { name: '', description: '' }]);
+  };
+
+  const updateCandidate = (index, field, value) => {
+    const nextCandidates = [...candidates];
+    nextCandidates[index][field] = value;
+    setCandidates(nextCandidates);
+  };
+
+  const removeCandidate = (index) => {
+    if (candidates.length <= 1) return;
+    setCandidates(candidates.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -39,8 +101,11 @@ export default function CreateElectionView() {
       return;
     }
 
-    const candidates = parseCandidates(candidatesInput);
-    if (!candidates.length) {
+    const validCandidates = candidates
+      .map(c => ({ name: c.name.trim(), description: c.description.trim() }))
+      .filter(c => c.name);
+
+    if (!validCandidates.length) {
       setError('Add at least one candidate name.');
       return;
     }
@@ -54,36 +119,18 @@ export default function CreateElectionView() {
     setIsSubmitting(true);
 
     try {
-      const payload = {
-        title: trimmedTitle,
-        description: description.trim(),
-        candidates,
-        start_date: startDate ? new Date(startDate).toISOString() : null,
-        end_date: endDate ? new Date(endDate).toISOString() : null,
-      };
-
-      const response = await createElection(payload);
-      const electionId = response?.election?.id;
-
-      if (!electionId) {
-        throw new Error('Election creation returned an invalid response.');
-      }
-
-      if (openImmediately) {
-        await updateElectionStatus(electionId, 'open');
-      }
-
-      setCreatedSession({
-        id: electionId,
-        title: response.election.title,
-        code: response.election.code,
-      });
-      pushToast({
-        type: 'success',
-        title: 'Session Created',
-        message: `Election ${response.election.title} is ready.`,
-      });
+      const payload = buildPayload();
+      await submitElection(payload);
     } catch (err) {
+      if (err?.status === 409) {
+        setReplacePrompt({
+          payload: buildPayload(),
+          duplicateSession: err?.data?.duplicateSession || null,
+        });
+        setError(err.message || 'A matching session already exists.');
+        return;
+      }
+
       const message = err.message || 'Unable to create election';
       setError(message);
       pushToast({
@@ -97,16 +144,17 @@ export default function CreateElectionView() {
   };
 
   return (
-    <div className="min-h-screen text-white relative z-10 -mt-24 pt-32 px-12 pb-24">
-      <div className="max-w-4xl">
-        <p className="label-md text-white/50 mb-2 tracking-[0.2em]">ADMIN CONSOLE</p>
-        <h2 className="font-muse font-bold text-6xl text-white">Initialize New Election</h2>
-      </div>
+    <>
+      <div className="min-h-screen text-[var(--primary)] relative z-10 -mt-24 pt-32 px-12 pb-24">
+        <div className="max-w-4xl">
+          <p className="label-md text-gray-500 mb-2 tracking-[0.2em]">ADMIN CONSOLE</p>
+          <h2 className="font-muse font-bold text-6xl text-[var(--primary)]">Initialize New Election</h2>
+        </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="mt-10 bg-white text-[var(--primary)] p-10 shadow-2xl max-w-4xl grid grid-cols-1 gap-6"
-      >
+        <form
+          onSubmit={handleSubmit}
+          className="mt-10 bg-white text-[var(--primary)] p-10 shadow-2xl max-w-4xl grid grid-cols-1 gap-6"
+        >
         <div>
           <label className="label-md text-gray-500 block mb-2">Title</label>
           <input
@@ -154,15 +202,47 @@ export default function CreateElectionView() {
         </div>
 
         <div>
-          <label className="label-md text-gray-500 block mb-2">Candidates</label>
-          <textarea
-            value={candidatesInput}
-            onChange={(event) => setCandidatesInput(event.target.value)}
-            placeholder="One per line or comma-separated"
-            rows={5}
-            className="w-full border border-gray-200 px-4 py-3"
+          <label className="label-md text-gray-500 block mb-4 border-b pb-2">Candidates</label>
+          <div className="flex flex-col gap-4">
+            {candidates.map((candidate, index) => (
+              <div key={index} className="flex flex-col md:flex-row gap-3 items-start border p-4 bg-gray-50/50">
+                <div className="flex-1 w-full flex flex-col gap-3">
+                  <input
+                    value={candidate.name}
+                    onChange={(e) => updateCandidate(index, 'name', e.target.value)}
+                    placeholder={`Candidate ${index + 1} Name`}
+                    className="w-full border border-gray-200 px-4 py-2"
+                    disabled={isSubmitting}
+                  />
+                  <input
+                    value={candidate.description}
+                    onChange={(e) => updateCandidate(index, 'description', e.target.value)}
+                    placeholder="Campaign Statement (Optional)"
+                    className="w-full border border-gray-200 px-4 py-2 text-sm text-gray-600"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                {candidates.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeCandidate(index)}
+                    disabled={isSubmitting}
+                    className="text-red-600 hover:text-red-800 text-xs tracking-widest uppercase mt-2 md:mt-0 px-2 py-2 transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addCandidate}
             disabled={isSubmitting}
-          />
+            className="mt-4 border border-dashed border-gray-400 text-gray-600 w-full py-3 uppercase text-xs tracking-widest hover:bg-gray-50 hover:text-black transition-all duration-200"
+          >
+            + Add Another Candidate
+          </button>
         </div>
 
         <label className="inline-flex items-center gap-3">
@@ -181,7 +261,7 @@ export default function CreateElectionView() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="bg-[var(--primary)] text-white px-8 py-3 uppercase text-xs tracking-widest disabled:opacity-50"
+            className="bg-[var(--primary)] text-white px-8 py-3 uppercase text-xs tracking-widest disabled:opacity-50 transition-transform duration-200 hover:-translate-y-0.5 shadow-md hover:shadow-lg active:translate-y-0"
           >
             {isSubmitting ? 'Creating...' : 'Create Election'}
           </button>
@@ -189,7 +269,7 @@ export default function CreateElectionView() {
             type="button"
             onClick={() => navigate('/admin')}
             disabled={isSubmitting}
-            className="border border-gray-300 px-8 py-3 uppercase text-xs tracking-widest"
+            className="border border-gray-300 px-8 py-3 uppercase text-xs tracking-widest transition-all duration-200 hover:bg-gray-100 shadow-sm hover:shadow-md active:translate-y-0.5"
           >
             Cancel
           </button>
@@ -235,7 +315,44 @@ export default function CreateElectionView() {
             </div>
           </div>
         ) : null}
-      </form>
-    </div>
+        </form>
+      </div>
+
+      <ConfirmDialog
+        open={!!replacePrompt}
+        title="Replace Existing Session?"
+        message={replacePrompt?.duplicateSession
+          ? `A matching session already exists (${replacePrompt.duplicateSession.title}, code ${replacePrompt.duplicateSession.code}). Replace it with this new one?`
+          : 'A matching session already exists. Replace it with this new one?'}
+        confirmLabel="Replace And Create"
+        confirmTone="danger"
+        busy={isSubmitting}
+        onCancel={() => setReplacePrompt(null)}
+        onConfirm={async () => {
+          if (!replacePrompt?.payload) {
+            setReplacePrompt(null);
+            return;
+          }
+
+          setIsSubmitting(true);
+          setError('');
+
+          try {
+            await submitElection(replacePrompt.payload, { replaceExisting: true });
+            setReplacePrompt(null);
+          } catch (err) {
+            const message = err.message || 'Unable to replace existing session';
+            setError(message);
+            pushToast({
+              type: 'error',
+              title: 'Replace Failed',
+              message,
+            });
+          } finally {
+            setIsSubmitting(false);
+          }
+        }}
+      />
+    </>
   );
 }

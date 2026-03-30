@@ -16,7 +16,7 @@ export default function Header() {
   if (isAdminSession(session)) {
     navItems = [
       { label: 'ADMIN', path: '/admin', disabled: false },
-      { label: 'RESULTS', path: '/results', disabled: false },
+      { label: 'RESULTS', path: '/results', disabled: true },
     ];
   } else if (isVoterSession(session)) {
     navItems = [
@@ -48,9 +48,7 @@ export default function Header() {
     <header
       className={clsx(
         "fixed top-0 w-full z-50 px-6 md:px-12 py-5 flex items-center justify-between pointer-events-none transition-colors duration-300",
-        isAdmin
-          ? "bg-[rgba(20,42,63,0.86)] backdrop-blur-md text-white border-b border-white/10"
-          : "bg-white/90 backdrop-blur-md text-[var(--primary)] border-b border-black/5 shadow-sm"
+        "bg-white/90 backdrop-blur-md text-[var(--primary)] border-b border-black/5 shadow-sm"
       )}
     >
       <div className="pointer-events-auto flex items-center">
@@ -60,17 +58,17 @@ export default function Header() {
             onClick={() => navigate('/')}
             className={clsx(
               'text-left rounded-sm transition-colors',
-              isAdmin ? 'hover:text-white/80' : 'hover:text-black/70'
+              'hover:text-black/70'
             )}
             aria-label="Return to home"
             title="Return to home"
           >
-            <h1 className={clsx('text-[1.35rem] font-muse font-bold tracking-tight', isAdmin ? 'text-white' : 'text-black')}>
+            <h1 className={clsx('text-[1.35rem] font-muse font-bold tracking-tight', 'text-black')}>
               The Editorial Ballot
             </h1>
           </button>
         ) : (
-          <h1 className={clsx('text-[1.35rem] font-muse font-bold tracking-tight', isAdmin ? 'text-white' : 'text-black')}>
+          <h1 className={clsx('text-[1.35rem] font-muse font-bold tracking-tight', 'text-black')}>
             The Editorial Ballot
           </h1>
         )}
@@ -91,7 +89,7 @@ export default function Header() {
                       title="This section is locked until its phase is active"
                       className={clsx(
                         'flex uppercase text-[0.65rem] tracking-[0.2em] transition-colors duration-300 cursor-not-allowed opacity-40',
-                        isAdmin ? 'text-white/40' : 'text-gray-400'
+                        'text-gray-400'
                       )}
                     >
                       {item.label}
@@ -101,8 +99,8 @@ export default function Header() {
                       to={item.path}
                       className={clsx(
                         'flex uppercase text-[0.65rem] tracking-[0.2em] transition-all duration-300',
-                        isAdmin ? 'text-white/60 hover:text-white' : 'text-gray-500 hover:text-black',
-                        isActive && (isAdmin ? 'text-white font-bold' : 'text-black font-bold')
+                        'text-gray-500 hover:text-black',
+                        isActive && 'text-black font-bold'
                       )}
                     >
                       {item.label}
@@ -119,7 +117,7 @@ export default function Header() {
         {isAdminSession(session) ? (
           <button
             onClick={handleSettingsClick}
-            className="px-4 py-2 border border-white/40 text-white uppercase text-[0.65rem] tracking-[0.2em] hover:bg-white hover:text-[var(--primary)] transition-colors duration-300"
+            className="px-4 py-2 border border-black/40 text-[var(--primary)] uppercase text-[0.65rem] tracking-[0.2em] hover:bg-[var(--primary)] hover:text-white transition-colors duration-300"
             aria-label="Exit admin room"
             title="Exit admin room"
           >

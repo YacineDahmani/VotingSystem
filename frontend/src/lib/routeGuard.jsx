@@ -54,6 +54,10 @@ export function ResultsRoute({ children }) {
     return children;
   }
 
+  if (session?.resultsElectionId) {
+    return children;
+  }
+
   if (!isVoterSession(session)) {
     return <Navigate to="/" replace />;
   }

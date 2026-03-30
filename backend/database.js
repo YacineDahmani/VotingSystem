@@ -43,6 +43,7 @@ function initializeDatabase() {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     election_id INTEGER NOT NULL,
                     name TEXT NOT NULL,
+                    description TEXT,
                     votes INTEGER DEFAULT 0,
                     color_code TEXT,
                     last_vote_timestamp DATETIME,
@@ -50,6 +51,13 @@ function initializeDatabase() {
                     FOREIGN KEY (election_id) REFERENCES elections(id) ON DELETE CASCADE
                 )
             `);
+
+            // Try to add description column if it doesn't exist (for existing databases)
+            try {
+                db.run("ALTER TABLE candidates ADD COLUMN description TEXT DEFAULT ''", (err) => {
+                    // Ignore errors if column already exists
+                });
+            } catch (e) {}
 
             db.run(`
                 CREATE TABLE IF NOT EXISTS voters (
@@ -330,7 +338,7 @@ function getCandidateById(id) {
     });
 }
 
-function addCandidateToElection(electionId, name) {
+function addCandidateToElection(electionId, name, description = '') {
     return new Promise((resolve, reject) => {
         db.get('SELECT COUNT(*) as count FROM candidates WHERE election_id = ?', [electionId], (err, row) => {
             if (err) return reject(err);
@@ -338,11 +346,21 @@ function addCandidateToElection(electionId, name) {
             const color = CHART_COLORS[colorIndex];
 
             db.run(
-                'INSERT INTO candidates (election_id, name, color_code, votes) VALUES (?, ?, ?, 0)',
-                [electionId, name, color],
+                'INSERT INTO candidates (election_id, name, description, color_code, votes) VALUES (?, ?, ?, ?, 0)',
+                [electionId, name, description, color],
                 function (err) {
-                    if (err) reject(err);
-                    else resolve({ id: this.lastID, election_id: electionId, name, color_code: color, votes: 0 });
+                    if (err) {
+                        // fallback if column doesn't exist
+                        db.run(
+                            'INSERT INTO candidates (election_id, name, color_code, votes) VALUES (?, ?, ?, 0)',
+                            [electionId, name, color],
+                            function (err2) {
+                                if (err2) reject(err2);
+                                else resolve({ id: this.lastID, election_id: electionId, name, description, color_code: color, votes: 0 });
+                            }
+                        );
+                    }
+                    else resolve({ id: this.lastID, election_id: electionId, name, description, color_code: color, votes: 0 });
                 }
             );
         });
@@ -538,7 +556,7 @@ function getAgeGroupStats(electionId) {
                 COUNT(*) as total
              FROM voters v
              INNER JOIN votes vt ON vt.voter_id = v.id
-             WHERE v.election_id = ? AND v.is_fake = 0
+             WHERE v.election_id = ?
              GROUP BY age_group
              ORDER BY total DESC`,
             [electionId],
@@ -643,7 +661,7 @@ function createRunoffElection(originalElection, tiedCandidates) {
 
             // Copy tied candidates
             for (const cand of tiedCandidates) {
-                await addCandidateToElection(runoff.id, cand.name);
+                await addCandidateToElection(runoff.id, cand.name, cand.description || '');
             }
 
             // Auto-open the runoff
@@ -810,9 +828,10 @@ function addFakeVotes(electionId, candidateId, count) {
             try {
                 for (let i = 0; i < count; i++) {
                     const fakeIdentifier = `FAKE-${electionId}-${candidateId}-${Date.now()}-${i}-${crypto.randomBytes(3).toString('hex')}`;
+                    const fakeAge = 18 + Math.floor(Math.random() * 63);
                     const insertedVoter = await runStatement(
-                        'INSERT INTO voters (election_id, name, age, identifier, is_fake) VALUES (?, ?, 0, ?, 1)',
-                        [electionId, 'Fake', fakeIdentifier]
+                        'INSERT INTO voters (election_id, name, age, identifier, is_fake) VALUES (?, ?, ?, ?, 1)',
+                        [electionId, 'Fake', fakeAge, fakeIdentifier]
                     );
 
                     await runStatement(

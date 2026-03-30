@@ -16,7 +16,7 @@ function AppContent() {
   const isAdmin = location.pathname.startsWith('/admin') && isAdminSession(session);
 
   return (
-    <div className={`min-h-screen w-full transition-colors duration-700 ${isAdmin ? 'blueprint-grid' : 'bg-[var(--surface)] text-[var(--on-surface)]'}`}>
+    <div className={`min-h-screen w-full transition-colors duration-700 bg-[var(--surface)] text-[var(--on-surface)]`}>
       <Header />
       <main className="pt-24 h-full pb-20">
         <Routes>
@@ -29,9 +29,7 @@ function AppContent() {
         </Routes>
       </main>
       <footer
-        className={`w-full border-t px-4 md:px-8 py-4 flex items-center justify-end ${
-          isAdmin ? 'border-white/20 text-white/80' : 'border-black/10 text-[var(--primary)]/80'
-        }`}
+        className={`w-full border-t px-4 md:px-8 py-4 flex items-center justify-end border-black/10 text-[var(--primary)]/80`}
       >
         <a
           href="https://github.com/YacineDahmani"

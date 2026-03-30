@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { castVote, getCandidates } from '../../lib/api';
+import { castVote, getCandidates, getResults } from '../../lib/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { useToast } from '../../components/ui/useToast';
-import { getSession, getVoterPhase, markVoteSubmitted } from '../../store/session';
+import { VOTER_PHASES, clearSession, getSession, getVoterPhase, markVoteSubmitted, setSession, setVoterPhase } from '../../store/session';
 
 export default function GravitySlot() {
   const navigate = useNavigate();
@@ -21,6 +21,26 @@ export default function GravitySlot() {
     () => candidates.find((item) => item.id === selectedCandidateId) || null,
     [candidates, selectedCandidateId]
   );
+
+  const exitBallot = () => {
+    clearSession();
+    navigate('/');
+  };
+
+  const redirectEndedSessionToResults = (message) => {
+    setSession({
+      electionStatus: 'closed',
+      resultsElectionId: session.electionId,
+      resultsNotice: message || 'This voting session has already ended. Showing final results.',
+    });
+    setVoterPhase(VOTER_PHASES.RESULTS);
+    navigate('/results', { replace: true });
+  };
+
+  const isEndedSessionError = (err) => {
+    const message = (err?.message || '').toLowerCase();
+    return err?.status === 403 || message.includes('ended') || message.includes('closed') || message.includes('not open');
+  };
 
   useEffect(() => {
     if (!session.electionId || !session.voterId) {
@@ -43,11 +63,27 @@ export default function GravitySlot() {
 
     async function loadCandidates() {
       try {
+        const results = await getResults(session.electionId);
+        if (!mounted) return;
+
+        const endDate = results?.election?.end_date ? new Date(results.election.end_date) : null;
+        const hasEndedByTime = !!endDate && !Number.isNaN(endDate.getTime()) && Date.now() >= endDate.getTime();
+        if (results?.election?.status === 'closed' || hasEndedByTime) {
+          redirectEndedSessionToResults('This voting session has already ended. Redirecting to results.');
+          return;
+        }
+
         const result = await getCandidates(session.electionId);
         if (!mounted) return;
         setCandidates(result.candidates || []);
       } catch (err) {
         if (!mounted) return;
+
+        if (isEndedSessionError(err)) {
+          redirectEndedSessionToResults('This voting session has already ended. Redirecting to results.');
+          return;
+        }
+
         setError(err.message || 'Failed to load candidates');
       } finally {
         if (mounted) setLoading(false);
@@ -92,6 +128,17 @@ export default function GravitySlot() {
       navigate('/waiting');
     } catch (err) {
       const message = err.message || 'Unable to submit vote';
+
+      if (isEndedSessionError(err)) {
+        pushToast({
+          type: 'info',
+          title: 'Session Ended',
+          message: 'This voting session has already ended. Showing final results.',
+        });
+        redirectEndedSessionToResults('This voting session has already ended. Showing final results.');
+        return;
+      }
+
       setError(message);
       pushToast({
         type: 'error',
@@ -117,7 +164,16 @@ export default function GravitySlot() {
       </div>
 
       <div className="w-full max-w-[1400px] px-12 mb-10 z-10">
-        <p className="label-md text-gray-500 mb-6 font-bold tracking-[0.1em]">PHASE 01 - SELECTION</p>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <p className="label-md text-gray-500 font-bold tracking-[0.1em]">PHASE 01 - SELECTION</p>
+          <button
+            type="button"
+            onClick={exitBallot}
+            className="border border-gray-300 px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100 hover:-translate-y-0.5 shadow-sm active:translate-y-0"
+          >
+            Exit Ballot
+          </button>
+        </div>
         <h2 className="font-muse text-5xl text-[var(--primary)] max-w-2xl leading-[1.1]">
           Choose one candidate, confirm, then submit your vote once.
         </h2>
@@ -142,6 +198,11 @@ export default function GravitySlot() {
                 <h3 className="font-muse text-3xl text-[var(--primary)] leading-tight">
                   {candidate.name}
                 </h3>
+                {candidate.description && (
+                  <p className="text-sm text-gray-600 mt-2 italic">
+                    {candidate.description}
+                  </p>
+                )}
                 <p className="label-md mt-4 text-gray-500">
                   {selected ? 'Selected for confirmation' : 'Click to select'}
                 </p>
@@ -162,14 +223,25 @@ export default function GravitySlot() {
             type="button"
             onClick={openConfirmation}
             disabled={!selectedCandidateId || isSubmitting}
-            className="bg-[var(--primary)] text-white px-8 py-3 uppercase text-xs tracking-[0.16em] disabled:opacity-40 disabled:cursor-not-allowed"
+            className="bg-[var(--primary)] text-white px-8 py-3 uppercase text-xs tracking-[0.16em] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:bg-black hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
           >
             {isSubmitting ? 'Submitting Vote...' : 'Submit Vote'}
           </button>
         </div>
       </div>
 
-      {error ? <p className="mt-8 label-md text-red-700 z-20">{error}</p> : null}
+      {error ? (
+        <div className="mt-8 z-20 flex flex-col items-center gap-3">
+          <p className="label-md text-red-700">{error}</p>
+          <button
+            type="button"
+            onClick={exitBallot}
+            className="border border-gray-300 px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100"
+          >
+            Return To Entry
+          </button>
+        </div>
+      ) : null}
 
       <ConfirmDialog
         open={showConfirm}

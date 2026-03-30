@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Shield } from 'lucide-react';
-import { submitIdentity } from '../../lib/api';
-import { clearSession, getSession, getVoterPhase, isVoterSession, setSession } from '../../store/session';
+import { submitIdentity, validateElectionCode } from '../../lib/api';
+import { clearSession, getSession, getVoterPhase, isAdminSession, isVoterSession, setSession } from '../../store/session';
 
 export default function IdentityArchive() {
   const navigate = useNavigate();
@@ -20,6 +20,12 @@ export default function IdentityArchive() {
 
   useEffect(() => {
     const currentSession = getSession();
+
+    if (isAdminSession(currentSession)) {
+      navigate('/admin', { replace: true });
+      return;
+    }
+
     if (!isVoterSession(currentSession)) {
       return;
     }
@@ -136,6 +142,40 @@ export default function IdentityArchive() {
     setTimeout(() => setIsShaking(false), 420);
   };
 
+  const routeClosedSessionToResults = useCallback((election, message) => {
+    clearSession();
+    setSession({
+      resultsElectionId: election?.id || null,
+      electionTitle: election?.title || null,
+      electionStatus: election?.status || 'closed',
+      electionEndAt: election?.end_date || null,
+      resultsNotice: message || 'This voting session has already ended. Showing results.',
+    });
+    navigate('/results', { replace: true });
+  }, [navigate]);
+
+  const ensureSessionCodeIsOpen = useCallback(async () => {
+    const normalizedCode = sessionCode.trim().toUpperCase();
+
+    try {
+      await validateElectionCode(normalizedCode);
+      return true;
+    } catch (err) {
+      const reason = err?.data?.reason;
+      const election = err?.data?.election;
+
+      if ((reason === 'ended' || reason === 'closed') && election?.id) {
+        const message = err?.message || 'This voting session has already ended. Redirecting to results.';
+        triggerSnag(message);
+        routeClosedSessionToResults(election, message);
+        return false;
+      }
+
+      triggerSnag(err?.message || 'Unable to validate session code.');
+      return false;
+    }
+  }, [routeClosedSessionToResults, sessionCode]);
+
   const validateCurrentStep = () => {
     if (stepIndex === 0 && name.trim().length < 2) {
       triggerSnag('Name must include at least 2 characters.');
@@ -182,6 +222,11 @@ export default function IdentityArchive() {
     setIsSubmitting(true);
 
     try {
+      const isSessionOpen = await ensureSessionCodeIsOpen();
+      if (!isSessionOpen) {
+        return;
+      }
+
       const payload = {
         name: name.trim(),
         birthdate,
@@ -211,10 +256,13 @@ export default function IdentityArchive() {
         electionId: result.election.id,
         electionTitle: result.election.title,
         electionStatus: result.election.status,
+        electionEndAt: result.election.end_date || null,
         hasVoted: !!result.hasVoted,
         selectedCandidateId: result.selectedCandidateId || null,
         votedAt: result.votedAt || null,
         phase: result.phase || 'ballot',
+        resultsElectionId: null,
+        resultsNotice: null,
       });
       const phase = result.phase || 'ballot';
       if (phase === 'results') {
@@ -225,6 +273,15 @@ export default function IdentityArchive() {
         navigate('/ballot');
       }
     } catch (err) {
+      const reason = err?.data?.reason;
+      const election = err?.data?.election;
+      if ((reason === 'ended' || reason === 'closed') && election?.id) {
+        const message = err?.message || 'This voting session has already ended. Redirecting to results.';
+        triggerSnag(message);
+        routeClosedSessionToResults(election, message);
+        return;
+      }
+
       triggerSnag(err.message || 'Unable to verify identity.');
     } finally {
       setIsSubmitting(false);
@@ -277,7 +334,7 @@ export default function IdentityArchive() {
       
       {/* Background massive BALLOT watermark */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden z-0">
-        <span className="font-muse text-[clamp(10rem,22vw,30rem)] leading-[0.8] text-black/[0.02] whitespace-nowrap uppercase tracking-tighter">
+        <span className="font-muse text-[clamp(10rem,22vw,30rem)] leading-[0.8] text-black/[0.07] whitespace-nowrap uppercase tracking-tighter">
           BALLOT
         </span>
       </div>
@@ -299,7 +356,7 @@ export default function IdentityArchive() {
         </div>
 
         <div
-          className="bg-white/70 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/60 w-full max-w-xl p-10 md:p-14 flex flex-col items-center relative"
+          className="bg-white/35 backdrop-blur-md shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] border border-white/40 w-full max-w-xl p-10 md:p-14 flex flex-col items-center relative"
           style={isShaking ? { transform: 'translateX(-4px)', transition: 'transform 0.4s ease' } : {}}
         >
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-black/5 to-transparent"></div>
@@ -375,7 +432,7 @@ export default function IdentityArchive() {
                 <button
                   onClick={handleAdvance}
                   disabled={isSubmitting}
-                  className="group bg-[#1a1c1c] text-white px-6 py-4 flex items-center gap-4 hover:bg-black transition-all duration-300"
+                  className="group bg-[#1a1c1c] text-white px-6 py-4 flex items-center gap-4 transition-all duration-200 hover:bg-black hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
                 >
                   <span className="text-[0.65rem] uppercase tracking-[0.2em]">
                     {isSubmitting ? 'VERIFYING' : stepIndex < steps.length - 1 ? 'NEXT SEQUENCE' : 'ENTER CHAMBER'}
@@ -408,7 +465,7 @@ export default function IdentityArchive() {
                   type="button"
                   onClick={handleAdminAccess}
                   disabled={isSubmitting}
-                  className="group bg-[#1a1c1c] text-white px-6 py-4 flex items-center gap-4 hover:bg-black transition-all duration-300 disabled:opacity-50"
+                  className="group bg-[#1a1c1c] text-white px-6 py-4 flex items-center gap-4 transition-all duration-200 hover:bg-black hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
                 >
                   <span className="text-[0.65rem] uppercase tracking-[0.2em] text-white">
                     {isSubmitting ? 'VERIFYING' : 'ENTER CHAMBER'}

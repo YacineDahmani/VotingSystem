@@ -26,7 +26,10 @@ async function request(path, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.error || 'Request failed');
+    const error = new Error(data.error || 'Request failed');
+    error.status = response.status;
+    error.data = data;
+    throw error;
   }
 
   return data;
@@ -40,6 +43,13 @@ export function submitIdentity(payload) {
   return request('/api/session/identity', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export function validateElectionCode(code) {
+  return request('/api/elections/join', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
   });
 }
 

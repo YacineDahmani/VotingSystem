@@ -5,6 +5,27 @@ const VOTER_PHASES = {
   RESULTS: 'results',
 };
 
+function hasElectionEnded(session) {
+  if (!session) {
+    return false;
+  }
+
+  if (session.electionStatus === 'closed') {
+    return true;
+  }
+
+  if (!session.electionEndAt) {
+    return false;
+  }
+
+  const endDate = new Date(session.electionEndAt);
+  if (Number.isNaN(endDate.getTime())) {
+    return false;
+  }
+
+  return Date.now() >= endDate.getTime();
+}
+
 function readSession() {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
@@ -46,7 +67,7 @@ export function getVoterPhase(session = readSession()) {
     return null;
   }
 
-  if (session.electionStatus === 'closed') {
+  if (hasElectionEnded(session)) {
     return VOTER_PHASES.RESULTS;
   }
 
