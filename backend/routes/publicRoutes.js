@@ -1,5 +1,74 @@
 const express = require('express');
 
+function parseBirthdate(rawBirthdate) {
+    if (typeof rawBirthdate !== 'string' || !rawBirthdate.trim()) {
+        return null;
+    }
+
+    const normalized = rawBirthdate.trim();
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized);
+    if (!match) {
+        return null;
+    }
+
+    const year = Number.parseInt(match[1], 10);
+    const month = Number.parseInt(match[2], 10);
+    const day = Number.parseInt(match[3], 10);
+    const parsed = new Date(year, month - 1, day);
+
+    if (
+        Number.isNaN(parsed.getTime())
+        || parsed.getFullYear() !== year
+        || parsed.getMonth() !== month - 1
+        || parsed.getDate() !== day
+        || parsed > new Date()
+    ) {
+        return null;
+    }
+
+    return normalized;
+}
+
+function calculateAgeFromBirthdate(birthdate) {
+    const [yearString, monthString, dayString] = birthdate.split('-');
+    const birthYear = Number.parseInt(yearString, 10);
+    const birthMonth = Number.parseInt(monthString, 10);
+    const birthDay = Number.parseInt(dayString, 10);
+    const today = new Date();
+
+    const parsed = new Date(birthYear, birthMonth - 1, birthDay);
+    if (
+        Number.isNaN(parsed.getTime())
+        || parsed.getFullYear() !== birthYear
+        || parsed.getMonth() !== birthMonth - 1
+        || parsed.getDate() !== birthDay
+    ) {
+        return null;
+    }
+
+    let years = today.getFullYear() - birthYear;
+    const hasReachedBirthday = (today.getMonth() + 1 > birthMonth)
+        || ((today.getMonth() + 1 === birthMonth) && today.getDate() >= birthDay);
+
+    if (!hasReachedBirthday) {
+        years -= 1;
+    }
+
+    return years;
+}
+
+function resolveVoterPhase(electionStatus, hasVoted) {
+    if (electionStatus === 'closed') {
+        return 'results';
+    }
+
+    if (hasVoted) {
+        return 'waiting';
+    }
+
+    return 'ballot';
+}
+
 function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, requireVoterAuth, emitElectionUpdate, adminMasterKey }) {
     const router = express.Router();
 
@@ -34,7 +103,7 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
         try {
             const {
                 name,
-                age,
+                birthdate,
                 sessionCode,
                 voterIdCode,
                 adminKey,
@@ -71,8 +140,13 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 return res.status(400).json({ error: 'Name is required' });
             }
 
-            const parsedAge = Number.parseInt(age, 10);
-            if (Number.isNaN(parsedAge) || parsedAge < 18) {
+            const normalizedBirthdate = parseBirthdate(birthdate);
+            if (!normalizedBirthdate) {
+                return res.status(400).json({ error: 'A valid birthdate is required' });
+            }
+
+            const parsedAge = calculateAgeFromBirthdate(normalizedBirthdate);
+            if (parsedAge === null || parsedAge < 18) {
                 return res.status(400).json({ error: 'You must be at least 18 years old to vote' });
             }
 
@@ -89,7 +163,24 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 return res.status(403).json({ error: 'This election has not started yet.' });
             }
 
-            const voter = await db.addVoter(election.id, name.trim(), parsedAge, normalizedVoterIdCode, false);
+            const existingVoter = await db.findVoterByIdentifier(election.id, normalizedVoterIdCode);
+            let voter = existingVoter;
+
+            if (!existingVoter) {
+                voter = await db.addVoter(election.id, name.trim(), parsedAge, normalizedVoterIdCode, false, normalizedBirthdate);
+            } else {
+                if (existingVoter.is_fake) {
+                    return res.status(403).json({ error: 'Invalid voter identity for this election' });
+                }
+
+                await db.updateVoterIdentity(existingVoter.id, name.trim(), parsedAge, normalizedBirthdate);
+                voter = await db.getVoterByIdAndElection(existingVoter.id, election.id);
+            }
+
+            const voterProgress = await db.getVoterProgress(voter.id, election.id);
+            const hasVoted = !!voterProgress?.has_voted || await db.hasVoted(election.id, voter.id);
+            const phase = resolveVoterPhase(election.status, hasVoted);
+
             const token = issueAuthToken({
                 role: 'voter',
                 voterId: voter.id,
@@ -103,6 +194,10 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 voter,
                 token,
                 sessionCode: election.code,
+                hasVoted,
+                phase,
+                selectedCandidateId: voterProgress?.voted_candidate_id || null,
+                votedAt: voterProgress?.voted_at || null,
             });
         } catch (err) {
             return res.status(400).json({ error: err.message });
@@ -149,13 +244,24 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
     router.post('/elections/:id/register', async (req, res) => {
         try {
             const electionId = Number.parseInt(req.params.id, 10);
-            const { name, age, identifier } = req.body;
+            const { name, birthdate, age, identifier } = req.body;
 
             if (!name || typeof name !== 'string' || name.trim().length === 0) {
                 return res.status(400).json({ error: 'Name is required' });
             }
 
-            if (!age || typeof age !== 'number' || age < 18) {
+            let parsedAge = Number.isFinite(age) ? age : null;
+            let normalizedBirthdate = null;
+
+            if (birthdate) {
+                normalizedBirthdate = parseBirthdate(birthdate);
+                if (!normalizedBirthdate) {
+                    return res.status(400).json({ error: 'A valid birthdate is required' });
+                }
+                parsedAge = calculateAgeFromBirthdate(normalizedBirthdate);
+            }
+
+            if (parsedAge === null || parsedAge < 18) {
                 return res.status(400).json({ error: 'You must be at least 18 years old to vote' });
             }
 
@@ -163,7 +269,7 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 return res.status(400).json({ error: 'Voter ID is required' });
             }
 
-            const voter = await db.addVoter(electionId, name.trim(), age, identifier.trim(), false);
+            const voter = await db.addVoter(electionId, name.trim(), parsedAge, identifier.trim(), false, normalizedBirthdate);
 
             return res.json({
                 success: true,
@@ -200,6 +306,10 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 return res.status(403).json({ error: 'Invalid voter identity for this election' });
             }
 
+            if (voter.has_voted) {
+                return res.status(400).json({ error: 'You have already voted in this election' });
+            }
+
             const election = await db.getElectionById(electionId);
             if (election.status !== 'open') {
                 return res.status(403).json({ error: 'Election is not open' });
@@ -221,6 +331,12 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 message: `Vote cast for ${candidate.name}`,
                 isTie: results.isTie,
                 totalVotes: results.totalVotes,
+                nextPhase: 'waiting',
+                notification: {
+                    type: 'success',
+                    title: 'Vote Registered',
+                    body: `Your vote for ${candidate.name} has been securely recorded.`,
+                },
             });
         } catch (err) {
             return res.status(400).json({ error: err.message });

@@ -47,3 +47,41 @@
 .animate-snag {
   animation: typewriterSnag 0.4s ease-in-out;
 }
+
+@keyframes pendulumSwing {
+  0% {
+    transform: rotate(calc(var(--pendulum-amplitude, 10deg) * -1));
+  }
+  50% {
+    transform: rotate(var(--pendulum-amplitude, 10deg));
+  }
+  100% {
+    transform: rotate(calc(var(--pendulum-amplitude, 10deg) * -1));
+  }
+}
+
+@keyframes pendulumBobGlow {
+  0%,
+  100% {
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.15));
+  }
+  50% {
+    filter: drop-shadow(0 16px 26px rgba(0, 0, 0, 0.28));
+  }
+}
+
+.pendulum-swing {
+  transform-origin: top center;
+  animation: pendulumSwing var(--pendulum-duration, 2.2s) ease-in-out infinite;
+}
+
+.pendulum-bob {
+  animation: pendulumBobGlow var(--pendulum-duration, 2.2s) ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pendulum-swing,
+  .pendulum-bob {
+    animation: none;
+  }
+}

@@ -57,8 +57,12 @@ function initializeDatabase() {
                     election_id INTEGER,
                     name TEXT NOT NULL,
                     age INTEGER,
+                    birthdate TEXT,
                     identifier TEXT,
                     is_fake BOOLEAN DEFAULT 0,
+                    has_voted BOOLEAN DEFAULT 0,
+                    voted_candidate_id INTEGER,
+                    voted_at DATETIME,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (election_id) REFERENCES elections(id) ON DELETE CASCADE,
                     UNIQUE(election_id, identifier)
@@ -89,7 +93,11 @@ function initializeDatabase() {
             // Schema Migrations (safely add columns if missing in existing DB)
             const migrations = [
                 'ALTER TABLE elections ADD COLUMN round INTEGER DEFAULT 1',
-                'ALTER TABLE voters ADD COLUMN identifier TEXT'
+                'ALTER TABLE voters ADD COLUMN identifier TEXT',
+                'ALTER TABLE voters ADD COLUMN birthdate TEXT',
+                'ALTER TABLE voters ADD COLUMN has_voted BOOLEAN DEFAULT 0',
+                'ALTER TABLE voters ADD COLUMN voted_candidate_id INTEGER',
+                'ALTER TABLE voters ADD COLUMN voted_at DATETIME'
             ];
 
             migrations.forEach(query => {
@@ -366,11 +374,11 @@ function incrementVote(candidateId) {
 
 // ==================== VOTERS & VOTING ====================
 
-function addVoter(electionId, name, age, identifier = null, isFake = false) {
+function addVoter(electionId, name, age, identifier = null, isFake = false, birthdate = null) {
     return new Promise((resolve, reject) => {
         db.run(
-            'INSERT INTO voters (election_id, name, age, identifier, is_fake) VALUES (?, ?, ?, ?, ?)',
-            [electionId, name, age, identifier, isFake ? 1 : 0],
+            'INSERT INTO voters (election_id, name, age, birthdate, identifier, is_fake, has_voted) VALUES (?, ?, ?, ?, ?, ?, 0)',
+            [electionId, name, age, birthdate, identifier, isFake ? 1 : 0],
             function (err) {
                 if (err) {
                     if (err.message.includes('UNIQUE constraint failed')) {
@@ -379,7 +387,68 @@ function addVoter(electionId, name, age, identifier = null, isFake = false) {
                         reject(err);
                     }
                 }
-                else resolve({ id: this.lastID, election_id: electionId, name, age, identifier });
+                else resolve({ id: this.lastID, election_id: electionId, name, age, birthdate, identifier, has_voted: 0 });
+            }
+        );
+    });
+}
+
+function findVoterByIdentifier(electionId, identifier) {
+    return new Promise((resolve, reject) => {
+        db.get(
+            'SELECT * FROM voters WHERE election_id = ? AND identifier = ? LIMIT 1',
+            [electionId, identifier],
+            (err, row) => {
+                if (err) reject(err);
+                else resolve(row || null);
+            }
+        );
+    });
+}
+
+function updateVoterIdentity(voterId, name, age, birthdate) {
+    return new Promise((resolve, reject) => {
+        db.run(
+            'UPDATE voters SET name = ?, age = ?, birthdate = ? WHERE id = ?',
+            [name, age, birthdate, voterId],
+            function (err) {
+                if (err) reject(err);
+                else resolve(this.changes > 0);
+            }
+        );
+    });
+}
+
+function setVoterVoteState(voterId, candidateId, votedAt = new Date().toISOString()) {
+    return new Promise((resolve, reject) => {
+        db.run(
+            'UPDATE voters SET has_voted = 1, voted_candidate_id = ?, voted_at = ? WHERE id = ?',
+            [candidateId, votedAt, voterId],
+            function (err) {
+                if (err) reject(err);
+                else resolve(this.changes > 0);
+            }
+        );
+    });
+}
+
+function getVoterProgress(voterId, electionId) {
+    return new Promise((resolve, reject) => {
+        db.get(
+            `SELECT
+                v.id,
+                v.has_voted,
+                v.voted_candidate_id,
+                v.voted_at,
+                e.status AS election_status
+             FROM voters v
+             INNER JOIN elections e ON e.id = v.election_id
+             WHERE v.id = ? AND v.election_id = ?
+             LIMIT 1`,
+            [voterId, electionId],
+            (err, row) => {
+                if (err) reject(err);
+                else resolve(row || null);
             }
         );
     });
@@ -431,6 +500,7 @@ function recordVote(electionId, voterId, candidateId) {
                         }
                     } else {
                         await incrementVote(candidateId);
+                        await setVoterVoteState(voterId, candidateId);
                         resolve({ voteId: this.lastID });
                     }
                 }
@@ -795,6 +865,10 @@ module.exports = {
     incrementVote,
     // Voters & Voting
     addVoter,
+    findVoterByIdentifier,
+    updateVoterIdentity,
+    setVoterVoteState,
+    getVoterProgress,
     getVoterByIdAndElection,
     hasVoted,
     recordVote,

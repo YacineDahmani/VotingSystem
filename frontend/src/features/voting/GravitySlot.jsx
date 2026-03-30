@@ -1,21 +1,41 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { castVote, getCandidates } from '../../lib/api';
-import { getSession, markVoteSubmitted } from '../../store/session';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { useToast } from '../../components/ui/useToast';
+import { getSession, getVoterPhase, markVoteSubmitted } from '../../store/session';
 
 export default function GravitySlot() {
   const navigate = useNavigate();
   const session = useMemo(() => getSession(), []);
+  const { pushToast } = useToast();
+
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [votedCandidateId, setVotedCandidateId] = useState(null);
+  const [selectedCandidateId, setSelectedCandidateId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const selectedCandidate = useMemo(
+    () => candidates.find((item) => item.id === selectedCandidateId) || null,
+    [candidates, selectedCandidateId]
+  );
 
   useEffect(() => {
     if (!session.electionId || !session.voterId) {
       navigate('/');
+      return;
+    }
+
+    const phase = getVoterPhase(session);
+    if (phase === 'results') {
+      navigate('/results', { replace: true });
+      return;
+    }
+
+    if (session.hasVoted || phase === 'waiting') {
+      navigate('/waiting', { replace: true });
       return;
     }
 
@@ -39,27 +59,48 @@ export default function GravitySlot() {
     return () => {
       mounted = false;
     };
-  }, [navigate, session.electionId, session.voterId]);
+  }, [navigate, session]);
 
-  const handleDragEnd = async (event, info, candidateId) => {
-    if (isSubmitting) return;
+  const openConfirmation = () => {
+    if (!selectedCandidateId || isSubmitting) {
+      return;
+    }
+    setShowConfirm(true);
+  };
 
-    if (info.offset.y > 170) {
-      setIsSubmitting(true);
-      setError('');
-      try {
-        await castVote(session.electionId, {
-          candidateId,
-        });
+  const confirmVote = async () => {
+    if (!selectedCandidateId || isSubmitting) {
+      return;
+    }
 
-        setVotedCandidateId(candidateId);
-        markVoteSubmitted(candidateId);
-        setTimeout(() => navigate('/waiting'), 700);
-      } catch (err) {
-        setError(err.message || 'Unable to submit vote');
-      } finally {
-        setIsSubmitting(false);
-      }
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const result = await castVote(session.electionId, {
+        candidateId: selectedCandidateId,
+      });
+
+      markVoteSubmitted(selectedCandidateId);
+
+      pushToast({
+        type: result?.notification?.type || 'success',
+        title: result?.notification?.title || 'Vote Registered',
+        message: result?.notification?.body || `Your vote for ${selectedCandidate?.name || 'the selected candidate'} was recorded.`,
+      });
+
+      navigate('/waiting');
+    } catch (err) {
+      const message = err.message || 'Unable to submit vote';
+      setError(message);
+      pushToast({
+        type: 'error',
+        title: 'Vote Failed',
+        message,
+      });
+    } finally {
+      setIsSubmitting(false);
+      setShowConfirm(false);
     }
   };
 
@@ -68,72 +109,78 @@ export default function GravitySlot() {
   }
 
   return (
-    <div className="relative min-h-[90vh] flex flex-col items-center pt-16 overflow-hidden">
-      
-      {/* Background Watermark */}
+    <div className="relative min-h-[90vh] flex flex-col items-center pt-16 pb-40 overflow-hidden">
       <div className="absolute top-[40%] flex items-center justify-center pointer-events-none select-none z-0">
         <span className="font-muse text-[25vw] leading-none text-black/[0.03] whitespace-nowrap">
           BALLOT
         </span>
       </div>
 
-      {/* Header */}
-      <div className="w-full max-w-[1400px] px-12 mb-16 z-10">
-        <p className="label-md text-gray-500 mb-6 font-bold tracking-[0.1em]">PHASE 01 — SELECTION</p>
-        <h2 className="font-muse text-5xl text-[var(--primary)] max-w-xl leading-[1.1]">
-          Cast your intent into the permanent record.
+      <div className="w-full max-w-[1400px] px-12 mb-10 z-10">
+        <p className="label-md text-gray-500 mb-6 font-bold tracking-[0.1em]">PHASE 01 - SELECTION</p>
+        <h2 className="font-muse text-5xl text-[var(--primary)] max-w-2xl leading-[1.1]">
+          Choose one candidate, confirm, then submit your vote once.
         </h2>
       </div>
 
-      {/* Cards Container */}
       <div className="w-full max-w-[1400px] px-12 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8 z-20">
-        {candidates.map((candidate, index) => (
-          <motion.div
-            key={candidate.id}
-            drag="y"
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={0.4}
-            onDragEnd={(e, info) => handleDragEnd(e, info, candidate.id)}
-            whileDrag={{ scale: 1.05, zIndex: 50, cursor: 'grabbing' }}
-            animate={
-              votedCandidateId
-                ? votedCandidateId === candidate.id
-                  ? { y: 1000, opacity: 0 }
-                  : { opacity: 0.2 }
-                : { y: 0, opacity: 1 }
-            }
-            className="paper-float bg-white p-12 aspect-[3/4] flex flex-col justify-between cursor-grab hover:shadow-2xl transition-shadow duration-300 relative"
+        {candidates.map((candidate, index) => {
+          const selected = selectedCandidateId === candidate.id;
+          return (
+            <button
+              type="button"
+              key={candidate.id}
+              onClick={() => setSelectedCandidateId(candidate.id)}
+              disabled={isSubmitting}
+              className={`paper-float bg-white p-12 aspect-[3/4] flex flex-col justify-between text-left transition-all duration-200 border-2 ${selected ? 'border-[var(--primary)] shadow-2xl' : 'border-transparent hover:border-black/15'}`}
+            >
+              <span className="font-muse text-[8rem] text-gray-100 leading-none -ml-4">
+                {String(index + 1).padStart(2, '0')}
+              </span>
+              <div>
+                <p className="label-md text-gray-400 mb-4">CANDIDATE</p>
+                <h3 className="font-muse text-3xl text-[var(--primary)] leading-tight">
+                  {candidate.name}
+                </h3>
+                <p className="label-md mt-4 text-gray-500">
+                  {selected ? 'Selected for confirmation' : 'Click to select'}
+                </p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 border-t border-black/10 bg-[rgba(249,249,249,0.95)] backdrop-blur-md py-5 z-30">
+        <div className="mx-auto w-full max-w-[1400px] px-12 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <p className="label-md text-gray-600 tracking-[0.08em]">
+            {selectedCandidate
+              ? `Selected: ${selectedCandidate.name}`
+              : 'Select one candidate to enable vote submission'}
+          </p>
+          <button
+            type="button"
+            onClick={openConfirmation}
+            disabled={!selectedCandidateId || isSubmitting}
+            className="bg-[var(--primary)] text-white px-8 py-3 uppercase text-xs tracking-[0.16em] disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <span className="font-muse text-[8rem] text-gray-100 leading-none -ml-4">
-              {String(index + 1).padStart(2, '0')}
-            </span>
-            <div>
-              <p className="label-md text-gray-400 mb-4">CANDIDATE</p>
-              <h3 className="font-muse text-3xl text-[var(--primary)] leading-tight">
-                {candidate.name}
-              </h3>
-            </div>
-          </motion.div>
-        ))}
+            {isSubmitting ? 'Submitting Vote...' : 'Submit Vote'}
+          </button>
+        </div>
       </div>
 
       {error ? <p className="mt-8 label-md text-red-700 z-20">{error}</p> : null}
 
-      {/* The Slot */}
-      <div className="absolute bottom-0 w-full h-48 flex justify-center items-end pb-8 z-10 pointer-events-none">
-        <div className="w-full max-w-4xl flex flex-col items-center">
-          <p className="label-md text-gray-400 mb-6 tracking-[0.2em]">DRAG SELECTION TO DEPOSIT</p>
-          <div className="w-full h-16 bg-[var(--surface-container-high)] shadow-[var(--layer-recessed)] relative overflow-hidden flex items-center justify-center">
-             <div className="w-[80%] h-1 bg-gradient-to-b from-black/20 to-transparent absolute top-0" />
-             <span className="text-gray-400">↓</span>
-             <div className="absolute top-0 right-0 h-full w-full flex items-center justify-end pr-4 pointer-events-none">
-                <span className="label-md text-[0.5rem] tracking-[0.2em] transform rotate-90 origin-right text-gray-300 -mr-6">
-                  ANALOG PRECISION SYSTEM V.2.4
-                </span>
-             </div>
-          </div>
-        </div>
-      </div>
+      <ConfirmDialog
+        open={showConfirm}
+        title="Confirm Vote"
+        message={selectedCandidate ? `Submit your final vote for ${selectedCandidate.name}? This cannot be changed.` : 'Submit this vote?'}
+        confirmLabel="Confirm Vote"
+        cancelLabel="Review Again"
+        onCancel={() => setShowConfirm(false)}
+        onConfirm={confirmVote}
+        busy={isSubmitting}
+      />
     </div>
   );
 }

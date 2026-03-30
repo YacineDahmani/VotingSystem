@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createElection, updateElectionStatus } from '../../lib/api';
+import { useToast } from '../../components/ui/useToast';
 import { getSession, isAdminSession } from '../../store/session';
 
 function parseCandidates(input) {
@@ -13,6 +14,7 @@ function parseCandidates(input) {
 export default function CreateElectionView() {
   const navigate = useNavigate();
   const session = useMemo(() => getSession(), []);
+  const { pushToast } = useToast();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -76,8 +78,19 @@ export default function CreateElectionView() {
         title: response.election.title,
         code: response.election.code,
       });
+      pushToast({
+        type: 'success',
+        title: 'Session Created',
+        message: `Election ${response.election.title} is ready.`,
+      });
     } catch (err) {
-      setError(err.message || 'Unable to create election');
+      const message = err.message || 'Unable to create election';
+      setError(message);
+      pushToast({
+        type: 'error',
+        title: 'Creation Failed',
+        message,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -194,8 +207,18 @@ export default function CreateElectionView() {
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(createdSession.code);
+                    pushToast({
+                      type: 'info',
+                      title: 'Code Copied',
+                      message: 'Session code copied to clipboard.',
+                    });
                   } catch {
                     setError('Unable to copy session code');
+                    pushToast({
+                      type: 'error',
+                      title: 'Copy Failed',
+                      message: 'Unable to copy session code.',
+                    });
                   }
                 }}
                 className="border border-gray-300 px-5 py-2 uppercase text-xs tracking-widest"

@@ -6,7 +6,9 @@ import { VOTER_PHASES, clearSession, getSession, isAdminSession, setVoterPhase }
 
 export default function ResultsView() {
   const navigate = useNavigate();
+  const MotionDiv = motion.div;
   const session = useMemo(() => getSession(), []);
+  const adminView = isAdminSession(session);
   const [results, setResults] = useState(null);
   const [integrity, setIntegrity] = useState(null);
   const [error, setError] = useState('');
@@ -29,18 +31,24 @@ export default function ResultsView() {
         const response = await getResults(electionId);
         if (!mounted) return;
 
-        if (!isAdminSession(session) && response?.election?.status !== 'closed') {
+        if (!adminView && response?.election?.status !== 'closed') {
           setVoterPhase(VOTER_PHASES.WAITING);
           navigate('/waiting');
           return;
         }
 
-        if (!isAdminSession(session)) {
+        if (!adminView) {
           setVoterPhase(VOTER_PHASES.RESULTS);
         } else {
-          const integrityResponse = await getIntegrityReport(electionId);
-          if (mounted) {
-            setIntegrity(integrityResponse);
+          try {
+            const integrityResponse = await getIntegrityReport(electionId);
+            if (mounted) {
+              setIntegrity(integrityResponse);
+            }
+          } catch {
+            if (mounted) {
+              setIntegrity(null);
+            }
           }
         }
 
@@ -56,7 +64,7 @@ export default function ResultsView() {
     return () => {
       mounted = false;
     };
-  }, [navigate, session]);
+  }, [adminView, navigate, session]);
 
   if (!results && !error) {
     return <div className="min-h-screen flex items-center justify-center">Compiling final scroll...</div>;
@@ -103,8 +111,13 @@ export default function ResultsView() {
     navigate('/');
   };
 
+  const handleExitResults = () => {
+    clearSession();
+    navigate('/');
+  };
+
   return (
-    <motion.div 
+    <MotionDiv 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="min-h-screen bg-white text-[var(--primary)] font-grotesque overflow-x-hidden pt-20"
@@ -118,7 +131,7 @@ export default function ResultsView() {
       </div>
 
       <div className="w-full max-w-6xl mx-auto px-12 relative z-10">
-        {isAdminSession(session) && integrity ? (
+        {adminView && integrity ? (
           <div className={`mb-10 border px-6 py-4 ${integrity.integrityStatus === 'clean' ? 'border-green-700 bg-green-50' : 'border-red-700 bg-red-50'}`}>
             <p className="label-md tracking-widest">INTEGRITY CHECK</p>
             <p className="text-sm mt-2">
@@ -129,6 +142,25 @@ export default function ResultsView() {
 
         {/* Header section */}
         <div className="mb-24">
+          <div className="mb-8 flex justify-end gap-3">
+            {adminView ? (
+              <button
+                type="button"
+                onClick={() => navigate('/admin')}
+                className="border border-[var(--primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest hover:bg-[var(--surface-container-low)]"
+              >
+                Back To Admin
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleExitResults}
+              className="bg-[var(--primary)] text-white px-4 py-2 text-[0.65rem] uppercase tracking-widest"
+            >
+              Exit Results
+            </button>
+          </div>
+
           <p className="label-md text-[var(--secondary)] mb-12 tracking-widest font-bold">
             CONSENSUS REACHED
           </p>
@@ -162,7 +194,7 @@ export default function ResultsView() {
                   <h4 className="font-muse italic text-3xl text-gray-500">{candidate.name}</h4>
                   <span className="font-bold text-lg">{candidate.percentage}</span>
                 </div>
-                {isAdminSession(session) && integrity?.candidates ? (
+                {adminView && integrity?.candidates ? (
                   <p className="label-md text-[0.6rem] text-gray-500 mb-2">
                     {(() => {
                       const integrityCandidate = integrity.candidates.find((item) => item.id === candidate.id);
@@ -211,7 +243,7 @@ export default function ResultsView() {
                <p className="text-sm text-gray-600 mb-6">
                  This election ended in a tie. A runoff has been opened as {runoffElection.title}.
                </p>
-               {!isAdminSession(session) ? (
+               {!adminView ? (
                  <button
                    onClick={handleRunoffContinue}
                    className="bg-[var(--primary)] text-white px-6 py-3 uppercase text-xs tracking-widest"
@@ -243,6 +275,6 @@ export default function ResultsView() {
          </div>
       </div>
 
-    </motion.div>
+    </MotionDiv>
   );
 }

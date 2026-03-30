@@ -1,15 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { ArrowRight, Shield } from 'lucide-react';
 import { submitIdentity } from '../../lib/api';
-import { VOTER_PHASES, clearSession, setSession } from '../../store/session';
+import { clearSession, getSession, getVoterPhase, isVoterSession, setSession } from '../../store/session';
 
 export default function IdentityArchive() {
   const navigate = useNavigate();
   const [entryMode, setEntryMode] = useState('voter');
   const [name, setName] = useState('');
-  const [age, setAge] = useState('');
+  const [birthdate, setBirthdate] = useState('');
   const [voterIdCode, setVoterIdCode] = useState('');
   const [sessionCode, setSessionCode] = useState('');
   const [adminKey, setAdminKey] = useState('');
@@ -18,6 +17,81 @@ export default function IdentityArchive() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
   const [isFlipping, setIsFlipping] = useState(false);
+
+  useEffect(() => {
+    const currentSession = getSession();
+    if (!isVoterSession(currentSession)) {
+      return;
+    }
+
+    const phase = getVoterPhase(currentSession);
+    if (phase === 'results') {
+      navigate('/results', { replace: true });
+      return;
+    }
+
+    if (currentSession.hasVoted || phase === 'waiting') {
+      navigate('/waiting', { replace: true });
+      return;
+    }
+
+    navigate('/ballot', { replace: true });
+  }, [navigate]);
+
+  const calculateAge = useCallback((value) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+    if (!match) {
+      return null;
+    }
+
+    const year = Number.parseInt(match[1], 10);
+    const month = Number.parseInt(match[2], 10);
+    const day = Number.parseInt(match[3], 10);
+    const parsed = new Date(year, month - 1, day);
+    if (
+      Number.isNaN(parsed.getTime())
+      || parsed.getFullYear() !== year
+      || parsed.getMonth() !== month - 1
+      || parsed.getDate() !== day
+      || parsed > new Date()
+    ) {
+      return null;
+    }
+
+    const today = new Date();
+    let years = today.getFullYear() - year;
+    const hasReachedBirthday = (today.getMonth() + 1 > month)
+      || ((today.getMonth() + 1 === month) && today.getDate() >= day);
+
+    if (!hasReachedBirthday) {
+      years -= 1;
+    }
+
+    return years;
+  }, []);
+
+  const handleBirthdateChange = useCallback((value) => {
+    setBirthdate(value);
+
+    if (stepIndex !== 1) {
+      return;
+    }
+
+    if (!value) {
+      setError('Birthdate is required.');
+      return;
+    }
+
+    const years = calculateAge(value);
+    if (years !== null && years < 18) {
+      setError('You must be at least 18 years old to vote.');
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 420);
+      return;
+    }
+
+    setError('');
+  }, [calculateAge, stepIndex]);
 
   const steps = useMemo(() => ([
     {
@@ -28,11 +102,11 @@ export default function IdentityArchive() {
       type: 'text',
     },
     {
-      label: 'AGE',
-      placeholder: 'ENTER AGE (18+)',
-      value: age,
-      onChange: setAge,
-      type: 'number',
+      label: 'BIRTHDATE',
+      placeholder: '',
+      value: birthdate,
+      onChange: handleBirthdateChange,
+      type: 'date',
     },
     {
       label: 'VOTER ID CODE',
@@ -48,7 +122,13 @@ export default function IdentityArchive() {
       onChange: setSessionCode,
       type: 'text',
     },
-  ]), [name, age, voterIdCode, sessionCode]);
+  ]), [name, birthdate, voterIdCode, sessionCode, handleBirthdateChange]);
+
+  const handleBack = () => {
+    if (isSubmitting || stepIndex === 0) return;
+    setError('');
+    setStepIndex((current) => Math.max(0, current - 1));
+  };
 
   const triggerSnag = (message) => {
     setError(message);
@@ -63,9 +143,14 @@ export default function IdentityArchive() {
     }
 
     if (stepIndex === 1) {
-      const parsedAge = parseInt(age, 10);
-      if (Number.isNaN(parsedAge) || parsedAge < 18) {
-        triggerSnag('Age must be 18 or above.');
+      const years = calculateAge(birthdate);
+      if (years === null) {
+        triggerSnag('Birthdate is required.');
+        return false;
+      }
+
+      if (years < 18) {
+        triggerSnag('You must be at least 18 years old to vote.');
         return false;
       }
     }
@@ -99,7 +184,7 @@ export default function IdentityArchive() {
     try {
       const payload = {
         name: name.trim(),
-        age: parseInt(age, 10),
+        birthdate,
         voterIdCode: voterIdCode.trim(),
         sessionCode: sessionCode.trim().toUpperCase(),
       };
@@ -120,14 +205,25 @@ export default function IdentityArchive() {
         token: result.token,
         voterId: result.voter.id,
         voterName: result.voter.name,
+        birthdate,
         voterIdCode: voterIdCode.trim(),
         sessionCode: result.sessionCode || sessionCode.trim().toUpperCase(),
         electionId: result.election.id,
         electionTitle: result.election.title,
-        hasVoted: false,
-        phase: VOTER_PHASES.BALLOT,
+        electionStatus: result.election.status,
+        hasVoted: !!result.hasVoted,
+        selectedCandidateId: result.selectedCandidateId || null,
+        votedAt: result.votedAt || null,
+        phase: result.phase || 'ballot',
       });
-      navigate('/ballot');
+      const phase = result.phase || 'ballot';
+      if (phase === 'results') {
+        navigate('/results');
+      } else if (phase === 'waiting' || result.hasVoted) {
+        navigate('/waiting');
+      } else {
+        navigate('/ballot');
+      }
     } catch (err) {
       triggerSnag(err.message || 'Unable to verify identity.');
     } finally {
@@ -174,11 +270,9 @@ export default function IdentityArchive() {
   };
 
   return (
-    <motion.div
+    <div
       className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden"
-      animate={isFlipping ? { rotateY: 180, opacity: 0 } : { rotateY: 0, opacity: 1 }}
-      transition={{ duration: 0.6, ease: [0.6, 0.01, 0.2, 1] }}
-      style={{ transformStyle: 'preserve-3d' }}
+      style={isFlipping ? { transform: 'rotateY(180deg)', opacity: 0, transition: 'transform 0.6s ease, opacity 0.6s ease' } : { transition: 'transform 0.6s ease, opacity 0.6s ease' }}
     >
       
       {/* Background massive BALLOT watermark */}
@@ -189,21 +283,15 @@ export default function IdentityArchive() {
       </div>
 
       {/* Main Content */}
-      <motion.div 
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: [0.19, 1, 0.22, 1] }}
-        className="relative z-10 w-full max-w-2xl flex flex-col items-center"
-      >
+      <div className="relative z-10 w-full max-w-2xl flex flex-col items-center">
         <div className="text-center mb-12">
           <p className="label-md text-[var(--tertiary-container)] mb-4 tracking-widest font-bold">VERIFICATION PHASE</p>
           <h2 className="font-muse text-5xl text-[var(--primary)]">Identity Archive</h2>
         </div>
 
-        <motion.div
+        <div
           className="paper-float w-full p-16 flex flex-col items-center"
-          animate={isShaking ? { x: [-10, 8, -6, 4, 0] } : {}}
-          transition={{ duration: 0.4 }}
+          style={isShaking ? { transform: 'translateX(-4px)', transition: 'transform 0.4s ease' } : {}}
         >
           <div className="w-full mb-6">
             <p className="label-md text-gray-500 mb-3">ENTRY MODE</p>
@@ -238,10 +326,9 @@ export default function IdentityArchive() {
           {entryMode === 'voter' ? (
             <>
               <div className="w-full mb-8 overflow-hidden">
-                <motion.div
+                <div
                   className="flex"
-                  animate={{ x: `-${stepIndex * 100}%` }}
-                  transition={{ type: 'spring', stiffness: 220, damping: 28 }}
+                  style={{ transform: `translateX(-${stepIndex * 100}%)`, transition: 'transform 0.42s cubic-bezier(0.22, 1, 0.36, 1)' }}
                 >
                   {steps.map((step) => (
                     <div key={step.label} className="w-full shrink-0 pr-2">
@@ -249,7 +336,7 @@ export default function IdentityArchive() {
                       <input
                         type={step.type}
                         placeholder={step.placeholder}
-                        className="w-full p-6 text-xl tracking-widest font-grotesque uppercase bg-[var(--surface-container-high)] shadow-[var(--layer-recessed)] text-[var(--primary)] placeholder-gray-400 focus:outline-none focus:bg-[var(--surface-container-highest)] transition-colors"
+                        className={`w-full p-6 text-xl tracking-widest font-grotesque ${step.type === 'date' ? '' : 'uppercase'} bg-[var(--surface-container-high)] shadow-[var(--layer-recessed)] text-[var(--primary)] placeholder-gray-400 focus:outline-none focus:bg-[var(--surface-container-highest)] transition-colors`}
                         value={step.value}
                         onChange={(e) => step.onChange(e.target.value)}
                         onKeyDown={handleKeyDown}
@@ -257,7 +344,7 @@ export default function IdentityArchive() {
                       />
                     </div>
                   ))}
-                </motion.div>
+                </div>
               </div>
 
               <div className="w-full flex items-center justify-between mb-4">
@@ -265,7 +352,16 @@ export default function IdentityArchive() {
                 {error ? <p className="label-md text-red-700">{error}</p> : null}
               </div>
 
-              <div className="w-full flex justify-end">
+              <div className="w-full flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  disabled={isSubmitting || stepIndex === 0}
+                  className="px-6 py-4 border border-gray-300 text-[var(--primary)] label-md tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  PREVIOUS
+                </button>
+
                 <button
                   onClick={handleAdvance}
                   disabled={isSubmitting}
@@ -313,7 +409,7 @@ export default function IdentityArchive() {
               </div>
             </>
           )}
-        </motion.div>
+        </div>
 
         {/* Footer Meta */}
         <div className="w-full max-w-2xl flex justify-between items-center mt-8 text-gray-400">
@@ -323,7 +419,7 @@ export default function IdentityArchive() {
           </div>
           <span className="label-md text-[0.6rem]">SERIAL: A-2949-V01</span>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }

@@ -8,7 +8,7 @@ export function VoterRoute({ children }) {
   }
 
   const phase = getVoterPhase(session);
-  if (phase === VOTER_PHASES.WAITING) {
+  if (session.hasVoted && phase === VOTER_PHASES.WAITING) {
     return <Navigate to="/waiting" replace />;
   }
   if (phase === VOTER_PHASES.RESULTS) {
@@ -22,6 +22,10 @@ export function WaitingRoute({ children }) {
   const session = getSession();
   if (!isVoterSession(session)) {
     return <Navigate to="/" replace />;
+  }
+
+  if (!session.hasVoted) {
+    return <Navigate to="/ballot" replace />;
   }
 
   const phase = getVoterPhase(session);
@@ -55,7 +59,7 @@ export function ResultsRoute({ children }) {
   }
 
   const phase = getVoterPhase(session);
-  if (phase === VOTER_PHASES.WAITING) {
+  if (session.hasVoted && phase === VOTER_PHASES.WAITING) {
     return <Navigate to="/waiting" replace />;
   }
 

@@ -46,6 +46,10 @@ export function getVoterPhase(session = readSession()) {
     return null;
   }
 
+  if (session.electionStatus === 'closed') {
+    return VOTER_PHASES.RESULTS;
+  }
+
   if (session.phase) {
     return session.phase;
   }
@@ -66,7 +70,14 @@ export function markVoteSubmitted(candidateId) {
     selectedCandidateId: candidateId,
     hasVoted: true,
     phase: VOTER_PHASES.WAITING,
+    waitingDismissedAt: null,
     votedAt: new Date().toISOString(),
+  });
+}
+
+export function markWaitingDismissed() {
+  return setSession({
+    waitingDismissedAt: new Date().toISOString(),
   });
 }
 

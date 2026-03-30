@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   deleteCandidate,
@@ -11,13 +11,16 @@ import {
   regenerateElectionCode,
   updateElectionStatus,
 } from '../../lib/api';
-import { getSession, isAdminSession } from '../../store/session';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { useToast } from '../../components/ui/useToast';
+import { getSession, isAdminSession, setSession } from '../../store/session';
 
 const FILTERS = ['all', 'open', 'draft', 'closed'];
 
 export default function BlueprintGrid() {
   const navigate = useNavigate();
   const session = useMemo(() => getSession(), []);
+  const { pushToast } = useToast();
 
   const [elections, setElections] = useState([]);
   const [selectedElectionId, setSelectedElectionId] = useState(null);
@@ -31,6 +34,7 @@ export default function BlueprintGrid() {
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState('');
   const [error, setError] = useState('');
+  const [confirmState, setConfirmState] = useState(null);
 
   const filteredElections = useMemo(() => {
     if (filter === 'all') return elections;
@@ -42,7 +46,7 @@ export default function BlueprintGrid() {
     [elections, selectedElectionId]
   );
 
-  const loadElections = async (preferredElectionId = null) => {
+  const loadElections = useCallback(async (preferredElectionId = null) => {
     const electionListResponse = await getAdminElections();
     const nextElections = electionListResponse.elections || [];
     setElections(nextElections);
@@ -61,9 +65,9 @@ export default function BlueprintGrid() {
 
     setSelectedElectionId(nextSelected?.id || null);
     return nextSelected;
-  };
+  }, []);
 
-  const loadElectionDetails = async (electionId) => {
+  const loadElectionDetails = useCallback(async (electionId) => {
     if (!electionId) {
       setCandidates([]);
       setIntegrity(null);
@@ -91,16 +95,16 @@ export default function BlueprintGrid() {
       });
       return next;
     });
-  };
+  }, []);
 
-  const refreshAll = async (preferredElectionId = null) => {
+  const refreshAll = useCallback(async (preferredElectionId = null) => {
     const selected = await loadElections(preferredElectionId || selectedElectionId);
     if (selected?.id) {
       await loadElectionDetails(selected.id);
     } else {
       await loadElectionDetails(null);
     }
-  };
+  }, [loadElectionDetails, loadElections, selectedElectionId]);
 
   useEffect(() => {
     let mounted = true;
@@ -127,7 +131,7 @@ export default function BlueprintGrid() {
     return () => {
       mounted = false;
     };
-  }, [session]);
+  }, [refreshAll, session]);
 
   useEffect(() => {
     if (!selectedElectionId) return;
@@ -135,18 +139,35 @@ export default function BlueprintGrid() {
     loadElectionDetails(selectedElectionId).catch((err) => {
       setError(err.message || 'Unable to load election details');
     });
-  }, [selectedElectionId]);
+  }, [loadElectionDetails, selectedElectionId]);
 
-  const withBusy = async (label, fn) => {
+  const withBusy = async (label, fn, successToast) => {
     try {
       setError('');
       setBusyAction(label);
       await fn();
+      if (successToast) {
+        pushToast({
+          type: 'success',
+          title: successToast.title,
+          message: successToast.message,
+        });
+      }
     } catch (err) {
-      setError(err.message || 'Action failed');
+      const message = err.message || 'Action failed';
+      setError(message);
+      pushToast({
+        type: 'error',
+        title: 'Action Failed',
+        message,
+      });
     } finally {
       setBusyAction('');
     }
+  };
+
+  const openConfirm = ({ title, message, confirmTone = 'primary', onConfirm }) => {
+    setConfirmState({ title, message, confirmTone, onConfirm });
   };
 
   const handleInject = async (candidateId, candidateName) => {
@@ -154,24 +175,37 @@ export default function BlueprintGrid() {
 
     const rawCount = Number.parseInt(String(injectionMap[candidateId] ?? 10), 10);
     const count = Math.max(1, Math.min(10000, Number.isNaN(rawCount) ? 1 : rawCount));
-    const confirmed = window.confirm(`Inject ${count} votes into ${candidateName}?`);
-    if (!confirmed) return;
-
-    await withBusy('inject', async () => {
-      await injectFakeVotes(selectedElection.id, { candidateId, count });
-      await refreshAll(selectedElection.id);
+    openConfirm({
+      title: 'Inject Votes',
+      message: `Inject ${count} synthetic votes into ${candidateName}?`,
+      onConfirm: async () => {
+        await withBusy('inject', async () => {
+          await injectFakeVotes(selectedElection.id, { candidateId, count });
+          await refreshAll(selectedElection.id);
+        }, {
+          title: 'Votes Injected',
+          message: `${count} votes were injected into ${candidateName}.`,
+        });
+      },
     });
   };
 
   const handleDeleteCandidate = async (candidateId, candidateName) => {
     if (!selectedElection) return;
 
-    const confirmed = window.confirm(`Remove ${candidateName} from this session?`);
-    if (!confirmed) return;
-
-    await withBusy('delete-candidate', async () => {
-      await deleteCandidate(candidateId);
-      await refreshAll(selectedElection.id);
+    openConfirm({
+      title: 'Remove Candidate',
+      message: `Remove ${candidateName} from this session?`,
+      confirmTone: 'danger',
+      onConfirm: async () => {
+        await withBusy('delete-candidate', async () => {
+          await deleteCandidate(candidateId);
+          await refreshAll(selectedElection.id);
+        }, {
+          title: 'Candidate Removed',
+          message: `${candidateName} was removed from the session.`,
+        });
+      },
     });
   };
 
@@ -180,6 +214,9 @@ export default function BlueprintGrid() {
     await withBusy('regen-code', async () => {
       await regenerateElectionCode(selectedElection.id);
       await refreshAll(selectedElection.id);
+    }, {
+      title: 'Session Code Regenerated',
+      message: 'A new code was issued for this election.',
     });
   };
 
@@ -188,18 +225,28 @@ export default function BlueprintGrid() {
     await withBusy(`status-${status}`, async () => {
       await updateElectionStatus(selectedElection.id, status);
       await refreshAll(selectedElection.id);
+    }, {
+      title: 'Status Updated',
+      message: `Election status changed to ${status}.`,
     });
   };
 
   const handleDeleteSession = async () => {
     if (!selectedElection) return;
 
-    const confirmed = window.confirm(`Delete session "${selectedElection.title}"? This cannot be undone.`);
-    if (!confirmed) return;
-
-    await withBusy('delete-session', async () => {
-      await deleteElection(selectedElection.id);
-      await refreshAll(null);
+    openConfirm({
+      title: 'Delete Session',
+      message: `Delete session "${selectedElection.title}"? This cannot be undone.`,
+      confirmTone: 'danger',
+      onConfirm: async () => {
+        await withBusy('delete-session', async () => {
+          await deleteElection(selectedElection.id);
+          await refreshAll(null);
+        }, {
+          title: 'Session Deleted',
+          message: 'Election session was removed permanently.',
+        });
+      },
     });
   };
 
@@ -208,8 +255,18 @@ export default function BlueprintGrid() {
 
     try {
       await navigator.clipboard.writeText(selectedElection.code);
+      pushToast({
+        type: 'info',
+        title: 'Session Code Copied',
+        message: 'The election code was copied to clipboard.',
+      });
     } catch {
       setError('Unable to copy session code to clipboard');
+      pushToast({
+        type: 'error',
+        title: 'Copy Failed',
+        message: 'Unable to copy session code to clipboard.',
+      });
     }
   };
 
@@ -223,6 +280,13 @@ export default function BlueprintGrid() {
     const currentValue = Number.parseInt(String(injectionMap[candidateId] ?? 10), 10);
     const base = Number.isNaN(currentValue) ? 1 : currentValue;
     setInjectionCount(candidateId, base + delta);
+  };
+
+  const handleViewResults = () => {
+    if (selectedElection?.id) {
+      setSession({ electionId: selectedElection.id });
+    }
+    navigate('/results');
   };
 
   if (loading) {
@@ -246,7 +310,7 @@ export default function BlueprintGrid() {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/results')}
+            onClick={handleViewResults}
             className="border border-white/60 text-white px-6 py-3 uppercase text-xs tracking-widest hover:bg-white/10 transition-colors"
           >
             View Results
@@ -411,6 +475,26 @@ export default function BlueprintGrid() {
           </div>
         </section>
       </div>
+
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.title || 'Confirm'}
+        message={confirmState?.message || ''}
+        confirmTone={confirmState?.confirmTone || 'primary'}
+        confirmLabel="Proceed"
+        cancelLabel="Cancel"
+        busy={!!busyAction}
+        onCancel={() => {
+          if (!busyAction) {
+            setConfirmState(null);
+          }
+        }}
+        onConfirm={async () => {
+          if (!confirmState?.onConfirm) return;
+          await confirmState.onConfirm();
+          setConfirmState(null);
+        }}
+      />
     </div>
   );
 }
