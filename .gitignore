@@ -1,0 +1,11 @@
+node_modules/
+*.db
+.env
+.DS_Store
+dist/
+build/
+*.log
+.env.*
+frontend/.vite/
+backend/.cache/
+.txt
