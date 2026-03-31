@@ -328,13 +328,13 @@ export default function IdentityArchive() {
 
   return (
     <div
-      className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#f7f7f7]"
+      className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[var(--surface)]"
       style={isFlipping ? { transform: 'rotateY(180deg)', opacity: 0, transition: 'transform 0.6s ease, opacity 0.6s ease' } : { transition: 'transform 0.6s ease, opacity 0.6s ease' }}
     >
       
       {/* Background massive BALLOT watermark */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden z-0">
-        <span className="font-muse text-[clamp(10rem,22vw,30rem)] leading-[0.8] text-black/[0.07] whitespace-nowrap uppercase tracking-tighter">
+        <span className="font-muse text-[clamp(10rem,22vw,30rem)] leading-[0.8] text-[var(--on-surface)]/[0.07] whitespace-nowrap uppercase tracking-tighter">
           BALLOT
         </span>
       </div>
@@ -351,12 +351,12 @@ export default function IdentityArchive() {
       {/* Main Content */}
       <div className="relative z-10 w-full max-w-2xl flex flex-col items-center mt-12">
         <div className="text-center mb-8">
-          <p className="label-md text-gray-500 mb-2 tracking-[0.2em] font-bold text-[0.65rem]">VERIFICATION PHASE</p>
-          <h2 className="font-muse text-[2.5rem] md:text-5xl text-black">Identity Archive</h2>
+          <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em] font-bold text-[0.65rem]">VERIFICATION PHASE</p>
+          <h2 className="font-muse text-[2.5rem] md:text-5xl text-[var(--on-surface)]">Identity Archive</h2>
         </div>
 
         <div
-          className="bg-white/35 backdrop-blur-md shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] border border-white/40 w-full max-w-xl p-10 md:p-14 flex flex-col items-center relative"
+          className="bg-[var(--surface-container-lowest)]/35 backdrop-blur-md shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] border border-white/40 w-full max-w-xl p-10 md:p-14 flex flex-col items-center relative"
           style={isShaking ? { transform: 'translateX(-4px)', transition: 'transform 0.4s ease' } : {}}
         >
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-black/5 to-transparent"></div>
@@ -369,7 +369,7 @@ export default function IdentityArchive() {
                   setEntryMode('voter');
                   setError('');
                 }}
-                className={`uppercase text-[0.65rem] tracking-[0.2em] pb-1 border-b-2 transition-all duration-300 ${entryMode === 'voter' ? 'text-black border-black font-bold' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
+                className={`uppercase text-[0.65rem] tracking-[0.2em] pb-1 border-b-2 transition-all duration-300 ${entryMode === 'voter' ? 'text-[var(--on-surface)] border-[var(--on-surface)] font-bold' : 'text-[var(--on-surface)] opacity-50 border-transparent hover:text-[var(--on-surface)] opacity-80'}`}
                 disabled={isSubmitting}
               >
                 Voter Entry
@@ -380,7 +380,7 @@ export default function IdentityArchive() {
                   setEntryMode('admin');
                   setError('');
                 }}
-                className={`uppercase text-[0.65rem] tracking-[0.2em] pb-1 border-b-2 transition-all duration-300 ${entryMode === 'admin' ? 'text-black border-black font-bold' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
+                className={`uppercase text-[0.65rem] tracking-[0.2em] pb-1 border-b-2 transition-all duration-300 ${entryMode === 'admin' ? 'text-[var(--on-surface)] border-[var(--on-surface)] font-bold' : 'text-[var(--on-surface)] opacity-50 border-transparent hover:text-[var(--on-surface)] opacity-80'}`}
                 disabled={isSubmitting}
               >
                 Admin Entry
@@ -397,11 +397,11 @@ export default function IdentityArchive() {
                 >
                   {steps.map((step) => (
                     <div key={step.label} className="w-full shrink-0 px-1">
-                      <label className="uppercase text-[0.6rem] tracking-[0.2em] text-gray-400 mb-3 block">{step.label}</label>
+                      <label className="uppercase text-[0.6rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-3 block">{step.label}</label>
                       <input
                         type={step.type}
                         placeholder={step.placeholder}
-                        className={`w-full p-4 md:p-5 text-lg md:text-xl tracking-widest font-muse ${step.type === 'date' ? '' : 'uppercase'} bg-[#f0f0f0] text-black placeholder-gray-400 focus:outline-none focus:bg-[#e8e8e8] transition-colors border-none`}
+                        className={`w-full p-4 md:p-5 text-lg md:text-xl tracking-widest font-muse ${step.type === 'date' ? '' : 'uppercase'} bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/50 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors border-none`}
                         value={step.value}
                         onChange={(e) => step.onChange(e.target.value)}
                         onKeyDown={handleKeyDown}
@@ -413,8 +413,8 @@ export default function IdentityArchive() {
               </div>
 
               <div className="w-full flex items-center justify-between mb-6 h-4 relative z-20">
-                <p className="uppercase text-[0.6rem] tracking-[0.2em] text-gray-400">STEP {stepIndex + 1}</p>
-                {error ? <p className="uppercase text-[0.6rem] tracking-[0.1em] text-red-600 absolute right-0 bg-white/90 pl-2">{error}</p> : null}
+                <p className="uppercase text-[0.6rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50">STEP {stepIndex + 1}</p>
+                {error ? <p className="uppercase text-[0.6rem] tracking-[0.1em] text-red-600 absolute right-0 bg-[var(--surface-container-lowest)]/90 pl-2">{error}</p> : null}
               </div>
 
               <div className="w-full flex items-center justify-end relative z-20">
@@ -423,7 +423,7 @@ export default function IdentityArchive() {
                     type="button"
                     onClick={handleBack}
                     disabled={isSubmitting}
-                    className="mr-auto text-[0.65rem] uppercase tracking-[0.2em] text-gray-400 hover:text-black transition-colors"
+                    className="mr-auto text-[0.65rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-50 hover:text-[var(--on-surface)] transition-colors"
                   >
                     Previous
                   </button>
@@ -432,7 +432,7 @@ export default function IdentityArchive() {
                 <button
                   onClick={handleAdvance}
                   disabled={isSubmitting}
-                  className="group bg-[#1a1c1c] text-white px-6 py-4 flex items-center gap-4 transition-all duration-200 hover:bg-black hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+                  className="group bg-[var(--primary)] text-[var(--on-primary)] px-6 py-4 flex items-center gap-4 transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
                 >
                   <span className="text-[0.65rem] uppercase tracking-[0.2em]">
                     {isSubmitting ? 'VERIFYING' : stepIndex < steps.length - 1 ? 'NEXT SEQUENCE' : 'ENTER CHAMBER'}
@@ -444,11 +444,11 @@ export default function IdentityArchive() {
           ) : (
             <>
               <div className="w-full mb-6 relative z-20">
-                <label className="uppercase text-[0.6rem] tracking-[0.2em] text-gray-400 mb-3 block">ADMIN MASTER KEY</label>
+                <label className="uppercase text-[0.6rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-3 block">ADMIN MASTER KEY</label>
                 <input
                   type="password"
                   placeholder=""
-                  className="w-full p-4 text-xl tracking-widest font-muse uppercase bg-[#f0f0f0] text-black placeholder-gray-400 focus:outline-none focus:bg-[#e8e8e8] transition-colors border-none"
+                  className="w-full p-4 text-xl tracking-widest font-muse uppercase bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/50 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors border-none"
                   value={adminKey}
                   onChange={(event) => setAdminKey(event.target.value)}
                   onKeyDown={handleKeyDown}
@@ -465,9 +465,9 @@ export default function IdentityArchive() {
                   type="button"
                   onClick={handleAdminAccess}
                   disabled={isSubmitting}
-                  className="group bg-[#1a1c1c] text-white px-6 py-4 flex items-center gap-4 transition-all duration-200 hover:bg-black hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+                  className="group bg-[var(--primary)] text-[var(--on-primary)] px-6 py-4 flex items-center gap-4 transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
                 >
-                  <span className="text-[0.65rem] uppercase tracking-[0.2em] text-white">
+                  <span className="text-[0.65rem] uppercase tracking-[0.2em] text-[var(--on-primary)]">
                     {isSubmitting ? 'VERIFYING' : 'ENTER CHAMBER'}
                   </span>
                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
@@ -478,9 +478,9 @@ export default function IdentityArchive() {
         </div>
 
         {/* Footer Meta */}
-        <div className="w-full max-w-xl flex justify-between items-center mt-6 text-gray-400 z-10 pl-2">
+        <div className="w-full max-w-xl flex justify-between items-center mt-6 text-[var(--on-surface)] opacity-50 z-10 pl-2">
           <div className="flex items-center gap-2">
-            <Shield size={12} className="text-gray-400" />
+            <Shield size={12} className="text-[var(--on-surface)] opacity-50" />
             <span className="text-[0.55rem] uppercase tracking-[0.2em]">PROTOCOL SECURED</span>    
           </div>
           <span className="text-[0.55rem] uppercase tracking-[0.2em]">SERIAL: A-2949-V01</span>    

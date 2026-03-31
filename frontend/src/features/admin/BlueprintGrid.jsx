@@ -399,21 +399,21 @@ export default function BlueprintGrid() {
     <div className="min-h-screen text-[var(--primary)] relative z-10 -mt-24 pt-32 px-8 pb-20">
       <div className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <p className="label-md text-gray-500 mb-2 tracking-[0.2em]">ADMIN CONTROL ROOM</p>
+          <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em]">ADMIN CONTROL ROOM</p>
           <h2 className="font-muse font-bold text-6xl text-[var(--primary)]">Session Manager</h2>
         </div>
         <div className="flex gap-3 flex-wrap">
           <button
             type="button"
             onClick={() => navigate('/admin/new')}
-            className="bg-[var(--primary)] text-white px-6 py-3 uppercase text-xs tracking-widest transition-transform duration-200 hover:-translate-y-0.5 shadow-md hover:shadow-lg active:translate-y-0"
+            className="bg-[var(--primary)] text-[var(--on-primary)] px-6 py-3 uppercase text-xs tracking-widest transition-transform duration-200 hover:-translate-y-0.5 shadow-md hover:shadow-lg active:translate-y-0"
           >
             Create Session
           </button>
           <button
             type="button"
             onClick={handleViewResults}
-            className="border border-black/20 text-[var(--primary)] px-6 py-3 uppercase text-xs tracking-widest hover:bg-black/5 transition-all duration-200 shadow-sm hover:shadow-md active:translate-y-0.5"
+            className="border border-[var(--on-surface)]/20 text-[var(--primary)] px-6 py-3 uppercase text-xs tracking-widest hover:bg-[var(--primary)]/90/5 transition-all duration-200 shadow-sm hover:shadow-md active:translate-y-0.5"
           >
             View Results
           </button>
@@ -421,10 +421,10 @@ export default function BlueprintGrid() {
       </div>
 
       <div className="grid grid-cols-12 gap-6">
-        <aside className="col-span-12 lg:col-span-4 bg-white text-[var(--primary)] p-6 shadow-xl">
+        <aside className="col-span-12 lg:col-span-4 bg-[var(--surface-container-lowest)] text-[var(--primary)] p-6 shadow-xl">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-muse italic text-3xl">Voting Sessions</h3>
-            <span className="label-md text-gray-500">{filteredElections.length}</span>
+            <span className="label-md text-[var(--on-surface)] opacity-60">{filteredElections.length}</span>
           </div>
 
           <div className="flex gap-2 mb-5 flex-wrap">
@@ -433,7 +433,7 @@ export default function BlueprintGrid() {
                 key={item}
                 type="button"
                 onClick={() => setFilter(item)}
-                className={`px-3 py-1 text-[0.65rem] uppercase tracking-wider border transition-all duration-200 hover:-translate-y-0.5 shadow-sm hover:shadow-md active:translate-y-0 ${filter === item ? 'bg-[var(--primary)] text-white' : 'border-gray-300 text-gray-600 hover:bg-gray-100'}`}
+                className={`px-3 py-1 text-[0.65rem] uppercase tracking-wider border transition-all duration-200 hover:-translate-y-0.5 shadow-sm hover:shadow-md active:translate-y-0 ${filter === item ? 'bg-[var(--primary)] text-[var(--on-primary)]' : 'border-[var(--outline-variant)] text-[var(--on-surface)] opacity-80 hover:bg-[var(--surface-container)]'}`}
               >
                 {item}
               </button>
@@ -448,53 +448,53 @@ export default function BlueprintGrid() {
                   type="button"
                   key={item.id}
                   onClick={() => setSelectedElectionId(item.id)}
-                  className={`w-full text-left border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 ${isSelected ? 'border-[var(--primary)] bg-[var(--surface-container-low)] shadow-sm' : 'border-gray-200 hover:bg-gray-50'}`}
+                  className={`w-full text-left border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 ${isSelected ? 'border-[var(--primary)] bg-[var(--surface-container-low)] shadow-sm' : 'border-[var(--outline-variant)] hover:bg-[var(--surface-container-low)]'}`}
                 >
                   <div className="flex justify-between items-start gap-3">
                     <p className="font-semibold text-sm">{item.title}</p>
-                    <span className={`text-[0.55rem] uppercase tracking-widest ${item.status === 'open' ? 'text-green-700' : item.status === 'closed' ? 'text-gray-500' : 'text-amber-700'}`}>
+                    <span className={`text-[0.55rem] uppercase tracking-widest ${item.status === 'open' ? 'text-green-700' : item.status === 'closed' ? 'text-[var(--on-surface)] opacity-60' : 'text-amber-700'}`}>
                       {item.status}
                     </span>
                   </div>
-                  <p className="label-md text-gray-500 mt-2">Session Code: {item.code}</p>
-                  <p className="label-md text-gray-400 mt-1">
+                  <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">Session Code: {item.code}</p>
+                  <p className="label-md text-[var(--on-surface)] opacity-50 mt-1">
                     Votes {item.totalVotes || 0} | Real IDs {item.voterCount || 0}
                   </p>
                 </button>
               );
             })}
-            {!filteredElections.length ? <p className="text-sm text-gray-500">No sessions for this filter.</p> : null}
+            {!filteredElections.length ? <p className="text-sm text-[var(--on-surface)] opacity-60">No sessions for this filter.</p> : null}
           </div>
         </aside>
 
         <section className="col-span-12 lg:col-span-8 space-y-6">
-          <div className="bg-white text-[var(--primary)] p-6 shadow-xl">
+          <div className="bg-[var(--surface-container-lowest)] text-[var(--primary)] p-6 shadow-xl">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="label-md text-gray-500">Selected Session</p>
+                <p className="label-md text-[var(--on-surface)] opacity-60">Selected Session</p>
                 <h3 className="font-muse italic text-4xl">{selectedElection ? selectedElection.title : 'None selected'}</h3>
-                <p className="label-md text-gray-500 mt-2">Code: {selectedElection?.code || '-'}</p>
-                <p className="label-md text-gray-500 mt-1">Ends: {selectedElection?.end_date ? new Date(selectedElection.end_date).toLocaleString() : 'Not scheduled'}</p>
-                <p className="label-md text-gray-700 mt-1">Time Remaining: {remainingTimeLabel}</p>
+                <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">Code: {selectedElection?.code || '-'}</p>
+                <p className="label-md text-[var(--on-surface)] opacity-60 mt-1">Ends: {selectedElection?.end_date ? new Date(selectedElection.end_date).toLocaleString() : 'Not scheduled'}</p>
+                <p className="label-md text-[var(--on-surface)] opacity-90 mt-1">Time Remaining: {remainingTimeLabel}</p>
               </div>
               <div className="flex gap-2 flex-wrap">
-                <button type="button" onClick={copySessionCode} className="border border-gray-300 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50" disabled={!selectedElection}>Copy Code</button>
-                <button type="button" onClick={handleRegenerateCode} className="border border-gray-300 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50" disabled={!selectedElection || !!busyAction}>Regenerate Code</button>
+                <button type="button" onClick={copySessionCode} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50" disabled={!selectedElection}>Copy Code</button>
+                <button type="button" onClick={handleRegenerateCode} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50" disabled={!selectedElection || !!busyAction}>Regenerate Code</button>
                 <button type="button" onClick={() => handleStatusChange('open')} className="border border-green-700 text-green-700 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-green-50 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50" disabled={!selectedElection || !!busyAction || selectedElection.status === 'open'}>Open</button>
-                <button type="button" onClick={() => handleStatusChange('closed')} className="border border-gray-700 text-gray-700 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-50 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50" disabled={!selectedElection || !!busyAction || selectedElection.status === 'closed'}>Close</button>
+                <button type="button" onClick={() => handleStatusChange('closed')} className="border border-[var(--on-surface)] text-[var(--on-surface)] opacity-90 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container-low)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50" disabled={!selectedElection || !!busyAction || selectedElection.status === 'closed'}>Close</button>
                 <button type="button" onClick={() => handleStatusChange('draft')} className="border border-amber-700 text-amber-700 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-amber-50 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50" disabled={!selectedElection || !!busyAction || selectedElection.status === 'draft'}>Draft</button>
                 <button type="button" onClick={handleDeleteSession} className="border border-red-700 text-red-700 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-red-50 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50" disabled={!selectedElection || !!busyAction}>Delete</button>
               </div>
             </div>
             {error ? <p className="label-md text-red-700 mt-4">{error}</p> : null}
 
-            <div className="mt-5 border-t border-gray-200 pt-4">
-              <p className="label-md text-gray-500 mb-3">Extend Voting End Time</p>
+            <div className="mt-5 border-t border-[var(--outline-variant)] pt-4">
+              <p className="label-md text-[var(--on-surface)] opacity-60 mb-3">Extend Voting End Time</p>
               <div className="flex flex-wrap gap-2 mb-3">
-                <button type="button" onClick={() => handleExtendEndTime(5 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-gray-300 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100 disabled:opacity-50">+5 min</button>
-                <button type="button" onClick={() => handleExtendEndTime(15 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-gray-300 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100 disabled:opacity-50">+15 min</button>
-                <button type="button" onClick={() => handleExtendEndTime(60 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-gray-300 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100 disabled:opacity-50">+1 hour</button>
-                <button type="button" onClick={() => handleExtendEndTime(24 * 60 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-gray-300 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100 disabled:opacity-50">+1 day</button>
+                <button type="button" onClick={() => handleExtendEndTime(5 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50">+5 min</button>
+                <button type="button" onClick={() => handleExtendEndTime(15 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50">+15 min</button>
+                <button type="button" onClick={() => handleExtendEndTime(60 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50">+1 hour</button>
+                <button type="button" onClick={() => handleExtendEndTime(24 * 60 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50">+1 day</button>
               </div>
 
               <div className="flex flex-col md:flex-row gap-2 md:items-center">
@@ -503,13 +503,13 @@ export default function BlueprintGrid() {
                   value={customEndDate}
                   onChange={(event) => setCustomEndDate(event.target.value)}
                   disabled={!selectedElection || !!busyAction}
-                  className="border border-gray-300 px-3 py-2"
+                  className="border border-[var(--outline-variant)] px-3 py-2"
                 />
                 <button
                   type="button"
                   onClick={handleApplyCustomEndDate}
                   disabled={!selectedElection || !!busyAction}
-                  className="border border-[var(--primary)] text-[var(--primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100 disabled:opacity-50"
+                  className="border border-[var(--primary)] text-[var(--primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50"
                 >
                   Set End Time
                 </button>
@@ -517,39 +517,39 @@ export default function BlueprintGrid() {
             </div>
           </div>
 
-          <div className="bg-white text-[var(--primary)] p-6 shadow-xl">
+          <div className="bg-[var(--surface-container-lowest)] text-[var(--primary)] p-6 shadow-xl">
             <h4 className="font-muse italic text-3xl mb-4">Integrity Console</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="border border-gray-200 p-4"><p className="label-md text-gray-500">Total Votes</p><p className="text-3xl font-bold">{integrity?.totalVotes || 0}</p></div>
-              <div className="border border-gray-200 p-4"><p className="label-md text-gray-500">Real Votes</p><p className="text-3xl font-bold text-green-700">{integrity?.realVotes || 0}</p></div>
-              <div className="border border-gray-200 p-4"><p className="label-md text-gray-500">Fake Votes</p><p className="text-3xl font-bold text-red-700">{integrity?.fakeVotes || 0}</p></div>
-              <div className="border border-gray-200 p-4"><p className="label-md text-gray-500">Validity</p><p className={`text-2xl font-bold ${integrity?.integrityStatus === 'clean' ? 'text-green-700' : 'text-red-700'}`}>{integrity?.integrityStatus === 'clean' ? 'CLEAN' : 'RIGGED'}</p></div>
+              <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Total Votes</p><p className="text-3xl font-bold">{integrity?.totalVotes || 0}</p></div>
+              <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Real Votes</p><p className="text-3xl font-bold text-green-700">{integrity?.realVotes || 0}</p></div>
+              <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Fake Votes</p><p className="text-3xl font-bold text-red-700">{integrity?.fakeVotes || 0}</p></div>
+              <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Validity</p><p className={`text-2xl font-bold ${integrity?.integrityStatus === 'clean' ? 'text-green-700' : 'text-red-700'}`}>{integrity?.integrityStatus === 'clean' ? 'CLEAN' : 'RIGGED'}</p></div>
             </div>
 
             <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
               {(integrity?.candidates || []).map((item) => (
-                <div key={item.id} className="border border-gray-200 p-4">
+                <div key={item.id} className="border border-[var(--outline-variant)] p-4">
                   <div className="flex justify-between items-center">
                     <p className="font-semibold">{item.name}</p>
                     {item.fakeVotes > 0 ? <span className="text-[0.6rem] uppercase tracking-widest text-red-700">rigged</span> : <span className="text-[0.6rem] uppercase tracking-widest text-green-700">valid</span>}
                   </div>
-                  <p className="label-md text-gray-500 mt-2">Real: {item.realVotes} | Fake: {item.fakeVotes} | Total: {item.totalVotes}</p>
+                  <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">Real: {item.realVotes} | Fake: {item.fakeVotes} | Total: {item.totalVotes}</p>
                 </div>
               ))}
             </div>
 
-            <p className="label-md text-gray-500 mt-4">Fake voter records tracked: {fakeVoterAudit.length}</p>
+            <p className="label-md text-[var(--on-surface)] opacity-60 mt-4">Fake voter records tracked: {fakeVoterAudit.length}</p>
           </div>
 
-          <div className="bg-white text-[var(--primary)] p-6 shadow-xl">
+          <div className="bg-[var(--surface-container-lowest)] text-[var(--primary)] p-6 shadow-xl">
             <h4 className="font-muse italic text-3xl mb-4">Injection Controls</h4>
-            <p className="text-sm text-gray-600 mb-5">
+            <p className="text-sm text-[var(--on-surface)] opacity-80 mb-5">
               Set an exact number of votes to inject. Use quick-step buttons for larger stress tests.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {candidates.map((candidate) => (
-                <div key={candidate.id} className="border border-gray-200 p-4">
+                <div key={candidate.id} className="border border-[var(--outline-variant)] p-4">
                   <div className="flex justify-between items-center">
                     <p className="font-semibold">{candidate.name}</p>
                     <button
@@ -561,15 +561,15 @@ export default function BlueprintGrid() {
                       Remove
                     </button>
                   </div>
-                  <p className="label-md text-gray-500 mt-1">Current votes: {candidate.votes}</p>
-                  <label className="label-md text-gray-500 mt-3 block">Inject Count</label>
+                  <p className="label-md text-[var(--on-surface)] opacity-60 mt-1">Current votes: {candidate.votes}</p>
+                  <label className="label-md text-[var(--on-surface)] opacity-60 mt-3 block">Inject Count</label>
                   <input
                     type="number"
                     min="1"
                     max="10000"
                     value={injectionMap[candidate.id] ?? 10}
                     onChange={(event) => setInjectionCount(candidate.id, event.target.value)}
-                    className="w-full mt-2 border border-gray-300 px-3 py-2"
+                    className="w-full mt-2 border border-[var(--outline-variant)] px-3 py-2"
                   />
                   <div className="mt-3 flex gap-2 flex-wrap">
                     {[10, 25, 50, 100].map((step) => (
@@ -577,7 +577,7 @@ export default function BlueprintGrid() {
                         key={step}
                         type="button"
                         onClick={() => bumpInjectionCount(candidate.id, step)}
-                        className="border border-gray-300 px-2 py-1 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100 hover:-translate-y-0.5 shadow-sm active:translate-y-0"
+                        className="border border-[var(--outline-variant)] px-2 py-1 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:-translate-y-0.5 shadow-sm active:translate-y-0"
                       >
                         +{step}
                       </button>
@@ -587,7 +587,7 @@ export default function BlueprintGrid() {
                         key={`minus-${step}`}
                         type="button"
                         onClick={() => bumpInjectionCount(candidate.id, -step)}
-                        className="border border-gray-300 px-2 py-1 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100 hover:-translate-y-0.5 shadow-sm active:translate-y-0"
+                        className="border border-[var(--outline-variant)] px-2 py-1 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:-translate-y-0.5 shadow-sm active:translate-y-0"
                       >
                         -{step}
                       </button>
@@ -597,7 +597,7 @@ export default function BlueprintGrid() {
                     type="button"
                     onClick={() => handleInject(candidate.id, candidate.name)}
                     disabled={!!busyAction}
-                    className="mt-3 bg-[var(--primary)] text-white w-full py-2 uppercase text-xs tracking-widest transition-all duration-200 hover:-translate-y-0.5 shadow-sm hover:shadow-md active:translate-y-0 disabled:opacity-50"
+                    className="mt-3 bg-[var(--primary)] text-[var(--on-primary)] w-full py-2 uppercase text-xs tracking-widest transition-all duration-200 hover:-translate-y-0.5 shadow-sm hover:shadow-md active:translate-y-0 disabled:opacity-50"
                   >
                     Inject
                   </button>

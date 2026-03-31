@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  /* Surface Hierarchy */
+  /* Light Theme variables - Surface Hierarchy */
   --surface: #f9f9f9;
   --surface-container: #eeeeee;
   --surface-container-high: #e8e8e8;
@@ -30,6 +30,34 @@
   
   /* Blueprint/Admin variables */
   --blueprint: #2B4562;
+}
+
+.dark {
+  /* Dark Theme variables - Surface Hierarchy */
+  --surface: #1a1c1c;
+  --surface-container: #272a2a;
+  --surface-container-high: #323535;
+  --surface-container-highest: #3e4141;
+  --surface-container-low: #222424;
+  --surface-container-lowest: #0e0f0f;
+
+  /* Neutrals & Text */
+  --on-surface: #e8e8e8;
+  --outline-variant: #565959;
+  
+  /* Brand Accents */
+  --primary: #e8e8e8;
+  --primary-container: #b3b3b3; 
+  --on-primary: #1a1c1c;
+  --secondary: #8cbaa3; /* Lighter Forest Accent */
+  --tertiary-container: #5c816d;
+
+  /* Depth Layering override for dark theme */
+  --layer-recessed: inset 0px 2px 4px rgba(0,0,0,0.4); 
+  --layer-hover: 0px 40px 40px -20px rgba(0,0,0,0.5); 
+  
+  /* Admin remains same but adjust contrast */
+  --blueprint: #1d3148;
 }
 
 @theme {

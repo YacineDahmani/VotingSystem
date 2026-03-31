@@ -158,18 +158,18 @@ export default function GravitySlot() {
   return (
     <div className="relative min-h-[90vh] flex flex-col items-center pt-16 pb-40 overflow-hidden">
       <div className="absolute top-[40%] flex items-center justify-center pointer-events-none select-none z-0">
-        <span className="font-muse text-[25vw] leading-none text-black/[0.03] whitespace-nowrap">
+        <span className="font-muse text-[25vw] leading-none text-[var(--on-surface)]/[0.03] whitespace-nowrap">
           BALLOT
         </span>
       </div>
 
       <div className="w-full max-w-[1400px] px-12 mb-10 z-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <p className="label-md text-gray-500 font-bold tracking-[0.1em]">PHASE 01 - SELECTION</p>
+          <p className="label-md text-[var(--on-surface)] opacity-60 font-bold tracking-[0.1em]">PHASE 01 - SELECTION</p>
           <button
             type="button"
             onClick={exitBallot}
-            className="border border-gray-300 px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100 hover:-translate-y-0.5 shadow-sm active:translate-y-0"
+            className="border border-[var(--outline-variant)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:-translate-y-0.5 shadow-sm active:translate-y-0"
           >
             Exit Ballot
           </button>
@@ -188,22 +188,22 @@ export default function GravitySlot() {
               key={candidate.id}
               onClick={() => setSelectedCandidateId(candidate.id)}
               disabled={isSubmitting}
-              className={`paper-float bg-white p-12 aspect-[3/4] flex flex-col justify-between text-left transition-all duration-200 border-2 ${selected ? 'border-[var(--primary)] shadow-2xl' : 'border-transparent hover:border-black/15'}`}
+              className={`paper-float bg-[var(--surface-container-lowest)] p-12 aspect-[3/4] flex flex-col justify-between text-left transition-all duration-200 border-2 ${selected ? 'border-[var(--primary)] shadow-none md:shadow-2xl' : 'border-transparent hover:border-[var(--on-surface)]/15 shadow-none'}`}
             >
-              <span className="font-muse text-[8rem] text-gray-100 leading-none -ml-4">
+              <span className="font-muse text-[8rem] text-[var(--on-surface)]/10 leading-none -ml-4">
                 {String(index + 1).padStart(2, '0')}
               </span>
               <div>
-                <p className="label-md text-gray-400 mb-4">CANDIDATE</p>
+                <p className="label-md text-[var(--on-surface)] opacity-50 mb-4">CANDIDATE</p>
                 <h3 className="font-muse text-3xl text-[var(--primary)] leading-tight">
                   {candidate.name}
                 </h3>
                 {candidate.description && (
-                  <p className="text-sm text-gray-600 mt-2 italic">
+                  <p className="text-sm text-[var(--on-surface)] opacity-80 mt-2 italic">
                     {candidate.description}
                   </p>
                 )}
-                <p className="label-md mt-4 text-gray-500">
+                <p className="label-md mt-4 text-[var(--on-surface)] opacity-60">
                   {selected ? 'Selected for confirmation' : 'Click to select'}
                 </p>
               </div>
@@ -212,9 +212,9 @@ export default function GravitySlot() {
         })}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 border-t border-black/10 bg-[rgba(249,249,249,0.95)] backdrop-blur-md py-5 z-30">
+      <div className="fixed bottom-0 left-0 right-0 border-t border-[var(--on-surface)]/10 bg-[var(--surface)]/95 backdrop-blur-md py-5 z-30">
         <div className="mx-auto w-full max-w-[1400px] px-12 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <p className="label-md text-gray-600 tracking-[0.08em]">
+          <p className="label-md text-[var(--on-surface)] opacity-80 tracking-[0.08em]">
             {selectedCandidate
               ? `Selected: ${selectedCandidate.name}`
               : 'Select one candidate to enable vote submission'}
@@ -223,7 +223,7 @@ export default function GravitySlot() {
             type="button"
             onClick={openConfirmation}
             disabled={!selectedCandidateId || isSubmitting}
-            className="bg-[var(--primary)] text-white px-8 py-3 uppercase text-xs tracking-[0.16em] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:bg-black hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
+            className="bg-[var(--primary)] text-[var(--on-primary)] px-8 py-3 uppercase text-xs tracking-[0.16em] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
           >
             {isSubmitting ? 'Submitting Vote...' : 'Submit Vote'}
           </button>
@@ -236,7 +236,7 @@ export default function GravitySlot() {
           <button
             type="button"
             onClick={exitBallot}
-            className="border border-gray-300 px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-gray-100"
+            className="border border-[var(--outline-variant)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)]"
           >
             Return To Entry
           </button>
