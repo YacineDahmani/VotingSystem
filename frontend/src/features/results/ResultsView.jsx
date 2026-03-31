@@ -298,7 +298,7 @@ export default function ResultsView() {
             </div>
             
             <div className="flex flex-col items-end gap-6 text-[var(--on-surface)]">
-              <span className="font-bold">THE EDITORIAL BALLOT © 2024</span>
+              <span className="font-bold">THE EDITORIAL BALLOT © 2026</span>
               <div className="flex gap-6 font-bold">
                  <a href="#" className="underline underline-offset-4 decoration-1">PRIVACY</a>
                  <a href="#" className="underline underline-offset-4 decoration-1">LOG</a>

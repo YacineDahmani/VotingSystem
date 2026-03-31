@@ -4,6 +4,11 @@ function normalizeText(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
+function normalizeNullableText(value) {
+    const normalized = normalizeText(value);
+    return normalized ? normalized : null;
+}
+
 function normalizeDateValue(value) {
     if (!value) {
         return null;
@@ -42,6 +47,209 @@ function normalizeCandidateList(candidates) {
         })
         .filter((candidate) => !!candidate.name)
         .sort((a, b) => a.name.localeCompare(b.name) || a.description.localeCompare(b.description));
+}
+
+function parseDelimitedLine(line, delimiter = ',') {
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let index = 0; index < line.length; index += 1) {
+        const char = line[index];
+
+        if (char === '"') {
+            if (inQuotes && line[index + 1] === '"') {
+                current += '"';
+                index += 1;
+            } else {
+                inQuotes = !inQuotes;
+            }
+            continue;
+        }
+
+        if (char === delimiter && !inQuotes) {
+            values.push(current.trim());
+            current = '';
+            continue;
+        }
+
+        current += char;
+    }
+
+    values.push(current.trim());
+    return values;
+}
+
+function detectDelimitedTextFormat(content) {
+    const sample = (content || '').split(/\r?\n/).find((line) => line.trim());
+    if (!sample) {
+        return { delimiter: ',', type: 'csv' };
+    }
+
+    const commaCount = (sample.match(/,/g) || []).length;
+    const tabCount = (sample.match(/\t/g) || []).length;
+    const semicolonCount = (sample.match(/;/g) || []).length;
+
+    if (tabCount > commaCount && tabCount >= semicolonCount) {
+        return { delimiter: '\t', type: 'tsv' };
+    }
+
+    if (semicolonCount > commaCount) {
+        return { delimiter: ';', type: 'csv' };
+    }
+
+    return { delimiter: ',', type: 'csv' };
+}
+
+function parseStructuredRecords(rawPayload, fallbackKey = 'records') {
+    if (!rawPayload || typeof rawPayload !== 'object') {
+        return [];
+    }
+
+    if (Array.isArray(rawPayload)) {
+        return rawPayload;
+    }
+
+    if (Array.isArray(rawPayload.records)) {
+        return rawPayload.records;
+    }
+
+    if (Array.isArray(rawPayload.voters)) {
+        return rawPayload.voters;
+    }
+
+    if (Array.isArray(rawPayload.candidates)) {
+        return rawPayload.candidates;
+    }
+
+    if (Array.isArray(rawPayload[fallbackKey])) {
+        return rawPayload[fallbackKey];
+    }
+
+    return [];
+}
+
+function parseDataContent(input) {
+    const content = typeof input?.content === 'string' ? input.content : '';
+    const fileName = normalizeText(input?.fileName).toLowerCase();
+    const explicitFormat = normalizeText(input?.format).toLowerCase();
+
+    if (!content.trim()) {
+        return { format: explicitFormat || 'unknown', records: [] };
+    }
+
+    const asJson = () => {
+        const parsed = JSON.parse(content);
+        const records = parseStructuredRecords(parsed);
+        return { format: 'json', records };
+    };
+
+    if (explicitFormat === 'json' || fileName.endsWith('.json')) {
+        return asJson();
+    }
+
+    if (explicitFormat === 'ndjson' || fileName.endsWith('.ndjson')) {
+        const records = content
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line) => JSON.parse(line));
+        return { format: 'ndjson', records };
+    }
+
+    try {
+        return asJson();
+    } catch {
+        const { delimiter, type } = detectDelimitedTextFormat(content);
+        const rows = content
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line) => parseDelimitedLine(line, delimiter));
+
+        if (!rows.length) {
+            return { format: type, records: [] };
+        }
+
+        const headers = rows[0].map((header) => normalizeText(header).toLowerCase());
+        const records = rows.slice(1).map((row) => {
+            const item = {};
+            headers.forEach((header, index) => {
+                item[header] = row[index] ?? '';
+            });
+            return item;
+        });
+
+        return { format: type, records };
+    }
+}
+
+function normalizeVoterImportRecords(rawRecords) {
+    if (!Array.isArray(rawRecords)) {
+        return [];
+    }
+
+    return rawRecords
+        .map((record) => {
+            if (!record || typeof record !== 'object') {
+                return null;
+            }
+
+            const rawName = record.name ?? record.full_name ?? record.fullName;
+            const rawIdentifier = record.id ?? record.identifier ?? record.voterId ?? record.voter_id ?? record.code;
+            const rawBirthdate = record.birthdate ?? record.birthday ?? record.dob ?? record.date_of_birth;
+
+            const normalizedBirthdate = normalizeText(rawBirthdate);
+            const parsedBirthdate = normalizeDateValue(normalizedBirthdate);
+
+            return {
+                name: normalizeNullableText(rawName),
+                identifier: normalizeNullableText(rawIdentifier),
+                birthdate: parsedBirthdate ? parsedBirthdate.slice(0, 10) : null,
+            };
+        })
+        .filter((record) => !!record)
+        .filter((record) => record.name || record.identifier || record.birthdate);
+}
+
+function normalizeCandidateImportRecords(rawRecords) {
+    if (!Array.isArray(rawRecords)) {
+        return [];
+    }
+
+    return rawRecords
+        .map((record) => {
+            if (!record || typeof record !== 'object') {
+                return null;
+            }
+
+            const name = normalizeText(record.name ?? record.candidate ?? record.title);
+            const description = normalizeText(record.description ?? record.summary ?? record.statement);
+
+            if (!name) {
+                return null;
+            }
+
+            return { name, description };
+        })
+        .filter((record) => !!record);
+}
+
+function parseMaxVoters(value) {
+    if (value === undefined) {
+        return { isProvided: false, value: null };
+    }
+
+    if (value === null || value === '') {
+        return { isProvided: true, value: null };
+    }
+
+    const parsed = Number.parseInt(String(value), 10);
+    if (Number.isNaN(parsed) || parsed < 1) {
+        throw new Error('max_voters must be a positive integer or null');
+    }
+
+    return { isProvided: true, value: parsed };
 }
 
 function buildElectionSignature({ title, description, startDate, endDate, candidates }) {
@@ -100,6 +308,8 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
                 start_date: startDate,
                 end_date: endDate,
                 replace_existing: replaceExisting,
+                max_voters: maxVotersInput,
+                voter_rules: voterRulesInput,
             } = req.body;
 
             if (!title) {
@@ -110,6 +320,8 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
             if (!normalizedCandidates.length) {
                 return res.status(400).json({ error: 'At least one candidate is required' });
             }
+
+            const parsedMaxVoters = parseMaxVoters(maxVotersInput);
 
             const requestedSignature = buildElectionSignature({
                 title,
@@ -156,10 +368,22 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
                 }
             }
 
-            const election = await db.createElection(title, description, startDate, endDate);
+            const election = await db.createElection(
+                title,
+                description,
+                startDate,
+                endDate,
+                1,
+                parsedMaxVoters.value,
+            );
 
             for (const candidate of normalizedCandidates) {
                 await db.addCandidateToElection(election.id, candidate.name, candidate.description || '');
+            }
+
+            const normalizedVoterRules = normalizeVoterImportRecords(voterRulesInput);
+            if (normalizedVoterRules.length) {
+                await db.replaceElectionEligibilityRules(election.id, normalizedVoterRules);
             }
 
             if (replaceExisting && duplicateMatches.length) {
@@ -177,6 +401,9 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
 
             return res.json({ success: true, election });
         } catch (err) {
+            if (err?.message && err.message.includes('max_voters')) {
+                return res.status(400).json({ error: err.message });
+            }
             return res.status(500).json({ error: err.message });
         }
     });
@@ -184,13 +411,21 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
     router.put('/elections/:id', async (req, res) => {
         try {
             const id = Number.parseInt(req.params.id, 10);
-            const updates = req.body;
+            const updates = { ...req.body };
+
+            if (Object.prototype.hasOwnProperty.call(updates, 'max_voters')) {
+                const parsedMaxVoters = parseMaxVoters(updates.max_voters);
+                updates.max_voters = parsedMaxVoters.value;
+            }
 
             await db.updateElection(id, updates);
             const election = await db.getElectionById(id);
 
             return res.json({ success: true, election });
         } catch (err) {
+            if (err?.message && err.message.includes('max_voters')) {
+                return res.status(400).json({ error: err.message });
+            }
             return res.status(500).json({ error: err.message });
         }
     });
@@ -239,6 +474,79 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
 
             const candidate = await db.addCandidateToElection(electionId, name, description);
             return res.json({ success: true, candidate });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.post('/elections/:id/import-voters', async (req, res) => {
+        try {
+            const electionId = Number.parseInt(req.params.id, 10);
+            const election = await db.getElectionById(electionId);
+            if (!election) {
+                return res.status(404).json({ error: 'Election not found' });
+            }
+
+            const { replaceExisting = true } = req.body;
+            const { records } = parseDataContent(req.body);
+            const normalizedRecords = normalizeVoterImportRecords(records);
+
+            if (!normalizedRecords.length) {
+                return res.status(400).json({ error: 'No valid voter records found in file' });
+            }
+
+            if (replaceExisting) {
+                await db.replaceElectionEligibilityRules(electionId, normalizedRecords);
+            } else {
+                await db.appendElectionEligibilityRules(electionId, normalizedRecords);
+            }
+
+            const totalRules = await db.getElectionEligibilityRuleCount(electionId);
+            return res.json({
+                success: true,
+                imported: normalizedRecords.length,
+                totalRules,
+                mode: replaceExisting ? 'replace' : 'append',
+            });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.post('/elections/:id/import-candidates', async (req, res) => {
+        try {
+            const electionId = Number.parseInt(req.params.id, 10);
+            const election = await db.getElectionById(electionId);
+            if (!election) {
+                return res.status(404).json({ error: 'Election not found' });
+            }
+
+            const { replaceExisting = false } = req.body;
+            const { records } = parseDataContent(req.body);
+            const normalizedCandidates = normalizeCandidateImportRecords(records);
+
+            if (!normalizedCandidates.length) {
+                return res.status(400).json({ error: 'No valid candidate records found in file' });
+            }
+
+            if (replaceExisting) {
+                const existingCandidates = await db.getCandidatesByElection(electionId);
+                for (const candidate of existingCandidates) {
+                    await db.deleteCandidate(candidate.id);
+                }
+            }
+
+            for (const candidate of normalizedCandidates) {
+                await db.addCandidateToElection(electionId, candidate.name, candidate.description);
+            }
+
+            const nextCandidates = await db.getCandidatesByElection(electionId);
+            return res.json({
+                success: true,
+                imported: normalizedCandidates.length,
+                totalCandidates: nextCandidates.length,
+                mode: replaceExisting ? 'replace' : 'append',
+            });
         } catch (err) {
             return res.status(500).json({ error: err.message });
         }

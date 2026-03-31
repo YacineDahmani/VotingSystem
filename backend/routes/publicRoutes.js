@@ -218,6 +218,22 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
 
             const existingVoter = await db.findVoterByIdentifier(election.id, normalizedVoterIdCode);
 
+            const eligibilityRuleCount = await db.getElectionEligibilityRuleCount(election.id);
+            if (!existingVoter && eligibilityRuleCount > 0) {
+                const isEligible = await db.hasMatchingEligibilityRule(election.id, {
+                    name: name.trim(),
+                    birthdate: normalizedBirthdate,
+                    identifier: normalizedVoterIdCode,
+                });
+
+                if (!isEligible) {
+                    return res.status(403).json({
+                        error: 'This identity does not match the voter import rules for this election.',
+                        reason: 'restricted',
+                    });
+                }
+            }
+
             if (hasElectionEnded(election) && (!existingVoter || existingVoter.is_fake)) {
                 return res.status(403).json({
                     error: 'This voting session has already ended.',
@@ -239,6 +255,19 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
             let voter = existingVoter;
 
             if (!existingVoter) {
+                const parsedMaxVoters = Number.parseInt(election.max_voters, 10);
+                const maxVoters = Number.isNaN(parsedMaxVoters) ? null : parsedMaxVoters;
+                if (maxVoters !== null) {
+                    const registeredVoterCount = await db.countRealVoters(election.id);
+                    if (registeredVoterCount >= maxVoters) {
+                        return res.status(403).json({
+                            error: 'This voting session has reached the maximum number of voters.',
+                            reason: 'max_voters_reached',
+                            maxVoters,
+                        });
+                    }
+                }
+
                 voter = await db.addVoter(election.id, name.trim(), parsedAge, normalizedVoterIdCode, false, normalizedBirthdate);
             } else {
                 if (existingVoter.is_fake) {

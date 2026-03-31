@@ -33,6 +33,7 @@ function initializeDatabase() {
                     status TEXT DEFAULT 'draft',
                     start_date DATETIME,
                     end_date DATETIME,
+                    max_voters INTEGER,
                     round INTEGER DEFAULT 1,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
@@ -78,6 +79,18 @@ function initializeDatabase() {
             `);
 
             db.run(`
+                CREATE TABLE IF NOT EXISTS voter_eligibility_rules (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    election_id INTEGER NOT NULL,
+                    name TEXT,
+                    birthdate TEXT,
+                    identifier TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (election_id) REFERENCES elections(id) ON DELETE CASCADE
+                )
+            `);
+
+            db.run(`
                 CREATE TABLE IF NOT EXISTS votes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     election_id INTEGER NOT NULL,
@@ -101,6 +114,7 @@ function initializeDatabase() {
             // Schema Migrations (safely add columns if missing in existing DB)
             const migrations = [
                 'ALTER TABLE elections ADD COLUMN round INTEGER DEFAULT 1',
+                'ALTER TABLE elections ADD COLUMN max_voters INTEGER',
                 'ALTER TABLE voters ADD COLUMN identifier TEXT',
                 'ALTER TABLE voters ADD COLUMN birthdate TEXT',
                 'ALTER TABLE voters ADD COLUMN has_voted BOOLEAN DEFAULT 0',
@@ -152,7 +166,7 @@ function setSetting(key, value) {
 
 // ==================== ELECTIONS ====================
 
-function createElection(title, description = '', startDate = null, endDate = null, round = 1) {
+function createElection(title, description = '', startDate = null, endDate = null, round = 1, maxVoters = null) {
     return new Promise(async (resolve, reject) => {
         try {
             let code = generateElectionCode();
@@ -166,9 +180,9 @@ function createElection(title, description = '', startDate = null, endDate = nul
             }
 
             db.run(
-                `INSERT INTO elections (title, description, code, status, start_date, end_date, round) 
-                 VALUES (?, ?, ?, 'draft', ?, ?, ?)`,
-                [title, description, code, startDate, endDate, round],
+                `INSERT INTO elections (title, description, code, status, start_date, end_date, round, max_voters) 
+                 VALUES (?, ?, ?, 'draft', ?, ?, ?, ?)`,
+                [title, description, code, startDate, endDate, round, maxVoters],
                 function (err) {
                     if (err) reject(err);
                     else resolve({
@@ -179,7 +193,8 @@ function createElection(title, description = '', startDate = null, endDate = nul
                         status: 'draft',
                         start_date: startDate,
                         end_date: endDate,
-                        round
+                        round,
+                        max_voters: maxVoters
                     });
                 }
             );
@@ -256,6 +271,7 @@ function updateElection(id, updates) {
         if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description); }
         if (updates.start_date !== undefined) { fields.push('start_date = ?'); values.push(updates.start_date); }
         if (updates.end_date !== undefined) { fields.push('end_date = ?'); values.push(updates.end_date); }
+        if (updates.max_voters !== undefined) { fields.push('max_voters = ?'); values.push(updates.max_voters); }
 
         if (fields.length === 0) return resolve(false);
 
@@ -421,6 +437,162 @@ function addVoter(electionId, name, age, identifier = null, isFake = false, birt
                     }
                 }
                 else resolve({ id: this.lastID, election_id: electionId, name, age, birthdate, identifier, has_voted: 0 });
+            }
+        );
+    });
+}
+
+function replaceElectionEligibilityRules(electionId, records = []) {
+    return new Promise((resolve, reject) => {
+        db.serialize(() => {
+            db.run('BEGIN TRANSACTION');
+
+            db.run('DELETE FROM voter_eligibility_rules WHERE election_id = ?', [electionId], (deleteErr) => {
+                if (deleteErr) {
+                    db.run('ROLLBACK');
+                    reject(deleteErr);
+                    return;
+                }
+
+                if (!Array.isArray(records) || records.length === 0) {
+                    db.run('COMMIT', (commitErr) => {
+                        if (commitErr) reject(commitErr);
+                        else resolve({ inserted: 0 });
+                    });
+                    return;
+                }
+
+                const stmt = db.prepare(
+                    'INSERT INTO voter_eligibility_rules (election_id, name, birthdate, identifier) VALUES (?, ?, ?, ?)'
+                );
+
+                let pending = records.length;
+                let failed = false;
+
+                records.forEach((record) => {
+                    stmt.run(
+                        [electionId, record.name ?? null, record.birthdate ?? null, record.identifier ?? null],
+                        (insertErr) => {
+                            if (failed) {
+                                return;
+                            }
+
+                            if (insertErr) {
+                                failed = true;
+                                stmt.finalize(() => {
+                                    db.run('ROLLBACK');
+                                    reject(insertErr);
+                                });
+                                return;
+                            }
+
+                            pending -= 1;
+                            if (pending === 0) {
+                                stmt.finalize((finalizeErr) => {
+                                    if (finalizeErr) {
+                                        db.run('ROLLBACK');
+                                        reject(finalizeErr);
+                                        return;
+                                    }
+
+                                    db.run('COMMIT', (commitErr) => {
+                                        if (commitErr) reject(commitErr);
+                                        else resolve({ inserted: records.length });
+                                    });
+                                });
+                            }
+                        }
+                    );
+                });
+            });
+        });
+    });
+}
+
+function appendElectionEligibilityRules(electionId, records = []) {
+    return new Promise((resolve, reject) => {
+        if (!Array.isArray(records) || records.length === 0) {
+            resolve({ inserted: 0 });
+            return;
+        }
+
+        const stmt = db.prepare(
+            'INSERT INTO voter_eligibility_rules (election_id, name, birthdate, identifier) VALUES (?, ?, ?, ?)'
+        );
+
+        let inserted = 0;
+        let pending = records.length;
+        let failed = false;
+
+        records.forEach((record) => {
+            stmt.run(
+                [electionId, record.name ?? null, record.birthdate ?? null, record.identifier ?? null],
+                (err) => {
+                    if (failed) {
+                        return;
+                    }
+
+                    if (err) {
+                        failed = true;
+                        stmt.finalize(() => reject(err));
+                        return;
+                    }
+
+                    inserted += 1;
+                    pending -= 1;
+
+                    if (pending === 0) {
+                        stmt.finalize((finalizeErr) => {
+                            if (finalizeErr) reject(finalizeErr);
+                            else resolve({ inserted });
+                        });
+                    }
+                }
+            );
+        });
+    });
+}
+
+function getElectionEligibilityRuleCount(electionId) {
+    return new Promise((resolve, reject) => {
+        db.get(
+            'SELECT COUNT(*) as count FROM voter_eligibility_rules WHERE election_id = ?',
+            [electionId],
+            (err, row) => {
+                if (err) reject(err);
+                else resolve(row?.count || 0);
+            }
+        );
+    });
+}
+
+function getElectionEligibilityRules(electionId) {
+    return new Promise((resolve, reject) => {
+        db.all(
+            'SELECT * FROM voter_eligibility_rules WHERE election_id = ? ORDER BY id ASC',
+            [electionId],
+            (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows || []);
+            }
+        );
+    });
+}
+
+function hasMatchingEligibilityRule(electionId, { name, birthdate, identifier }) {
+    return new Promise((resolve, reject) => {
+        db.get(
+            `SELECT id
+             FROM voter_eligibility_rules
+             WHERE election_id = ?
+               AND (name IS NULL OR lower(name) = lower(?))
+               AND (birthdate IS NULL OR birthdate = ?)
+               AND (identifier IS NULL OR lower(identifier) = lower(?))
+             LIMIT 1`,
+            [electionId, name || '', birthdate || '', identifier || ''],
+            (err, row) => {
+                if (err) reject(err);
+                else resolve(!!row);
             }
         );
     });
@@ -900,6 +1072,11 @@ module.exports = {
     incrementVote,
     // Voters & Voting
     addVoter,
+    replaceElectionEligibilityRules,
+    appendElectionEligibilityRules,
+    getElectionEligibilityRuleCount,
+    getElectionEligibilityRules,
+    hasMatchingEligibilityRule,
     findVoterByIdentifier,
     updateVoterIdentity,
     setVoterVoteState,

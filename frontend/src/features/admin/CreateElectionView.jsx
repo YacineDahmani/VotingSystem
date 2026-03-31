@@ -5,6 +5,144 @@ import { useToast } from '../../components/ui/useToast';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { getSession, isAdminSession } from '../../store/session';
 
+function normalizeText(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function parseDelimitedLine(line, delimiter = ',') {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+
+    if (char === '"') {
+      if (inQuotes && line[index + 1] === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === delimiter && !inQuotes) {
+      values.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  values.push(current.trim());
+  return values;
+}
+
+function detectDelimitedTextFormat(content) {
+  const sample = (content || '').split(/\r?\n/).find((line) => line.trim());
+  if (!sample) {
+    return ',';
+  }
+
+  const commaCount = (sample.match(/,/g) || []).length;
+  const tabCount = (sample.match(/\t/g) || []).length;
+  const semicolonCount = (sample.match(/;/g) || []).length;
+
+  if (tabCount > commaCount && tabCount >= semicolonCount) {
+    return '\t';
+  }
+
+  if (semicolonCount > commaCount) {
+    return ';';
+  }
+
+  return ',';
+}
+
+function parseStructuredRecords(parsed) {
+  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed?.records)) return parsed.records;
+  if (Array.isArray(parsed?.voters)) return parsed.voters;
+  if (Array.isArray(parsed?.candidates)) return parsed.candidates;
+  return [];
+}
+
+function parseFileRecords(content, fileName) {
+  const normalizedName = normalizeText(fileName).toLowerCase();
+  const isJson = normalizedName.endsWith('.json');
+  const isNdjson = normalizedName.endsWith('.ndjson');
+
+  if (isNdjson) {
+    return content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  }
+
+  if (isJson) {
+    return parseStructuredRecords(JSON.parse(content));
+  }
+
+  try {
+    return parseStructuredRecords(JSON.parse(content));
+  } catch {
+    const delimiter = detectDelimitedTextFormat(content);
+    const rows = content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => parseDelimitedLine(line, delimiter));
+
+    if (rows.length < 2) {
+      return [];
+    }
+
+    const headers = rows[0].map((header) => normalizeText(header).toLowerCase());
+    return rows.slice(1).map((row) => {
+      const item = {};
+      headers.forEach((header, index) => {
+        item[header] = row[index] ?? '';
+      });
+      return item;
+    });
+  }
+}
+
+function normalizeCandidateImport(records) {
+  return (Array.isArray(records) ? records : [])
+    .map((record) => {
+      if (!record || typeof record !== 'object') return null;
+      const name = normalizeText(record.name ?? record.candidate ?? record.title);
+      if (!name) return null;
+      const description = normalizeText(record.description ?? record.summary ?? record.statement);
+      return { name, description };
+    })
+    .filter(Boolean);
+}
+
+function normalizeVoterRulesImport(records) {
+  return (Array.isArray(records) ? records : [])
+    .map((record) => {
+      if (!record || typeof record !== 'object') return null;
+      const name = normalizeText(record.name ?? record.full_name ?? record.fullName);
+      const id = normalizeText(record.id ?? record.identifier ?? record.voterId ?? record.voter_id ?? record.code);
+      const birthdate = normalizeText(record.birthdate ?? record.birthday ?? record.dob ?? record.date_of_birth);
+
+      const normalizedBirthdate = /^\d{4}-\d{2}-\d{2}$/.test(birthdate) ? birthdate : '';
+      if (!name && !id && !normalizedBirthdate) return null;
+
+      return {
+        name: name || null,
+        identifier: id || null,
+        birthdate: normalizedBirthdate || null,
+      };
+    })
+    .filter(Boolean);
+}
+
 export default function CreateElectionView() {
   const navigate = useNavigate();
   const session = useMemo(() => getSession(), []);
@@ -13,7 +151,11 @@ export default function CreateElectionView() {
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [maxVoters, setMaxVoters] = useState('');
   const [candidates, setCandidates] = useState([{ name: '', description: '' }]);
+  const [voterRules, setVoterRules] = useState([]);
+  const [candidateImportReplace, setCandidateImportReplace] = useState(false);
+  const [voterImportReplace, setVoterImportReplace] = useState(true);
   const [openImmediately, setOpenImmediately] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,14 +167,73 @@ export default function CreateElectionView() {
     const validCandidates = candidates
       .map(c => ({ name: c.name.trim(), description: c.description.trim() }))
       .filter(c => c.name);
+    const parsedMaxVoters = maxVoters.trim()
+      ? Number.parseInt(maxVoters.trim(), 10)
+      : null;
 
     return {
       title: trimmedTitle,
       description: description.trim(),
       candidates: validCandidates,
+      voter_rules: voterRules,
       start_date: startDate ? new Date(startDate).toISOString() : null,
       end_date: endDate ? new Date(endDate).toISOString() : null,
+      max_voters: Number.isNaN(parsedMaxVoters) ? null : parsedMaxVoters,
     };
+  };
+
+  const handleCandidateFileImport = async (file) => {
+    if (!file) return;
+
+    try {
+      const content = await file.text();
+      const imported = normalizeCandidateImport(parseFileRecords(content, file.name));
+
+      if (!imported.length) {
+        setError('No valid candidate records found in the selected file.');
+        return;
+      }
+
+      setCandidates((current) => {
+        if (candidateImportReplace) {
+          return imported;
+        }
+        return [...current, ...imported];
+      });
+
+      setError('');
+      pushToast({
+        type: 'success',
+        title: 'Candidates Imported',
+        message: `${imported.length} candidate records loaded.`,
+      });
+    } catch (err) {
+      setError(err.message || 'Unable to import candidate file.');
+    }
+  };
+
+  const handleVoterFileImport = async (file) => {
+    if (!file) return;
+
+    try {
+      const content = await file.text();
+      const imported = normalizeVoterRulesImport(parseFileRecords(content, file.name));
+
+      if (!imported.length) {
+        setError('No valid voter records found in the selected file.');
+        return;
+      }
+
+      setVoterRules((current) => (voterImportReplace ? imported : [...current, ...imported]));
+      setError('');
+      pushToast({
+        type: 'success',
+        title: 'Voter Rules Imported',
+        message: `${imported.length} voter rule records loaded.`,
+      });
+    } catch (err) {
+      setError(err.message || 'Unable to import voter file.');
+    }
   };
 
   const submitElection = async (payload, { replaceExisting = false } = {}) => {
@@ -113,6 +314,14 @@ export default function CreateElectionView() {
     if (startDate && endDate && new Date(endDate) <= new Date(startDate)) {
       setError('End date must be after start date.');
       return;
+    }
+
+    if (maxVoters.trim()) {
+      const parsedMaxVoters = Number.parseInt(maxVoters.trim(), 10);
+      if (Number.isNaN(parsedMaxVoters) || parsedMaxVoters < 1) {
+        setError('Maximum voters must be empty or a positive number.');
+        return;
+      }
     }
 
     setError('');
@@ -202,6 +411,20 @@ export default function CreateElectionView() {
         </div>
 
         <div>
+          <label className="label-md text-[var(--on-surface)] opacity-60 block mb-2">Maximum Voters (Optional)</label>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={maxVoters}
+            onChange={(event) => setMaxVoters(event.target.value)}
+            placeholder="Leave empty for unlimited"
+            className="w-full border border-[var(--outline-variant)] px-4 py-3"
+            disabled={isSubmitting}
+          />
+        </div>
+
+        <div>
           <label className="label-md text-[var(--on-surface)] opacity-60 block mb-4 border-b pb-2">Candidates</label>
           <div className="flex flex-col gap-4">
             {candidates.map((candidate, index) => (
@@ -243,6 +466,50 @@ export default function CreateElectionView() {
           >
             + Add Another Candidate
           </button>
+
+          <div className="mt-4 border border-[var(--outline-variant)] p-4 bg-[var(--surface-container-low)]/40">
+            <p className="label-md text-[var(--on-surface)] opacity-70 mb-2">Import Candidates (CSV, TSV, JSON, NDJSON)</p>
+            <label className="inline-flex items-center gap-2 text-sm text-[var(--on-surface)] opacity-80 mb-3">
+              <input
+                type="checkbox"
+                checked={candidateImportReplace}
+                onChange={(event) => setCandidateImportReplace(event.target.checked)}
+                disabled={isSubmitting}
+              />
+              Replace current candidates
+            </label>
+            <input
+              type="file"
+              accept=".csv,.tsv,.json,.ndjson,.txt"
+              onChange={(event) => handleCandidateFileImport(event.target.files?.[0] || null)}
+              disabled={isSubmitting}
+              className="w-full border border-[var(--outline-variant)] px-4 py-2 bg-[var(--surface-container-lowest)]"
+            />
+          </div>
+        </div>
+
+        <div className="border border-[var(--outline-variant)] p-4 bg-[var(--surface-container-low)]/30">
+          <label className="label-md text-[var(--on-surface)] opacity-70 block mb-2">Import Voter Rules (Optional)</label>
+          <p className="text-xs text-[var(--on-surface)] opacity-70 mb-3">
+            Fields can include name, id/identifier, and birthdate (YYYY-MM-DD). Missing fields are treated as unrestricted.
+          </p>
+          <label className="inline-flex items-center gap-2 text-sm text-[var(--on-surface)] opacity-80 mb-3">
+            <input
+              type="checkbox"
+              checked={voterImportReplace}
+              onChange={(event) => setVoterImportReplace(event.target.checked)}
+              disabled={isSubmitting}
+            />
+            Replace current voter rules
+          </label>
+          <input
+            type="file"
+            accept=".csv,.tsv,.json,.ndjson,.txt"
+            onChange={(event) => handleVoterFileImport(event.target.files?.[0] || null)}
+            disabled={isSubmitting}
+            className="w-full border border-[var(--outline-variant)] px-4 py-2 bg-[var(--surface-container-lowest)]"
+          />
+          <p className="label-md text-[var(--on-surface)] opacity-70 mt-2">Loaded voter rules: {voterRules.length}</p>
         </div>
 
         <label className="inline-flex items-center gap-3">

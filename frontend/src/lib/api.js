@@ -109,6 +109,20 @@ export function deleteCandidate(candidateId) {
   });
 }
 
+export function importVoters(electionId, payload) {
+  return request(`/api/admin/elections/${electionId}/import-voters`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function importCandidates(electionId, payload) {
+  return request(`/api/admin/elections/${electionId}/import-candidates`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function regenerateElectionCode(electionId) {
   return request(`/api/admin/elections/${electionId}/regenerate-code`, {
     method: 'POST',

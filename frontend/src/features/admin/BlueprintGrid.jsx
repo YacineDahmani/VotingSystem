@@ -79,6 +79,7 @@ export default function BlueprintGrid() {
   const [confirmState, setConfirmState] = useState(null);
   const [clockNow, setClockNow] = useState(Date.now());
   const [customEndDate, setCustomEndDate] = useState('');
+  const [maxVotersInput, setMaxVotersInput] = useState('');
 
   const filteredElections = useMemo(() => {
     if (filter === 'all') return elections;
@@ -201,6 +202,20 @@ export default function BlueprintGrid() {
   useEffect(() => {
     setCustomEndDate(toLocalDateTimeInput(selectedElection?.end_date));
   }, [selectedElection?.end_date]);
+
+  useEffect(() => {
+    if (!selectedElection) {
+      setMaxVotersInput('');
+      return;
+    }
+
+    if (selectedElection.max_voters === null || selectedElection.max_voters === undefined) {
+      setMaxVotersInput('');
+      return;
+    }
+
+    setMaxVotersInput(String(selectedElection.max_voters));
+  }, [selectedElection]);
 
   const withBusy = async (label, fn, successToast) => {
     try {
@@ -349,6 +364,26 @@ export default function BlueprintGrid() {
           message: 'Election session was removed permanently.',
         });
       },
+    });
+  };
+
+  const handleSaveMaxVoters = async () => {
+    if (!selectedElection) return;
+
+    const raw = maxVotersInput.trim();
+    const payload = raw ? Number.parseInt(raw, 10) : null;
+
+    if (raw && (Number.isNaN(payload) || payload < 1)) {
+      setError('Max voters must be empty for unlimited, or a positive number.');
+      return;
+    }
+
+    await withBusy('set-max-voters', async () => {
+      await updateElectionDetails(selectedElection.id, { max_voters: payload });
+      await refreshAll(selectedElection.id);
+    }, {
+      title: 'Voter Limit Updated',
+      message: payload ? `Maximum voters set to ${payload}.` : 'Voter limit removed (unlimited).',
     });
   };
 
@@ -514,6 +549,33 @@ export default function BlueprintGrid() {
                   Set End Time
                 </button>
               </div>
+            </div>
+
+            <div className="mt-5 border-t border-[var(--outline-variant)] pt-4">
+              <p className="label-md text-[var(--on-surface)] opacity-60 mb-3">Maximum Voters</p>
+              <div className="flex flex-col md:flex-row gap-2 md:items-center">
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={maxVotersInput}
+                  onChange={(event) => setMaxVotersInput(event.target.value)}
+                  placeholder="Leave empty for unlimited"
+                  disabled={!selectedElection || !!busyAction}
+                  className="border border-[var(--outline-variant)] px-3 py-2"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveMaxVoters}
+                  disabled={!selectedElection || !!busyAction}
+                  className="border border-[var(--primary)] text-[var(--primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50"
+                >
+                  Save Limit
+                </button>
+              </div>
+              <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">
+                Current: {selectedElection?.max_voters ? `${selectedElection.max_voters} voters` : 'Unlimited'}
+              </p>
             </div>
           </div>
 
