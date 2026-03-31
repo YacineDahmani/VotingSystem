@@ -165,7 +165,7 @@ export default function ResultsView() {
         ) : null}
 
         {adminView && integrity ? (
-          <div className={`mb-10 border px-6 py-4 ${integrity.integrityStatus === 'clean' ? 'border-green-700 bg-green-50' : 'border-red-700 bg-red-50'}`}>
+          <div className={`mb-10 border px-6 py-4 ${integrity.integrityStatus === 'clean' ? 'border-green-700 bg-green-50' : 'border-red-700 bg-red-60'}`}>
             <p className="label-md tracking-widest">INTEGRITY CHECK</p>
             <p className="text-sm mt-2">
               Status: <strong>{integrity.integrityStatus === 'clean' ? 'CLEAN' : 'RIGGED'}</strong> | Real Votes: {integrity.realVotes} | Fake Votes: {integrity.fakeVotes}
@@ -180,7 +180,7 @@ export default function ResultsView() {
               <button
                 type="button"
                 onClick={() => navigate('/admin')}
-                className="border border-[var(--primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:-translate-y-0.5 shadow-sm active:translate-y-0"
+                className="border border-[var(--on-surface)]/20 bg-[var(--surface-container-low)]/70 px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:border-[var(--on-surface)]/40 hover:-translate-y-0.5 shadow-sm active:translate-y-0"
               >
                 Back To Admin
               </button>

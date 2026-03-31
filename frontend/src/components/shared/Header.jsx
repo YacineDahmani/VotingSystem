@@ -50,11 +50,17 @@ export default function Header() {
   return (
     <header
       className={clsx(
-        "fixed top-0 w-full z-50 px-6 md:px-12 py-5 flex items-center justify-between pointer-events-none transition-colors duration-300",
-        "bg-[var(--surface)]/90 backdrop-blur-md text-[var(--primary)] border-b border-[var(--on-surface)]/5 shadow-sm"
+        "fixed top-0 w-full z-50 px-6 md:px-12 py-4 flex items-center justify-between pointer-events-none transition-colors duration-300 overflow-hidden",
+        "bg-[var(--surface)]/80 backdrop-blur-xl border-b border-[var(--on-surface)]/10 shadow-sm"
       )}
     >
-      <div className="pointer-events-auto flex items-center">
+      {/* Glare Effect Overlay */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        <div className="absolute top-[-100%] left-[15%] w-[150px] h-[300%] bg-gradient-to-r from-transparent via-[var(--on-surface)]/10 to-transparent blur-[20px] rotate-[35deg] transform-gpu" />
+        <div className="absolute top-[-100%] left-[30%] w-[60px] h-[300%] bg-gradient-to-r from-transparent via-[var(--on-surface)]/5 to-transparent blur-[12px] rotate-[35deg] transform-gpu" />
+      </div>
+
+      <div className="pointer-events-auto flex items-center z-10">
         {isVoter ? (
           <button
             type="button"
@@ -77,13 +83,13 @@ export default function Header() {
         )}
       </div>
 
-      <nav className="pointer-events-auto absolute left-1/2 -translate-x-1/2 flex items-center gap-8 md:gap-12">
+      <nav className="pointer-events-auto absolute left-1/2 -translate-x-1/2 flex items-center gap-8 md:gap-12 z-10">
         {navItems.length ? (
-          <ul className="hidden md:flex items-center gap-10">
+          <ul className="hidden md:flex items-center gap-8">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
-                <li key={item.path} className="flex">
+                <li key={item.path} className="flex group">
                   {item.disabled ? (
                     <button
                       type="button"
@@ -91,8 +97,14 @@ export default function Header() {
                       aria-disabled="true"
                       title="This section is locked until its phase is active"
                       className={clsx(
-                        'flex uppercase text-[0.65rem] tracking-[0.2em] transition-colors duration-300 cursor-not-allowed opacity-40',
-                        'text-[var(--on-surface)]'
+                        'relative flex uppercase text-[0.65rem] tracking-[0.2em] transition-all duration-300 py-2 cursor-not-allowed',
+                        isActive
+                          ? 'text-[var(--on-surface)] font-bold opacity-100'
+                          : 'text-[var(--on-surface)] opacity-40',
+                        'after:content-[""] after:absolute after:bottom-0 after:left-0 after:w-full after:h-px after:bg-[var(--on-surface)] after:transition-transform after:duration-300 after:origin-left',
+                        isActive
+                          ? 'after:scale-x-100 after:shadow-[0_0_8px_rgba(255,255,255,0.45)] after:opacity-100'
+                          : 'after:scale-x-0 after:opacity-0'
                       )}
                     >
                       {item.label}
@@ -101,9 +113,12 @@ export default function Header() {
                     <Link
                       to={item.path}
                       className={clsx(
-                        'flex uppercase text-[0.65rem] tracking-[0.2em] transition-all duration-300',
-                        'text-[var(--on-surface)]/60 hover:text-[var(--on-surface)]',
-                        isActive && 'text-[var(--on-surface)] font-bold'
+                        'relative flex uppercase text-[0.65rem] tracking-[0.2em] transition-all duration-300 py-2',
+                        isActive 
+                          ? 'text-[var(--on-surface)] font-bold'
+                          : 'text-[var(--on-surface)]/60 hover:text-[var(--on-surface)]',
+                        'after:content-[""] after:absolute after:bottom-0 after:left-0 after:w-full after:h-px after:bg-[var(--on-surface)] after:transition-transform after:duration-300 after:origin-left',
+                        isActive ? 'after:scale-x-100' : 'after:scale-x-0 group-hover:after:scale-x-100'
                       )}
                     >
                       {item.label}
@@ -116,11 +131,11 @@ export default function Header() {
         ) : null}
       </nav>
 
-      <div className="pointer-events-auto flex items-center justify-end w-40 gap-4">
+      <div className="pointer-events-auto flex items-center justify-end w-40 gap-4 z-10">
         {isAdminSession(session) ? (
           <button
             onClick={handleSettingsClick}
-            className="px-4 py-2 border border-[var(--on-surface)]/40 text-[var(--primary)] uppercase text-[0.65rem] tracking-[0.2em] hover:bg-[var(--primary)] hover:text-[var(--on-primary)] transition-colors duration-300"
+            className="px-4 py-2 border border-[var(--on-surface)]/20 text-[var(--on-surface)] uppercase text-[0.65rem] tracking-[0.2em] hover:bg-[var(--on-surface)] hover:text-[var(--surface)] transition-all duration-300"
             aria-label="Exit admin room"
             title="Exit admin room"
           >
@@ -132,8 +147,8 @@ export default function Header() {
         <button 
           onClick={() => setTheme(theme === 'dark' || (theme === 'system' && document.documentElement.classList.contains('dark')) ? 'light' : 'dark')}
           className={clsx(
-            "p-1.5 border rounded-sm transition-all duration-300",
-            "border-transparent hover:border-[var(--on-surface)]/20 text-[var(--on-surface)]/70 hover:text-[var(--on-surface)]"
+            "p-2 transition-all duration-300",
+            "border border-[var(--on-surface)]/10 hover:border-[var(--on-surface)]/40 text-[var(--on-surface)]/70 hover:text-[var(--on-surface)]"
           )}
           aria-label="Toggle Theme"
         >

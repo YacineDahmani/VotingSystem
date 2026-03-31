@@ -156,6 +156,10 @@ export default function CreateElectionView() {
   const [voterRules, setVoterRules] = useState([]);
   const [candidateImportReplace, setCandidateImportReplace] = useState(false);
   const [voterImportReplace, setVoterImportReplace] = useState(true);
+  const [candidateImportPreview, setCandidateImportPreview] = useState([]);
+  const [voterImportPreview, setVoterImportPreview] = useState([]);
+  const [candidateImportFileName, setCandidateImportFileName] = useState('');
+  const [voterImportFileName, setVoterImportFileName] = useState('');
   const [openImmediately, setOpenImmediately] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -200,6 +204,8 @@ export default function CreateElectionView() {
         }
         return [...current, ...imported];
       });
+      setCandidateImportPreview(imported.slice(0, 5));
+      setCandidateImportFileName(file.name);
 
       setError('');
       pushToast({
@@ -225,6 +231,8 @@ export default function CreateElectionView() {
       }
 
       setVoterRules((current) => (voterImportReplace ? imported : [...current, ...imported]));
+      setVoterImportPreview(imported.slice(0, 5));
+      setVoterImportFileName(file.name);
       setError('');
       pushToast({
         type: 'success',
@@ -485,6 +493,32 @@ export default function CreateElectionView() {
               disabled={isSubmitting}
               className="w-full border border-[var(--outline-variant)] px-4 py-2 bg-[var(--surface-container-lowest)]"
             />
+
+            {candidateImportPreview.length ? (
+              <div className="mt-3 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] p-3">
+                <p className="text-xs uppercase tracking-widest text-[var(--on-surface)] opacity-70 mb-2">
+                  Preview: {candidateImportFileName || 'Imported candidates'} (first 5 rows)
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-left border-b border-[var(--outline-variant)]">
+                        <th className="py-1 pr-2">Name</th>
+                        <th className="py-1">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {candidateImportPreview.map((item, index) => (
+                        <tr key={`${item.name}-${index}`} className="border-b border-[var(--outline-variant)]/50">
+                          <td className="py-1 pr-2">{item.name || '-'}</td>
+                          <td className="py-1">{item.description || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -509,6 +543,33 @@ export default function CreateElectionView() {
             disabled={isSubmitting}
             className="w-full border border-[var(--outline-variant)] px-4 py-2 bg-[var(--surface-container-lowest)]"
           />
+          {voterImportPreview.length ? (
+            <div className="mt-3 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] p-3">
+              <p className="text-xs uppercase tracking-widest text-[var(--on-surface)] opacity-70 mb-2">
+                Preview: {voterImportFileName || 'Imported voters'} (first 5 rows)
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left border-b border-[var(--outline-variant)]">
+                      <th className="py-1 pr-2">Name</th>
+                      <th className="py-1 pr-2">Identifier</th>
+                      <th className="py-1">Birthdate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {voterImportPreview.map((item, index) => (
+                      <tr key={`${item.identifier || item.name || 'rule'}-${index}`} className="border-b border-[var(--outline-variant)]/50">
+                        <td className="py-1 pr-2">{item.name || '-'}</td>
+                        <td className="py-1 pr-2">{item.identifier || '-'}</td>
+                        <td className="py-1">{item.birthdate || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
           <p className="label-md text-[var(--on-surface)] opacity-70 mt-2">Loaded voter rules: {voterRules.length}</p>
         </div>
 
