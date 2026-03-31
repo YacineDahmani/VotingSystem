@@ -106,6 +106,7 @@ export default function IdentityArchive() {
       value: name,
       onChange: setName,
       type: 'text',
+      maxLength: 100,
     },
     {
       label: 'BIRTHDATE',
@@ -120,6 +121,7 @@ export default function IdentityArchive() {
       value: voterIdCode,
       onChange: setVoterIdCode,
       type: 'text',
+      maxLength: 13,
     },
     {
       label: 'SESSION CODE',
@@ -127,6 +129,7 @@ export default function IdentityArchive() {
       value: sessionCode,
       onChange: setSessionCode,
       type: 'text',
+      maxLength: 8,
     },
   ]), [name, birthdate, voterIdCode, sessionCode, handleBirthdateChange]);
 
@@ -200,8 +203,8 @@ export default function IdentityArchive() {
       return false;
     }
 
-    if (stepIndex === 3 && sessionCode.trim().length < 4) {
-      triggerSnag('Session code is required.');
+    if (stepIndex === 3 && sessionCode.trim().length !== 8) {
+      triggerSnag('Session code must be exactly 8 characters.');
       return false;
     }
 
@@ -405,6 +408,7 @@ export default function IdentityArchive() {
                         value={step.value}
                         onChange={(e) => step.onChange(e.target.value)}
                         onKeyDown={handleKeyDown}
+                        maxLength={step.maxLength}
                         disabled={isSubmitting}
                       />
                     </div>
