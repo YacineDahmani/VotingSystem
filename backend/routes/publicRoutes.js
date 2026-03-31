@@ -86,6 +86,35 @@ function resolveVoterPhase(election, hasVoted) {
     return 'ballot';
 }
 
+function resolveSessionStatus(election) {
+    if (!election) {
+        return 'waiting';
+    }
+
+    if (hasElectionEnded(election) || election.status === 'closed') {
+        return 'closed';
+    }
+
+    if (election.status === 'draft') {
+        return 'waiting';
+    }
+
+    if (election.status === 'open') {
+        if (!election.start_date) {
+            return 'open';
+        }
+
+        const startDate = new Date(election.start_date);
+        if (Number.isNaN(startDate.getTime())) {
+            return 'open';
+        }
+
+        return Date.now() >= startDate.getTime() ? 'open' : 'waiting';
+    }
+
+    return 'waiting';
+}
+
 function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, requireVoterAuth, emitElectionUpdate, adminMasterKey }) {
     const router = express.Router();
 
@@ -111,6 +140,21 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
             const totalVotes = candidates.reduce((sum, candidate) => sum + candidate.votes, 0);
 
             res.json({ election, candidates, totalVotes });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.get('/elections/session-status', async (req, res) => {
+        try {
+            const activeElection = await db.getActiveElection();
+            const election = activeElection || await db.getLatestElection();
+
+            res.json({
+                state: resolveSessionStatus(election),
+                election,
+                serverTime: new Date().toISOString(),
+            });
         } catch (err) {
             res.status(500).json({ error: err.message });
         }

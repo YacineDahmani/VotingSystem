@@ -116,21 +116,7 @@ export default function Header() {
         ) : null}
       </nav>
 
-      <div className="pointer-events-auto flex items-center justify-end w-40">
-        <button 
-          onClick={() => setTheme(theme === 'dark' || (theme === 'system' && document.documentElement.classList.contains('dark')) ? 'light' : 'dark')}
-          className={clsx(
-            "mr-4 p-1.5 border rounded-sm transition-all duration-300",
-            "border-transparent hover:border-[var(--on-surface)]/20 text-[var(--on-surface)]/70 hover:text-[var(--on-surface)]"
-          )}
-          aria-label="Toggle Theme"
-        >
-          {theme === 'dark' || (theme === 'system' && document.documentElement.classList.contains('dark')) ? (
-            <Sun size={18} strokeWidth={1.5} />
-          ) : (
-            <Moon size={18} strokeWidth={1.5} />
-          )}
-        </button>
+      <div className="pointer-events-auto flex items-center justify-end w-40 gap-4">
         {isAdminSession(session) ? (
           <button
             onClick={handleSettingsClick}
@@ -141,9 +127,22 @@ export default function Header() {
             Exit Admin
           </button>
         ) : (
-          /* Removed settings icon logic as per requirements */
           <div className="w-6 h-6"></div>
         )}
+        <button 
+          onClick={() => setTheme(theme === 'dark' || (theme === 'system' && document.documentElement.classList.contains('dark')) ? 'light' : 'dark')}
+          className={clsx(
+            "p-1.5 border rounded-sm transition-all duration-300",
+            "border-transparent hover:border-[var(--on-surface)]/20 text-[var(--on-surface)]/70 hover:text-[var(--on-surface)]"
+          )}
+          aria-label="Toggle Theme"
+        >
+          {theme === 'dark' || (theme === 'system' && document.documentElement.classList.contains('dark')) ? (
+            <Sun size={18} strokeWidth={1.5} />
+          ) : (
+            <Moon size={18} strokeWidth={1.5} />
+          )}
+        </button>
       </div>
     </header>
   );

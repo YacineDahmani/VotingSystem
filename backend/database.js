@@ -232,6 +232,21 @@ function getActiveElection() {
     });
 }
 
+function getLatestElection() {
+    return new Promise((resolve, reject) => {
+        db.get(
+            `SELECT * FROM elections
+             ORDER BY datetime(created_at) DESC
+             LIMIT 1`,
+            [],
+            (err, row) => {
+                if (err) reject(err);
+                else resolve(row || null);
+            }
+        );
+    });
+}
+
 function updateElection(id, updates) {
     return new Promise((resolve, reject) => {
         const fields = [];
@@ -871,6 +886,7 @@ module.exports = {
     getElectionById,
     getAllElections,
     getActiveElection,
+    getLatestElection,
     updateElection,
     updateElectionStatus,
     regenerateElectionCode,

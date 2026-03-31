@@ -4,6 +4,29 @@ import { ArrowRight, Shield } from 'lucide-react';
 import { submitIdentity, validateElectionCode } from '../../lib/api';
 import { clearSession, getSession, getVoterPhase, isAdminSession, isVoterSession, setSession } from '../../store/session';
 
+const SESSION_STATUS_COPY = {
+  open: {
+    label: 'OPEN',
+    detail: 'Voting is currently active. You can vote.',
+    badgeClass: 'bg-emerald-500/15 text-emerald-700',
+  },
+  waiting: {
+    label: 'WAITING',
+    detail: 'This session is not open yet.',
+    badgeClass: 'bg-amber-500/15 text-amber-700',
+  },
+  closed: {
+    label: 'CLOSED',
+    detail: 'This session has ended. You can view results.',
+    badgeClass: 'bg-rose-500/15 text-rose-700',
+  },
+  invalid: {
+    label: 'INVALID',
+    detail: 'Session code not found. Check and try again.',
+    badgeClass: 'bg-slate-500/15 text-slate-700',
+  },
+};
+
 export default function IdentityArchive() {
   const navigate = useNavigate();
   const [entryMode, setEntryMode] = useState('voter');
@@ -17,6 +40,13 @@ export default function IdentityArchive() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
   const [isFlipping, setIsFlipping] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState({
+    state: 'waiting',
+    electionTitle: null,
+    electionCode: null,
+    message: '',
+    isLoaded: false,
+  });
 
   useEffect(() => {
     const currentSession = getSession();
@@ -43,6 +73,8 @@ export default function IdentityArchive() {
 
     navigate('/ballot', { replace: true });
   }, [navigate]);
+
+  const statusMeta = SESSION_STATUS_COPY[sessionStatus.state] || SESSION_STATUS_COPY.waiting;
 
   const calculateAge = useCallback((value) => {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
@@ -101,6 +133,14 @@ export default function IdentityArchive() {
 
   const steps = useMemo(() => ([
     {
+      label: 'SESSION CODE',
+      placeholder: 'ENTER VOTING SESSION CODE',
+      value: sessionCode,
+      onChange: setSessionCode,
+      type: 'text',
+      maxLength: 8,
+    },
+    {
       label: 'NAME',
       placeholder: 'ENTER FULL NAME',
       value: name,
@@ -123,15 +163,7 @@ export default function IdentityArchive() {
       type: 'text',
       maxLength: 13,
     },
-    {
-      label: 'SESSION CODE',
-      placeholder: 'ENTER VOTING SESSION CODE',
-      value: sessionCode,
-      onChange: setSessionCode,
-      type: 'text',
-      maxLength: 8,
-    },
-  ]), [name, birthdate, voterIdCode, sessionCode, handleBirthdateChange]);
+  ]), [sessionCode, name, birthdate, voterIdCode, handleBirthdateChange]);
 
   const handleBack = () => {
     if (isSubmitting || stepIndex === 0) return;
@@ -157,35 +189,85 @@ export default function IdentityArchive() {
     navigate('/results', { replace: true });
   }, [navigate]);
 
-  const ensureSessionCodeIsOpen = useCallback(async () => {
+  const applySessionStatusFromCode = useCallback((state, election, message = '') => {
+    const normalizedState = SESSION_STATUS_COPY[state] ? state : 'invalid';
+    setSessionStatus({
+      state: normalizedState,
+      electionTitle: election?.title || null,
+      electionCode: election?.code || sessionCode.trim().toUpperCase() || null,
+      message,
+      isLoaded: true,
+    });
+  }, [sessionCode]);
+
+  const checkSessionCodeStatus = useCallback(async ({ routeClosedToResults = false } = {}) => {
     const normalizedCode = sessionCode.trim().toUpperCase();
 
+    if (normalizedCode.length !== 8) {
+      triggerSnag('Session code must be exactly 8 characters.');
+      setSessionStatus({
+        state: 'invalid',
+        electionTitle: null,
+        electionCode: normalizedCode || null,
+        message: '',
+        isLoaded: false,
+      });
+      return { ok: false, state: 'invalid' };
+    }
+
     try {
-      await validateElectionCode(normalizedCode);
-      return true;
+      const response = await validateElectionCode(normalizedCode);
+      applySessionStatusFromCode('open', response?.election, 'This session is open. You can proceed.');
+      setError('');
+      return { ok: true, state: 'open', election: response?.election || null };
     } catch (err) {
       const reason = err?.data?.reason;
       const election = err?.data?.election;
 
-      if ((reason === 'ended' || reason === 'closed') && election?.id) {
-        const message = err?.message || 'This voting session has already ended. Redirecting to results.';
-        triggerSnag(message);
-        routeClosedSessionToResults(election, message);
-        return false;
+      if (reason === 'draft') {
+        applySessionStatusFromCode('waiting', election, err?.message || 'This session has not started yet.');
+        triggerSnag(err?.message || 'This session has not started yet.');
+        return { ok: false, state: 'waiting', election };
       }
 
+      if (reason === 'ended' || reason === 'closed') {
+        const message = err?.message || 'This voting session has already ended.';
+        applySessionStatusFromCode('closed', election, message);
+
+        if (routeClosedToResults && election?.id) {
+          routeClosedSessionToResults(election, message);
+        } else {
+          triggerSnag(message);
+        }
+
+        return { ok: false, state: 'closed', election };
+      }
+
+      applySessionStatusFromCode('invalid', election, err?.message || 'Session code not found.');
       triggerSnag(err?.message || 'Unable to validate session code.');
-      return false;
+      return { ok: false, state: 'invalid', election };
     }
-  }, [routeClosedSessionToResults, sessionCode]);
+  }, [applySessionStatusFromCode, routeClosedSessionToResults, sessionCode]);
+
+  const ensureSessionCodeIsOpen = useCallback(async () => {
+    const check = await checkSessionCodeStatus({ routeClosedToResults: true });
+    return check.ok;
+  }, [checkSessionCodeStatus]);
 
   const validateCurrentStep = () => {
-    if (stepIndex === 0 && name.trim().length < 2) {
-      triggerSnag('Name must include at least 2 characters.');
+    if (stepIndex === 0 && sessionCode.trim().length !== 8) {
+      triggerSnag('Session code must be exactly 8 characters.');
       return false;
     }
 
     if (stepIndex === 1) {
+      if (name.trim().length < 2) {
+        triggerSnag('Name must include at least 2 characters.');
+        return false;
+      }
+    }
+
+    if (stepIndex === 2) {
       const years = calculateAge(birthdate);
       if (years === null) {
         triggerSnag('Birthdate is required.');
@@ -198,13 +280,8 @@ export default function IdentityArchive() {
       }
     }
 
-    if (stepIndex === 2 && voterIdCode.trim().length < 3) {
+    if (stepIndex === 3 && voterIdCode.trim().length < 3) {
       triggerSnag('Voter ID code is required.');
-      return false;
-    }
-
-    if (stepIndex === 3 && sessionCode.trim().length !== 8) {
-      triggerSnag('Session code must be exactly 8 characters.');
       return false;
     }
 
@@ -216,6 +293,13 @@ export default function IdentityArchive() {
     if (isSubmitting) return;
 
     if (!validateCurrentStep()) return;
+
+    if (stepIndex === 0) {
+      const status = await checkSessionCodeStatus({ routeClosedToResults: true });
+      if (!status.ok) {
+        return;
+      }
+    }
 
     if (stepIndex < steps.length - 1) {
       setStepIndex((current) => current + 1);
@@ -363,7 +447,7 @@ export default function IdentityArchive() {
           style={isShaking ? { transform: 'translateX(-4px)', transition: 'transform 0.4s ease' } : {}}
         >
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-black/5 to-transparent"></div>
-          
+
           <div className="w-full mb-8 relative z-20">
             <div className="flex items-center gap-6 mb-4">
               <button
@@ -389,6 +473,32 @@ export default function IdentityArchive() {
                 Admin Entry
               </button>
             </div>
+
+            {entryMode === 'voter' && sessionStatus.isLoaded ? (
+              <div className="w-full bg-[var(--surface-container)]/75 border border-black/10 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="uppercase text-[0.58rem] tracking-[0.2em] text-[var(--on-surface)] opacity-60">Election Session</p>
+                  <span className={`px-2 py-1 text-[0.55rem] uppercase tracking-[0.18em] font-semibold ${statusMeta.badgeClass}`}>
+                    {statusMeta.label}
+                  </span>
+                </div>
+                <p className="mt-2 text-[0.62rem] uppercase tracking-[0.14em] text-[var(--on-surface)] opacity-65">
+                  {sessionStatus.message || statusMeta.detail}
+                </p>
+                {sessionStatus.electionTitle ? (
+                  <p className="mt-1 text-[0.58rem] uppercase tracking-[0.14em] text-[var(--on-surface)] opacity-60">
+                    {sessionStatus.electionTitle}
+                    {sessionStatus.electionCode ? ` / CODE ${sessionStatus.electionCode}` : ''}
+                  </p>
+                ) : (
+                  sessionStatus.electionCode ? (
+                    <p className="mt-1 text-[0.58rem] uppercase tracking-[0.14em] text-[var(--on-surface)] opacity-60">
+                      CODE {sessionStatus.electionCode}
+                    </p>
+                  ) : null
+                )}
+              </div>
+            ) : null}
           </div>
 
           {entryMode === 'voter' ? (
@@ -451,7 +561,7 @@ export default function IdentityArchive() {
                 <label className="uppercase text-[0.6rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-3 block">ADMIN MASTER KEY</label>
                 <input
                   type="password"
-                  placeholder=""
+                  placeholder="ENTER ADMIN MASTER KEY"
                   className="w-full p-4 text-xl tracking-widest font-muse uppercase bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/50 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors border-none"
                   value={adminKey}
                   onChange={(event) => setAdminKey(event.target.value)}

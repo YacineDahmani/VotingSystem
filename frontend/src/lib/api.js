@@ -39,6 +39,10 @@ export function getActiveElection() {
   return request('/api/elections/active');
 }
 
+export function getElectionSessionStatus() {
+  return request('/api/elections/session-status');
+}
+
 export function submitIdentity(payload) {
   return request('/api/session/identity', {
     method: 'POST',
