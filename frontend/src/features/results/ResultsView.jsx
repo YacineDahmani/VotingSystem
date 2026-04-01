@@ -105,13 +105,29 @@ export default function ResultsView() {
     );
   }
 
-  const distribution = (results?.candidates || []).map((candidate, index) => ({
-    id: candidate.id,
-    name: candidate.name,
-    percentage: `${candidate.percentage}%`,
-    width: `${candidate.percentage}%`,
-    barColor: index === 0 ? 'bg-[var(--primary)]' : index === 1 ? 'bg-gray-400' : 'bg-[var(--surface-container-high)]',
-  }));
+  const totalVotes = results?.totalVotes || 0;
+  const maxVoters = results?.election?.max_voters || null;
+  const turnoutPercentage = maxVoters ? ((totalVotes / maxVoters) * 100).toFixed(1) : null;
+  const totalCandidates = results?.candidates?.length || 0;
+  const topVotes = results?.candidates?.[0]?.votes || 0;
+  const runnerUpVotes = results?.candidates?.[1]?.votes || 0;
+  const winnerShare = totalVotes > 0 ? ((topVotes / totalVotes) * 100).toFixed(1) : '0.0';
+  const winnerMarginVotes = Math.max(0, topVotes - runnerUpVotes);
+  const averageVotesPerCandidate = totalCandidates > 0 ? (totalVotes / totalCandidates).toFixed(1) : '0.0';
+
+  const distribution = (results?.candidates || []).map((candidate, index) => {
+    const relativeToMaxPercentage = maxVoters ? ((candidate.votes / maxVoters) * 100).toFixed(1) : null;
+    
+    return {
+      id: candidate.id,
+      name: candidate.name,
+      votes: candidate.votes,
+      percentage: `${candidate.percentage}%`,
+      relativePercentage: relativeToMaxPercentage ? `${relativeToMaxPercentage}%` : null,
+      width: `${candidate.percentage}%`,
+      barColor: index === 0 ? 'bg-[var(--primary)]' : index === 1 ? 'bg-gray-400' : 'bg-[var(--surface-container-high)]',
+    };
+  });
 
   const ageGroups = results?.ageGroups || [];
   const highestAgeGroupVotes = ageGroups.length ? Math.max(...ageGroups.map((item) => item.total)) : 0;
@@ -211,21 +227,70 @@ export default function ResultsView() {
       <div className="bg-[var(--surface-container-low)] w-full py-24 relative z-10">
         <div className="w-full max-w-6xl mx-auto px-12 grid grid-cols-1 md:grid-cols-12 gap-16">
           
-          <div className="md:col-span-4">
-            <h3 className="label-md font-bold text-[var(--on-surface)] opacity-60 tracking-[0.2em] mb-6 border-b-2 border-[var(--on-surface)] pb-2">
-              VOTE DISTRIBUTION
-            </h3>
-            <p className="text-sm leading-relaxed text-[var(--on-surface)] opacity-80">
-              Final tally generated directly from the election ledger. Bars are proportional to verified candidate vote totals.
-            </p>
+          <div className="md:col-span-4 flex flex-col gap-6">
+            <div>
+              <h3 className="label-md font-bold text-[var(--on-surface)] opacity-60 tracking-[0.2em] mb-4 border-b-2 border-[var(--on-surface)] pb-2">
+                VOTE DISTRIBUTION
+              </h3>
+              <p className="text-sm leading-relaxed text-[var(--on-surface)] opacity-80 mb-6">
+                Final tally generated directly from the election ledger. Bars are proportional to verified candidate vote totals.
+              </p>
+            </div>
+            
+            <div className="bg-[var(--surface-container)] border border-[var(--outline-variant)] p-6 flex flex-col gap-4 mt-2 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-[var(--primary)] opacity-40"></div>
+              <div>
+                <p className="label-md text-[0.65rem] tracking-widest opacity-60 mb-1">TOTAL VOTERS</p>
+                <div className="font-muse text-5xl text-[var(--primary)]">{totalVotes}</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="border-t border-[var(--outline-variant)]/50 pt-4">
+                  <p className="label-md text-[0.6rem] tracking-widest opacity-50 mb-1">CANDIDATES</p>
+                  <p className="font-muse text-2xl text-[var(--on-surface)]">{totalCandidates}</p>
+                </div>
+                <div className="border-t border-[var(--outline-variant)]/50 pt-4">
+                  <p className="label-md text-[0.6rem] tracking-widest opacity-50 mb-1">AVERAGE / CANDIDATE</p>
+                  <p className="font-muse text-2xl text-[var(--on-surface)]">{averageVotesPerCandidate}</p>
+                </div>
+                <div className="border-t border-[var(--outline-variant)]/50 pt-4">
+                  <p className="label-md text-[0.6rem] tracking-widest opacity-50 mb-1">WINNER SHARE</p>
+                  <p className="font-muse text-2xl text-[var(--on-surface)]">{winnerShare}%</p>
+                </div>
+                <div className="border-t border-[var(--outline-variant)]/50 pt-4">
+                  <p className="label-md text-[0.6rem] tracking-widest opacity-50 mb-1">WINNER MARGIN</p>
+                  <p className="font-muse text-2xl text-[var(--on-surface)]">{winnerMarginVotes}</p>
+                </div>
+              </div>
+
+              {maxVoters && (
+                <div className="pt-4 border-t border-[var(--outline-variant)]/50 mt-2">
+                  <p className="label-md text-[0.65rem] tracking-widest opacity-60 mb-1">ELIGIBLE VOTER CAP</p>
+                  <div className="flex items-end gap-3">
+                    <p className="font-muse text-3xl">{maxVoters}</p>
+                    <p className="text-xs opacity-60 mb-1 pb-0.5">({turnoutPercentage}% turnout)</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="md:col-span-8 flex flex-col gap-12">
+          <div className="md:col-span-8 flex flex-col gap-12 mt-2">
             {distribution.map((candidate) => (
               <div key={candidate.name}>
                 <div className="flex justify-between items-end mb-4">
-                  <h4 className="font-muse italic text-3xl text-[var(--on-surface)] opacity-60">{candidate.name}</h4>
-                  <span className="font-bold text-lg">{candidate.percentage}</span>
+                  <h4 className="font-muse italic text-3xl text-[var(--on-surface)] opacity-90">{candidate.name}</h4>
+                  <div className="flex flex-col items-end">
+                    <div className="flex items-center gap-3">
+                      <span className="label-md text-[0.65rem] tracking-widest opacity-50">RAW: {candidate.votes}</span>
+                      <span className="font-bold text-xl">{candidate.percentage}</span>
+                    </div>
+                    {candidate.relativePercentage && (
+                      <span className="label-md text-[0.55rem] tracking-[0.1em] opacity-40 mt-1">
+                        {candidate.relativePercentage} OF TOTAL LIMIT
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {adminView && integrity?.candidates ? (
                   <p className="label-md text-[0.6rem] text-[var(--on-surface)] opacity-60 mb-2">
