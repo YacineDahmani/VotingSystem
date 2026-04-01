@@ -282,14 +282,9 @@ export default function ResultsView() {
                   <h4 className="font-muse italic text-3xl text-[var(--on-surface)] opacity-90">{candidate.name}</h4>
                   <div className="flex flex-col items-end">
                     <div className="flex items-center gap-3">
-                      <span className="label-md text-[0.65rem] tracking-widest opacity-50">RAW: {candidate.votes}</span>
+                      <span className="label-md text-[0.65rem] tracking-widest opacity-50">VOTERS COUNT: {candidate.votes}</span>
                       <span className="font-bold text-xl">{candidate.percentage}</span>
                     </div>
-                    {candidate.relativePercentage && (
-                      <span className="label-md text-[0.55rem] tracking-[0.1em] opacity-40 mt-1">
-                        {candidate.relativePercentage} OF TOTAL LIMIT
-                      </span>
-                    )}
                   </div>
                 </div>
                 {adminView && integrity?.candidates ? (
