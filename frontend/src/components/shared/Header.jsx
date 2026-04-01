@@ -9,8 +9,6 @@ export default function Header() {
   const location = useLocation();
   const session = getSession();
   const { theme, setTheme } = useTheme();
-  const isAdmin = location.pathname.startsWith('/admin') && isAdminSession(session);
-  const isVoter = isVoterSession(session);
   const phase = getVoterPhase(session);
   const hasVoted = !!session?.hasVoted;
 
@@ -23,7 +21,7 @@ export default function Header() {
     ];
   } else if (isVoterSession(session)) {
     navItems = [
-      { label: 'ENTRY', path: '/', disabled: false },
+      { label: 'ENTRY', path: '/', disabled: true },
       { label: 'BALLOT', path: '/ballot', disabled: hasVoted || phase === 'results' },
       { label: 'WAITING', path: '/waiting', disabled: !hasVoted || phase === 'results' },
       { label: 'RESULTS', path: '/results', disabled: phase !== 'results' },
@@ -61,26 +59,9 @@ export default function Header() {
       </div>
 
       <div className="pointer-events-auto flex items-center z-10">
-        {isVoter ? (
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className={clsx(
-              'text-left rounded-sm transition-colors',
-              'hover:text-[var(--on-surface)]/70'
-            )}
-            aria-label="Return to home"
-            title="Return to home"
-          >
-            <h1 className={clsx('text-[1.35rem] font-muse font-bold tracking-tight', 'text-[var(--on-surface)]')}>
-              The Editorial Ballot
-            </h1>
-          </button>
-        ) : (
-          <h1 className={clsx('text-[1.35rem] font-muse font-bold tracking-tight', 'text-[var(--on-surface)]')}>
-            The Editorial Ballot
-          </h1>
-        )}
+        <h1 className={clsx('text-[1.35rem] font-muse font-bold tracking-tight', 'text-[var(--on-surface)]')}>
+          The Editorial Ballot
+        </h1>
       </div>
 
       <nav className="pointer-events-auto absolute left-1/2 -translate-x-1/2 flex items-center gap-8 md:gap-12 z-10">
@@ -112,6 +93,11 @@ export default function Header() {
                   ) : (
                     <Link
                       to={item.path}
+                      onClick={() => {
+                        if (item.path === '/') {
+                          clearSession();
+                        }
+                      }}
                       className={clsx(
                         'relative flex uppercase text-[0.65rem] tracking-[0.2em] transition-all duration-300 py-2',
                         isActive 
