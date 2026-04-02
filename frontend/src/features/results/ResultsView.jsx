@@ -147,6 +147,10 @@ export default function ResultsView() {
 
   const winnerName = results?.leader?.name || distribution[0]?.name || 'No winner yet';
   const runoffElection = results?.runoffElection || null;
+  const tiedTopCandidates = results?.isTie ? (results?.tiedCandidates || []) : [];
+  const isTieResult = !!results?.isTie;
+  const heroLabel = isTieResult ? 'TIE DETECTED' : 'CONSENSUS REACHED';
+  const heroTitle = isTieResult ? 'Runoff Required' : winnerName;
 
   const handleRunoffContinue = () => {
     clearSession();
@@ -211,15 +215,19 @@ export default function ResultsView() {
           </div>
 
           <p className="label-md text-[var(--secondary)] mb-12 tracking-widest font-bold">
-            CONSENSUS REACHED
+            {heroLabel}
           </p>
           
           <h1 className="font-muse italic text-8xl md:text-[11rem] leading-[0.9] text-[var(--primary)] max-w-2xl animate-ink-bleed">
-            {winnerName.split(' ')[0]}<br />{winnerName.split(' ').slice(1).join(' ')}
+            {heroTitle.split(' ')[0]}<br />{heroTitle.split(' ').slice(1).join(' ')}
           </h1>
           
           <div className="mt-12 max-w-xs label-md text-[0.6rem] leading-[1.8] text-[var(--on-surface)] opacity-50 tracking-[0.15em]">
-            <p>DECLARED WINNER OF THE CURRENT EDITORIAL SELECTION. THE FOLLOWING DATA REPRESENTS THE FINAL VERIFIED COUNT.</p>
+            <p>
+              {isTieResult
+                ? 'THE FINAL COUNT IS TIED AT THE TOP. A RUNOFF SESSION IS REQUIRED TO DECLARE A WINNER.'
+                : 'DECLARED WINNER OF THE CURRENT EDITORIAL SELECTION. THE FOLLOWING DATA REPRESENTS THE FINAL VERIFIED COUNT.'}
+            </p>
           </div>
         </div>
       </div>
@@ -336,6 +344,16 @@ export default function ResultsView() {
                <p className="text-sm text-[var(--on-surface)] opacity-80 mb-6">
                  This election ended in a tie. A runoff has been opened as {runoffElection.title}.
                </p>
+               {tiedTopCandidates.length ? (
+                 <div className="mb-6 border border-[var(--outline-variant)] bg-[var(--surface-container)] px-4 py-3">
+                   <p className="label-md text-[0.62rem] tracking-widest text-[var(--on-surface)] opacity-60 mb-2">
+                     TOP-TIE CANDIDATES MOVED TO RUNOFF ({tiedTopCandidates.length})
+                   </p>
+                   <p className="text-sm text-[var(--on-surface)] opacity-90">
+                     {tiedTopCandidates.map((candidate) => candidate.name).join(' • ')}
+                   </p>
+                 </div>
+               ) : null}
                {!adminView ? (
                  <button
                    onClick={handleRunoffContinue}
@@ -346,6 +364,18 @@ export default function ResultsView() {
                ) : (
                  <p className="label-md text-[var(--on-surface)] opacity-80">Use the admin room to monitor the runoff session.</p>
                )}
+             </div>
+           ) : results?.isTie ? (
+             <div className="mt-16 p-8 bg-[var(--surface-container-low)] border border-[var(--outline-variant)]">
+               <p className="label-md text-[var(--secondary)] font-bold tracking-[0.2em] mb-3">TIE DETECTED</p>
+               <p className="text-sm text-[var(--on-surface)] opacity-80 mb-3">
+                 Final results are tied at the top. A runoff session is being prepared.
+               </p>
+               {tiedTopCandidates.length ? (
+                 <p className="text-sm text-[var(--on-surface)] opacity-90">
+                   Top-tied candidates: {tiedTopCandidates.map((candidate) => candidate.name).join(' • ')}
+                 </p>
+               ) : null}
              </div>
            ) : null}
          </div>
