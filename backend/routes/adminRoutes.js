@@ -466,13 +466,20 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
     router.post('/elections/:id/candidates', async (req, res) => {
         try {
             const electionId = Number.parseInt(req.params.id, 10);
-            const { name, description = '' } = req.body;
+            const election = await db.getElectionById(electionId);
+            if (!election) {
+                return res.status(404).json({ error: 'Election not found' });
+            }
 
-            if (!name) {
+            const { name, description = '' } = req.body;
+            const normalizedName = normalizeText(name);
+
+            if (!normalizedName) {
                 return res.status(400).json({ error: 'Candidate name is required' });
             }
 
-            const candidate = await db.addCandidateToElection(electionId, name, description);
+            const candidate = await db.addCandidateToElection(electionId, normalizedName, normalizeText(description));
+            await emitElectionUpdate(electionId, 'election:candidates');
             return res.json({ success: true, candidate });
         } catch (err) {
             return res.status(500).json({ error: err.message });
@@ -541,6 +548,7 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
             }
 
             const nextCandidates = await db.getCandidatesByElection(electionId);
+            await emitElectionUpdate(electionId, 'election:candidates');
             return res.json({
                 success: true,
                 imported: normalizedCandidates.length,
@@ -555,7 +563,13 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
     router.delete('/candidates/:id', async (req, res) => {
         try {
             const id = Number.parseInt(req.params.id, 10);
+            const candidate = await db.getCandidateById(id);
+            if (!candidate) {
+                return res.status(404).json({ error: 'Candidate not found' });
+            }
+
             await db.deleteCandidate(id);
+            await emitElectionUpdate(candidate.election_id, 'election:candidates');
             return res.json({ success: true });
         } catch (err) {
             return res.status(500).json({ error: err.message });

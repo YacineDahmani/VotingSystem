@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  addCandidate,
   deleteCandidate,
   deleteElection,
   getAdminElections,
@@ -80,6 +81,8 @@ export default function BlueprintGrid() {
   const [clockNow, setClockNow] = useState(Date.now());
   const [customEndDate, setCustomEndDate] = useState('');
   const [maxVotersInput, setMaxVotersInput] = useState('');
+  const [newCandidateName, setNewCandidateName] = useState('');
+  const [newCandidateDescription, setNewCandidateDescription] = useState('');
 
   const filteredElections = useMemo(() => {
     if (filter === 'all') return elections;
@@ -282,6 +285,29 @@ export default function BlueprintGrid() {
           message: `${candidateName} was removed from the session.`,
         });
       },
+    });
+  };
+
+  const handleAddCandidate = async () => {
+    if (!selectedElection) return;
+
+    const trimmedName = newCandidateName.trim();
+    if (!trimmedName) {
+      setError('Candidate name is required.');
+      return;
+    }
+
+    await withBusy('add-candidate', async () => {
+      await addCandidate(selectedElection.id, {
+        name: trimmedName,
+        description: newCandidateDescription.trim(),
+      });
+      setNewCandidateName('');
+      setNewCandidateDescription('');
+      await refreshAll(selectedElection.id);
+    }, {
+      title: 'Candidate Added',
+      message: `${trimmedName} is now available on this ballot.`,
     });
   };
 
@@ -608,6 +634,36 @@ export default function BlueprintGrid() {
             <p className="text-sm text-[var(--on-surface)] opacity-80 mb-5">
               Set an exact number of votes to inject. Use quick-step buttons for larger stress tests.
             </p>
+
+            <div className="mb-6 border border-[var(--outline-variant)] p-4">
+              <p className="label-md text-[var(--on-surface)] opacity-60 mb-3">Add Candidate</p>
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2">
+                <input
+                  type="text"
+                  value={newCandidateName}
+                  onChange={(event) => setNewCandidateName(event.target.value)}
+                  placeholder="Candidate name"
+                  disabled={!selectedElection || !!busyAction}
+                  className="border border-[var(--outline-variant)] px-3 py-2"
+                />
+                <input
+                  type="text"
+                  value={newCandidateDescription}
+                  onChange={(event) => setNewCandidateDescription(event.target.value)}
+                  placeholder="Description (optional)"
+                  disabled={!selectedElection || !!busyAction}
+                  className="border border-[var(--outline-variant)] px-3 py-2"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCandidate}
+                  disabled={!selectedElection || !!busyAction}
+                  className="border border-[var(--primary)] text-[var(--primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50"
+                >
+                  Add Candidate
+                </button>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {candidates.map((candidate) => (
