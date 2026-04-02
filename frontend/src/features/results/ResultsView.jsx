@@ -99,7 +99,7 @@ export default function ResultsView() {
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="label-md text-red-700">{error}</p>
+        <p className="label-md text-black dark:text-red-100">{error}</p>
         <button onClick={() => navigate('/')} className="px-6 py-3 bg-[var(--primary)] text-[var(--on-primary)] label-md transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">Return to entry</button>
       </div>
     );
@@ -178,9 +178,9 @@ export default function ResultsView() {
 
       <div className="w-full max-w-6xl mx-auto px-12 relative z-10">
         {endedNotice ? (
-          <div className="mb-8 border border-amber-700 bg-amber-50 px-6 py-4">
-            <p className="label-md tracking-widest text-amber-900">SESSION UPDATE</p>
-            <p className="text-sm mt-2 text-amber-900">{endedNotice}</p>
+          <div className="mb-8 border border-l-4 border-amber-300 border-l-amber-700 bg-amber-50 px-6 py-4 dark:border-rose-500/30 dark:border-l-rose-400 dark:bg-rose-950/25">
+            <p className="label-md tracking-widest text-black dark:text-rose-100">SESSION UPDATE</p>
+            <p className="text-sm mt-2 text-black dark:text-rose-100">{endedNotice}</p>
           </div>
         ) : null}
 

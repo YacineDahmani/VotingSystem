@@ -583,7 +583,7 @@ export default function CreateElectionView() {
           <span className="label-md text-[var(--on-surface)] opacity-90">Open election immediately after creation</span>
         </label>
 
-        {error ? <p className="label-md text-red-700">{error}</p> : null}
+        {error ? <p className="label-md text-black dark:text-red-100">{error}</p> : null}
 
         <div className="flex gap-4">
           <button
@@ -604,10 +604,10 @@ export default function CreateElectionView() {
         </div>
 
         {createdSession ? (
-          <div className="border border-green-700/40 bg-green-50 p-6">
-            <p className="label-md text-green-800 tracking-widest">SESSION CREATED</p>
+          <div className="border border-l-4 border-green-300 border-l-green-700 bg-green-50 p-6 dark:border-green-500/30 dark:border-l-green-400 dark:bg-green-950/25">
+            <p className="label-md text-black tracking-widest dark:text-green-100">SESSION CREATED</p>
             <h3 className="font-muse text-3xl mt-2">{createdSession.title}</h3>
-            <p className="mt-3 text-sm text-[var(--on-surface)] opacity-90">Share this session code with voters:</p>
+            <p className="mt-3 text-sm text-[var(--on-surface)] opacity-90 dark:opacity-100">Share this session code with voters:</p>
             <p className="font-bold text-2xl tracking-[0.2em] mt-1">{createdSession.code}</p>
             <div className="mt-4 flex gap-3 flex-wrap">
               <button

@@ -2,10 +2,10 @@ import { useCallback, useMemo, useState } from 'react';
 import { ToastContext } from './ToastContext';
 
 const TOAST_STYLES = {
-  success: 'border-green-300 bg-green-50 text-green-900',
-  error: 'border-red-300 bg-red-50 text-red-900',
-  warning: 'border-amber-300 bg-amber-50 text-amber-900',
-  info: 'border-sky-300 bg-sky-50 text-sky-900',
+  success: 'border border-l-4 border-green-300 border-l-green-700 bg-green-50 text-black dark:border-green-500/30 dark:border-l-green-400 dark:bg-green-950/25 dark:text-green-100',
+  error: 'border border-l-4 border-red-300 border-l-red-700 bg-red-50 text-black dark:border-rose-500/30 dark:border-l-rose-400 dark:bg-rose-950/30 dark:text-rose-100',
+  warning: 'border border-l-4 border-amber-300 border-l-amber-700 bg-amber-50 text-black dark:border-amber-500/30 dark:border-l-amber-400 dark:bg-amber-950/25 dark:text-amber-100',
+  info: 'border border-l-4 border-sky-300 border-l-sky-700 bg-sky-50 text-black dark:border-sky-500/30 dark:border-l-sky-400 dark:bg-sky-950/25 dark:text-sky-100',
 };
 
 export function ToastProvider({ children }) {
