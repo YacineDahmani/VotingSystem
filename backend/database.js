@@ -34,8 +34,10 @@ function initializeDatabase() {
                     start_date DATETIME,
                     end_date DATETIME,
                     max_voters INTEGER,
+                    source_election_id INTEGER,
                     round INTEGER DEFAULT 1,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (source_election_id) REFERENCES elections(id) ON DELETE SET NULL
                 )
             `);
 
@@ -115,6 +117,7 @@ function initializeDatabase() {
             const migrations = [
                 'ALTER TABLE elections ADD COLUMN round INTEGER DEFAULT 1',
                 'ALTER TABLE elections ADD COLUMN max_voters INTEGER',
+                'ALTER TABLE elections ADD COLUMN source_election_id INTEGER',
                 'ALTER TABLE voters ADD COLUMN identifier TEXT',
                 'ALTER TABLE voters ADD COLUMN birthdate TEXT',
                 'ALTER TABLE voters ADD COLUMN has_voted BOOLEAN DEFAULT 0',
@@ -166,7 +169,7 @@ function setSetting(key, value) {
 
 // ==================== ELECTIONS ====================
 
-function createElection(title, description = '', startDate = null, endDate = null, round = 1, maxVoters = null) {
+function createElection(title, description = '', startDate = null, endDate = null, round = 1, maxVoters = null, sourceElectionId = null) {
     return new Promise(async (resolve, reject) => {
         try {
             let code = generateElectionCode();
@@ -180,9 +183,9 @@ function createElection(title, description = '', startDate = null, endDate = nul
             }
 
             db.run(
-                `INSERT INTO elections (title, description, code, status, start_date, end_date, round, max_voters) 
-                 VALUES (?, ?, ?, 'draft', ?, ?, ?, ?)`,
-                [title, description, code, startDate, endDate, round, maxVoters],
+                `INSERT INTO elections (title, description, code, status, start_date, end_date, round, max_voters, source_election_id) 
+                 VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?)`,
+                [title, description, code, startDate, endDate, round, maxVoters, sourceElectionId],
                 function (err) {
                     if (err) reject(err);
                     else resolve({
@@ -194,13 +197,30 @@ function createElection(title, description = '', startDate = null, endDate = nul
                         start_date: startDate,
                         end_date: endDate,
                         round,
-                        max_voters: maxVoters
+                        max_voters: maxVoters,
+                        source_election_id: sourceElectionId
                     });
                 }
             );
         } catch (err) {
             reject(err);
         }
+    });
+}
+
+function getRunoffElectionForSource(sourceElectionId) {
+    return new Promise((resolve, reject) => {
+        db.get(
+            `SELECT * FROM elections
+             WHERE source_election_id = ?
+             ORDER BY round DESC, datetime(created_at) DESC
+             LIMIT 1`,
+            [sourceElectionId],
+            (err, row) => {
+                if (err) reject(err);
+                else resolve(row || null);
+            }
+        );
     });
 }
 
@@ -789,9 +809,9 @@ function getElectionResults(electionId) {
             let tiedCandidates = [];
             let leader = null;
 
-            if (candidates.length >= 2 && candidates[0].votes > 0) {
-                const maxVotes = candidates[0].votes;
-                const topCandidates = candidates.filter(c => c.votes === maxVotes);
+            if (resultsWithPercentages.length >= 2 && resultsWithPercentages[0].votes > 0) {
+                const maxVotes = resultsWithPercentages[0].votes;
+                const topCandidates = resultsWithPercentages.filter(c => c.votes === maxVotes);
 
                 // Tie if more than 1 candidate has maxVotes
                 isTie = topCandidates.length > 1;
@@ -799,17 +819,17 @@ function getElectionResults(electionId) {
                 if (isTie) {
                     tiedCandidates = topCandidates;
                 } else {
-                    leader = {
-                        ...resultsWithPercentages[0],
-                        percentage: totalVotes > 0 ? ((candidates[0].votes / totalVotes) * 100).toFixed(1) : '0.0'
-                    };
+                    leader = resultsWithPercentages[0];
                 }
             }
 
             // Auto-Runoff Logic
+            let runoffElection = null;
             if (justClosed && isTie) {
                 console.log(`[Auto-Runoff] Tie detected in election ${electionId}, creating runoff...`);
-                await createRunoffElection(election, tiedCandidates);
+                runoffElection = await createRunoffElection(election, tiedCandidates);
+            } else if (election.status === 'closed' && isTie) {
+                runoffElection = await getRunoffElectionForSource(electionId);
             }
 
             const ageGroups = await getAgeGroupStats(electionId);
@@ -821,6 +841,7 @@ function getElectionResults(electionId) {
                 isTie,
                 tiedCandidates,
                 leader,
+                runoffElection,
                 ageGroups
             });
         } catch (err) {
@@ -832,18 +853,35 @@ function getElectionResults(electionId) {
 function createRunoffElection(originalElection, tiedCandidates) {
     return new Promise(async (resolve, reject) => {
         try {
+            if (!Array.isArray(tiedCandidates) || tiedCandidates.length < 2) {
+                return resolve(null);
+            }
+
+            const existingRunoff = await getRunoffElectionForSource(originalElection.id);
+            if (existingRunoff) {
+                return resolve(existingRunoff);
+            }
+
             const newTitle = `[Runoff] ${originalElection.title}`;
-            // Set start now, end in 24h by default for runoff (or same duration as original)
-            // For simplicity, let's default to 1 hour for runoffs in this demo context
             const now = new Date();
-            const endDate = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour
+            const originalStart = originalElection.start_date ? new Date(originalElection.start_date) : null;
+            const originalEnd = originalElection.end_date ? new Date(originalElection.end_date) : null;
+            const originalDurationMs = originalStart && originalEnd
+                && !Number.isNaN(originalStart.getTime())
+                && !Number.isNaN(originalEnd.getTime())
+                && originalEnd.getTime() > originalStart.getTime()
+                ? (originalEnd.getTime() - originalStart.getTime())
+                : (60 * 60 * 1000);
+            const endDate = new Date(now.getTime() + originalDurationMs);
 
             const runoff = await createElection(
                 newTitle,
                 `Runoff for election #${originalElection.id}`,
                 now.toISOString(),
                 endDate.toISOString(),
-                (originalElection.round || 1) + 1
+                (originalElection.round || 1) + 1,
+                null,
+                originalElection.id
             );
 
             // Copy tied candidates
@@ -1059,6 +1097,7 @@ module.exports = {
     getAllElections,
     getActiveElection,
     getLatestElection,
+    getRunoffElectionForSource,
     updateElection,
     updateElectionStatus,
     regenerateElectionCode,

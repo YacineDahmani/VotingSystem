@@ -465,10 +465,10 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
             const electionId = Number.parseInt(req.params.id, 10);
             const results = await db.getElectionResults(electionId);
 
-            if (results?.election?.status === 'closed' && results?.isTie) {
-                const activeElection = await db.getActiveElection();
-                if (activeElection && activeElection.id !== electionId) {
-                    results.runoffElection = activeElection;
+            if (results?.election?.status === 'closed' && results?.isTie && !results?.runoffElection) {
+                const runoffElection = await db.getRunoffElectionForSource(electionId);
+                if (runoffElection) {
+                    results.runoffElection = runoffElection;
                 }
             }
 
