@@ -39,7 +39,7 @@ export default function GravitySlot() {
 
   const isEndedSessionError = (err) => {
     const message = (err?.message || '').toLowerCase();
-    return err?.status === 403 || message.includes('ended') || message.includes('closed') || message.includes('not open');
+    return message.includes('ended') || message.includes('closed') || err?.data?.reason === 'ended' || err?.data?.reason === 'closed';
   };
 
   useEffect(() => {
@@ -152,7 +152,18 @@ export default function GravitySlot() {
   };
 
   if (loading) {
-    return <div className="min-h-[90vh] flex items-center justify-center label-md">Loading ballot...</div>;
+    return (
+      <div className="min-h-[90vh] flex flex-col items-center justify-center gap-4 label-md px-6 text-center">
+        <p>Loading ballot...</p>
+        <button
+          type="button"
+          onClick={exitBallot}
+          className="border border-[var(--outline-variant)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)]"
+        >
+          Return To Entry
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -239,6 +250,13 @@ export default function GravitySlot() {
             className="border border-[var(--outline-variant)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)]"
           >
             Return To Entry
+          </button>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="border border-[var(--outline-variant)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)]"
+          >
+            Retry Loading Ballot
           </button>
         </div>
       ) : null}

@@ -1,4 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const REQUEST_TIMEOUT_MS = 15000;
 
 function getAuthToken() {
   try {
@@ -13,15 +14,32 @@ function getAuthToken() {
 
 async function request(path, options = {}) {
   const token = getAuthToken();
+  const controller = new AbortController();
+  const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : REQUEST_TIMEOUT_MS;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const fetchOptions = { ...options };
+  delete fetchOptions.timeoutMs;
+  let response;
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(fetchOptions.headers || {}),
+      },
+      ...fetchOptions,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Request timed out. Please make sure the backend server is running.');
+    }
+
+    throw new Error('Unable to reach the server. Please check your connection and backend status.');
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   const data = await response.json().catch(() => ({}));
 
