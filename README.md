@@ -84,7 +84,3 @@ The admin code is not hard-coded in the frontend. It is controlled by the `ADMIN
 - Use the same value whenever you want the default admin password to be created or refreshed in a clean database.
 - If the variable is missing, the backend exits during startup with a clear error.
 
-## Notes
-
-- The backend uses SQLite and creates its local database file on first run.
-- Production builds can be served from the frontend dist output when present.
