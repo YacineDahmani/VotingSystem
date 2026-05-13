@@ -84,12 +84,6 @@ The admin code is not hard-coded in the frontend. It is controlled by the `ADMIN
 - Use the same value whenever you want the default admin password to be created or refreshed in a clean database.
 - If the variable is missing, the backend exits during startup with a clear error.
 
-## Visual Direction
-
-- User palette: eggshell white with strong black typography and inset paper-like depth.
-- Admin palette: blueprint blue with technical grid lines and architectural controls.
-- Motion language: horizontal strip slides, drag-and-drop ballot deposits, pendulum kicks, and an unfolding reveal for results.
-
 ## Notes
 
 - The backend uses SQLite and creates its local database file on first run.
