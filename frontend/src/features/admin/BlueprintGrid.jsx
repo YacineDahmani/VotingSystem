@@ -548,12 +548,9 @@ export default function BlueprintGrid() {
             <span className="px-2 py-0.5 text-[0.55rem] uppercase tracking-[0.2em] font-bold bg-[var(--primary)] text-[var(--on-primary)]">
               ADMIN CONTROL
             </span>
-            <p className="text-[0.62rem] uppercase tracking-[0.16em] text-[var(--on-surface)] opacity-60">
-              Officer: <strong>{adminProfile.username}</strong> ({adminProfile.role})
-            </p>
           </div>
           <h2 className="font-muse text-4xl text-[var(--primary)] mt-1 font-bold">
-            Electoral Operations
+            Election Management
           </h2>
         </div>
 
@@ -1008,7 +1005,6 @@ export default function BlueprintGrid() {
                     <span className="text-[0.58rem] uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-50">
                       DIRECT VOTER INVITE LINK
                     </span>
-                    <span className="text-[0.55rem] font-mono font-bold text-[var(--on-surface)] opacity-70">READY TO SHARE</span>
                   </div>
 
                   <div className="flex items-center gap-2">
