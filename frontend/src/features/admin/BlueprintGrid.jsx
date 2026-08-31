@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowRight,
   ArrowUpRight,
+  BarChart3,
   Check,
   CheckCircle2,
   Clock,
@@ -554,6 +555,22 @@ export default function BlueprintGrid() {
         <div className="flex items-center gap-3">
           <button
             type="button"
+            onClick={() => {
+              if (selectedElection?.id) {
+                setSession({ resultsElectionId: selectedElection.id });
+                navigate(`/results?electionId=${selectedElection.id}`);
+              } else {
+                navigate('/results');
+              }
+            }}
+            className="border border-[var(--outline-variant)] px-4 py-2.5 text-xs uppercase tracking-widest hover:bg-[var(--surface-container)] transition-colors flex items-center gap-2"
+            title="View live results & tally"
+          >
+            <BarChart3 size={14} />
+            <span>Live Results</span>
+          </button>
+          <button
+            type="button"
             onClick={() => navigate('/admin/create')}
             className="bg-[var(--primary)] text-[var(--on-primary)] px-5 py-2.5 text-xs uppercase tracking-widest font-bold hover:bg-[var(--primary)]/90 transition-all shadow-sm flex items-center gap-2"
           >
@@ -658,6 +675,18 @@ export default function BlueprintGrid() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSession({ resultsElectionId: selectedElection.id });
+                      navigate(`/results?electionId=${selectedElection.id}`);
+                    }}
+                    className="px-3 py-1.5 text-[0.62rem] uppercase tracking-wider font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] flex items-center gap-1 transition-colors"
+                    title="View live tally for this election"
+                  >
+                    <BarChart3 size={13} />
+                    <span>Results</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleStatusChange('open')}
@@ -932,17 +961,51 @@ export default function BlueprintGrid() {
                     Voter Access & Share Links
                   </h4>
                   <p className="text-xs text-[var(--on-surface)] opacity-70">
-                    Distribute this direct link or session code to voters for immediate onboarding.
+                    Distribute this direct link, session code, or scannable QR code to voters.
                   </p>
+                </div>
+
+                {/* Scannable Live QR Code Card */}
+                <div className="bg-[var(--surface)] p-6 border border-[var(--on-surface)]/15 flex flex-col md:flex-row items-center gap-6">
+                  <div className="p-3 bg-white border border-[var(--on-surface)]/20 shadow-sm shrink-0">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(voterJoinUrl)}&margin=6`}
+                      alt="Election QR Code"
+                      className="w-40 h-40 block"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2.5 text-center md:text-left">
+                    <span className="text-[0.58rem] uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-50">
+                      SCANNABLE QR CODE
+                    </span>
+                    <h5 className="font-muse text-2xl font-bold text-[var(--primary)]">
+                      Instant Mobile Voting Access
+                    </h5>
+                    <p className="text-xs text-[var(--on-surface)] opacity-70 leading-relaxed">
+                      Voters can scan this QR code with any phone camera to automatically open the voting screen with the election session pre-filled.
+                    </p>
+                    <div className="pt-2 flex flex-wrap gap-2 justify-center md:justify-start">
+                      <a
+                        href={`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(voterJoinUrl)}&margin=12`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-4 py-2 text-xs uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] flex items-center gap-1.5"
+                      >
+                        <ExternalLink size={13} />
+                        <span>Open Fullscreen QR</span>
+                      </a>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Direct Link Box */}
                 <div className="bg-[var(--surface)] p-6 border border-[var(--on-surface)]/15 space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-[0.58rem] uppercase tracking-[0.2em] font-bold text-[var(--primary)]">
+                    <span className="text-[0.58rem] uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-50">
                       DIRECT VOTER INVITE LINK
                     </span>
-                    <span className="text-[0.55rem] font-mono text-emerald-600 font-bold">READY TO SHARE</span>
+                    <span className="text-[0.55rem] font-mono font-bold text-[var(--on-surface)] opacity-70">READY TO SHARE</span>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -957,7 +1020,7 @@ export default function BlueprintGrid() {
                       onClick={copyJoinLink}
                       className="px-5 py-3 text-xs uppercase tracking-widest font-bold bg-[var(--primary)] text-[var(--on-primary)] hover:bg-[var(--primary)]/90 flex items-center gap-1.5 shrink-0"
                     >
-                      {copiedLink ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                      {copiedLink ? <Check size={14} /> : <Copy size={14} />}
                       <span>{copiedLink ? 'Copied' : 'Copy Link'}</span>
                     </button>
                   </div>
@@ -984,7 +1047,7 @@ export default function BlueprintGrid() {
                         onClick={copySessionCode}
                         className="px-4 py-2 text-xs uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] flex items-center gap-1.5"
                       >
-                        {copiedCode ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                        {copiedCode ? <Check size={14} /> : <Copy size={14} />}
                         <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
                       </button>
                       <button
