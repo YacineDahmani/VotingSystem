@@ -48,28 +48,5 @@ export function AdminRoute({ children }) {
 }
 
 export function ResultsRoute({ children }) {
-  const session = getSession();
-
-  if (isAdminSession(session)) {
-    return children;
-  }
-
-  if (session?.resultsElectionId) {
-    return children;
-  }
-
-  if (!isVoterSession(session)) {
-    return <Navigate to="/" replace />;
-  }
-
-  const phase = getVoterPhase(session);
-  if (session.hasVoted && phase === VOTER_PHASES.WAITING) {
-    return <Navigate to="/waiting" replace />;
-  }
-
-  if (phase !== VOTER_PHASES.RESULTS) {
-    return <Navigate to="/ballot" replace />;
-  }
-
   return children;
 }

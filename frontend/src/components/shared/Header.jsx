@@ -17,7 +17,7 @@ export default function Header() {
   if (isAdminSession(session)) {
     navItems = [
       { label: 'ADMIN', path: '/admin', disabled: false },
-      { label: 'RESULTS', path: '/results', disabled: true },
+      { label: 'RESULTS', path: '/results', disabled: false },
     ];
   } else if (isVoterSession(session)) {
     navItems = [

@@ -19,6 +19,7 @@ function AppContent() {
           <Route path="/ballot" element={<VoterRoute><GravitySlot /></VoterRoute>} />
           <Route path="/waiting" element={<WaitingRoute><PendulumView /></WaitingRoute>} />
           <Route path="/admin" element={<AdminRoute><BlueprintGrid /></AdminRoute>} />
+          <Route path="/admin/create" element={<AdminRoute><CreateElectionView /></AdminRoute>} />
           <Route path="/admin/new" element={<AdminRoute><CreateElectionView /></AdminRoute>} />
           <Route path="/results" element={<ResultsRoute><ResultsView /></ResultsRoute>} />
         </Routes>
