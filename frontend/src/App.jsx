@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Header from './components/shared/Header';
 import IdentityArchive from './features/auth/IdentityArchive';
 import GravitySlot from './features/voting/GravitySlot';
@@ -6,15 +6,10 @@ import PendulumView from './features/shared/PendulumView';
 import BlueprintGrid from './features/admin/BlueprintGrid';
 import CreateElectionView from './features/admin/CreateElectionView';
 import ResultsView from './features/results/ResultsView';
-import { getSession, isAdminSession } from './store/session';
 import { AdminRoute, ResultsRoute, VoterRoute, WaitingRoute } from './lib/routeGuard';
 import { ToastProvider } from './components/ui/ToastProvider';
 
 function AppContent() {
-  const location = useLocation();
-  const session = getSession();
-  const isAdmin = location.pathname.startsWith('/admin') && isAdminSession(session);
-
   return (
     <div className={`min-h-screen w-full transition-colors duration-700 bg-[var(--surface)] text-[var(--on-surface)]`}>
       <Header />

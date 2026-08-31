@@ -339,15 +339,15 @@ export default function PendulumView() {
 
       <div className="w-full flex justify-between items-start px-6 md:px-12 relative z-20 mt-4 md:mt-0">
         <div>
-          <h2 className="font-muse text-[2.5rem] italic text-[var(--primary)] mb-2 font-normal leading-none">The Pendulum</h2>
-          <p className="text-[0.65rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-50 mt-4">SECTION: 04 / STATUS: PROCESSING</p>
+          <h2 className="font-muse text-[2.5rem] italic text-[var(--primary)] mb-2 font-normal leading-none">Waiting Room</h2>
+          <p className="text-[0.65rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-50 mt-4">Live Updates</p>
         </div>
 
         <div className="flex flex-col items-end gap-3">
           <div className="flex items-center gap-2 mt-2">
             <span className={`w-1.5 h-1.5 rounded-full ${isSocketConnected ? 'bg-black' : 'bg-red-600 animate-pulse'}`} />
             <p className="text-[0.55rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-50">
-              {isSocketConnected ? 'LIVE CHANNEL' : 'RECONNECTING'}
+              {isSocketConnected ? 'LIVE' : 'RECONNECTING'}
             </p>
           </div>
           <button
@@ -355,7 +355,7 @@ export default function PendulumView() {
             onClick={handleLeaveWaiting}
             className="mt-4 px-6 py-3 bg-[var(--primary)] text-[var(--on-primary)] text-[0.65rem] uppercase tracking-[0.2em] transition-all duration-200 hover:bg-[var(--primary)]/90 hover:-translate-y-0.5 shadow-md active:translate-y-0 font-bold"
           >
-            Leave Waiting Area
+            Leave
           </button>
         </div>
       </div>
@@ -387,10 +387,10 @@ export default function PendulumView() {
           </div>
           <div className="flex flex-col items-center mt-2 border-t border-[var(--on-surface)]/10 pt-4 px-12">
             <p className="text-[0.65rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-60 font-bold mb-6">
-              Total Votes Cast Live
+              Votes Cast
             </p>
             <p className="text-[0.55rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-50">
-              VOTING ENDS IN
+              TIME REMAINING
             </p>
             <p className="text-sm mt-1 font-bold uppercase tracking-[0.15em] text-[var(--primary)]">
               {timeRemainingLabel}
@@ -401,16 +401,10 @@ export default function PendulumView() {
                 onClick={handleGoToResults}
                 className="mt-4 px-6 py-3 border border-[var(--primary)] text-[var(--primary)] text-[0.65rem] uppercase tracking-[0.2em] transition-all duration-200 hover:bg-[var(--primary)] hover:text-[var(--on-primary)] hover:-translate-y-0.5 shadow-sm active:translate-y-0 font-bold"
               >
-                Go To Results
+                View Results
               </button>
             ) : null}
           </div>
-        </div>
-
-        <div className="w-full max-w-2xl px-8 flex justify-between items-center mt-24 opacity-60 relative z-20">
-          <span className="text-[0.55rem] uppercase tracking-[0.2em] border-b border-[var(--on-surface)]/10 pb-1 text-[var(--on-surface)] opacity-60">SYNCHRONIZING ARCHIVE</span>
-          <span className="text-[0.55rem] uppercase tracking-[0.2em] border-b border-[var(--on-surface)]/10 pb-1 text-[var(--on-surface)] opacity-60">V01-BLLT</span>
-          <span className="text-[0.55rem] uppercase tracking-[0.2em] border-b border-[var(--on-surface)]/10 pb-1 text-[var(--on-surface)] opacity-60">ACTIVE LEDGER</span>
         </div>
       </div>
     </div>

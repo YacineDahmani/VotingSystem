@@ -27,7 +27,7 @@ export default function GravitySlot() {
     navigate('/');
   };
 
-  const redirectEndedSessionToResults = (message) => {
+  const redirectEndedSessionToResults = useCallback((message) => {
     setSession({
       electionStatus: 'closed',
       resultsElectionId: session.electionId,
@@ -35,7 +35,7 @@ export default function GravitySlot() {
     });
     setVoterPhase(VOTER_PHASES.RESULTS);
     navigate('/results', { replace: true });
-  };
+  }, [navigate, session.electionId]);
 
   const isEndedSessionError = (err) => {
     const message = (err?.message || '').toLowerCase();
@@ -95,7 +95,7 @@ export default function GravitySlot() {
     return () => {
       mounted = false;
     };
-  }, [navigate, session]);
+  }, [navigate, redirectEndedSessionToResults, session]);
 
   const openConfirmation = () => {
     if (!selectedCandidateId || isSubmitting) {
@@ -160,7 +160,7 @@ export default function GravitySlot() {
           onClick={exitBallot}
           className="border border-[var(--outline-variant)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)]"
         >
-          Return To Entry
+          Back
         </button>
       </div>
     );
@@ -176,17 +176,17 @@ export default function GravitySlot() {
 
       <div className="w-full max-w-[1400px] px-12 mb-10 z-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <p className="label-md text-[var(--on-surface)] opacity-60 font-bold tracking-[0.1em]">PHASE 01 - SELECTION</p>
+          <p className="label-md text-[var(--on-surface)] opacity-60 font-bold tracking-[0.1em]">OFFICIAL BALLOT</p>
           <button
             type="button"
             onClick={exitBallot}
             className="border border-[var(--outline-variant)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:-translate-y-0.5 shadow-sm active:translate-y-0"
           >
-            Exit Ballot
+            Exit
           </button>
         </div>
         <h2 className="font-muse text-5xl text-[var(--primary)] max-w-2xl leading-[1.1]">
-          Choose one candidate, confirm, then submit your vote once.
+          Select a candidate to cast your vote.
         </h2>
       </div>
 
@@ -205,7 +205,6 @@ export default function GravitySlot() {
                 {String(index + 1).padStart(2, '0')}
               </span>
               <div>
-                <p className="label-md text-[var(--on-surface)] opacity-50 mb-4">CANDIDATE</p>
                 <h3 className="font-muse text-3xl text-[var(--primary)] leading-tight">
                   {candidate.name}
                 </h3>
@@ -215,7 +214,7 @@ export default function GravitySlot() {
                   </p>
                 )}
                 <p className="label-md mt-4 text-[var(--on-surface)] opacity-60">
-                  {selected ? 'Selected for confirmation' : 'Click to select'}
+                  {selected ? 'Selected' : 'Select'}
                 </p>
               </div>
             </button>
@@ -228,7 +227,7 @@ export default function GravitySlot() {
           <p className="label-md text-[var(--on-surface)] opacity-80 tracking-[0.08em]">
             {selectedCandidate
               ? `Selected: ${selectedCandidate.name}`
-              : 'Select one candidate to enable vote submission'}
+              : 'Select a candidate to continue'}
           </p>
           <button
             type="button"
@@ -236,7 +235,7 @@ export default function GravitySlot() {
             disabled={!selectedCandidateId || isSubmitting}
             className="bg-[var(--primary)] text-[var(--on-primary)] px-8 py-3 uppercase text-xs tracking-[0.16em] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
           >
-            {isSubmitting ? 'Submitting Vote...' : 'Submit Vote'}
+            {isSubmitting ? 'Submitting...' : 'Submit Vote'}
           </button>
         </div>
       </div>
@@ -249,14 +248,14 @@ export default function GravitySlot() {
             onClick={exitBallot}
             className="border border-[var(--outline-variant)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)]"
           >
-            Return To Entry
+            Back
           </button>
           <button
             type="button"
             onClick={() => window.location.reload()}
             className="border border-[var(--outline-variant)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)]"
           >
-            Retry Loading Ballot
+            Retry
           </button>
         </div>
       ) : null}
@@ -264,9 +263,9 @@ export default function GravitySlot() {
       <ConfirmDialog
         open={showConfirm}
         title="Confirm Vote"
-        message={selectedCandidate ? `Submit your final vote for ${selectedCandidate.name}? This cannot be changed.` : 'Submit this vote?'}
-        confirmLabel="Confirm Vote"
-        cancelLabel="Review Again"
+        message={selectedCandidate ? `Submit your vote for ${selectedCandidate.name}? You cannot change this later.` : 'Submit this vote?'}
+        confirmLabel="Submit Vote"
+        cancelLabel="Cancel"
         onCancel={() => setShowConfirm(false)}
         onConfirm={confirmVote}
         busy={isSubmitting}

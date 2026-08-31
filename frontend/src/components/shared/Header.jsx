@@ -21,14 +21,14 @@ export default function Header() {
     ];
   } else if (isVoterSession(session)) {
     navItems = [
-      { label: 'ENTRY', path: '/', disabled: true },
+      { label: 'SIGN IN', path: '/', disabled: true },
       { label: 'BALLOT', path: '/ballot', disabled: hasVoted || phase === 'results' },
       { label: 'WAITING', path: '/waiting', disabled: !hasVoted || phase === 'results' },
       { label: 'RESULTS', path: '/results', disabled: phase !== 'results' },
     ];
   } else {
     navItems = [
-      { label: 'ENTRY', path: '/', disabled: false },
+      { label: 'SIGN IN', path: '/', disabled: false },
       { label: 'WAITING', path: '/waiting', disabled: true },
       { label: 'ADMIN', path: '/admin', disabled: true },
       { label: 'RESULTS', path: '/results', disabled: true },
@@ -60,7 +60,7 @@ export default function Header() {
 
       <div className="pointer-events-auto flex items-center z-10">
         <h1 className={clsx('text-[1.35rem] font-muse font-bold tracking-tight', 'text-[var(--on-surface)]')}>
-          The Editorial Ballot
+          Voting System
         </h1>
       </div>
 
@@ -76,7 +76,7 @@ export default function Header() {
                       type="button"
                       disabled
                       aria-disabled="true"
-                      title="This section is locked until its phase is active"
+                      title="Unavailable in current step"
                       className={clsx(
                         'relative flex uppercase text-[0.65rem] tracking-[0.2em] transition-all duration-300 py-2 cursor-not-allowed',
                         isActive
@@ -122,8 +122,8 @@ export default function Header() {
           <button
             onClick={handleSettingsClick}
             className="px-4 py-2 border border-[var(--on-surface)]/20 text-[var(--on-surface)] uppercase text-[0.65rem] tracking-[0.2em] hover:bg-[var(--on-surface)] hover:text-[var(--surface)] transition-all duration-300"
-            aria-label="Exit admin room"
-            title="Exit admin room"
+            aria-label="Exit admin"
+            title="Exit admin"
           >
             Exit Admin
           </button>

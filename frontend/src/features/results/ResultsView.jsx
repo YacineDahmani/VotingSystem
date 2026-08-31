@@ -93,14 +93,14 @@ export default function ResultsView() {
   }, [adminView, guestResultsView, navigate, session]);
 
   if (!results && !error) {
-    return <div className="min-h-screen flex items-center justify-center">Compiling final scroll...</div>;
+    return <div className="min-h-screen flex items-center justify-center">Loading results...</div>;
   }
 
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="label-md text-black dark:text-red-100">{error}</p>
-        <button onClick={() => navigate('/')} className="px-6 py-3 bg-[var(--primary)] text-[var(--on-primary)] label-md transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">Return to entry</button>
+        <button onClick={() => navigate('/')} className="px-6 py-3 bg-[var(--primary)] text-[var(--on-primary)] label-md transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">Back to Sign In</button>
       </div>
     );
   }
@@ -140,7 +140,7 @@ export default function ResultsView() {
 
     return {
       group: item.age_group,
-      stat: `${item.total} recorded votes`,
+      stat: `${item.total} votes`,
       type,
     };
   });
@@ -149,7 +149,7 @@ export default function ResultsView() {
   const runoffElection = results?.runoffElection || null;
   const tiedTopCandidates = results?.isTie ? (results?.tiedCandidates || []) : [];
   const isTieResult = !!results?.isTie;
-  const heroLabel = isTieResult ? 'TIE DETECTED' : 'CONSENSUS REACHED';
+  const heroLabel = isTieResult ? 'TIE' : 'FINAL RESULTS';
   const heroTitle = isTieResult ? 'Runoff Required' : winnerName;
 
   const handleRunoffContinue = () => {
@@ -169,7 +169,7 @@ export default function ResultsView() {
       className="min-h-screen bg-[var(--surface-container-lowest)] text-[var(--primary)] font-grotesque overflow-x-hidden pt-20"
     >
       
-      {/* Massive subtle absolute letter */}
+      {/* Subtle background letter */}
       <div className="absolute top-[20%] right-[-5%] overflow-hidden max-h-screen z-0">
           <span className="font-muse text-[50vw] leading-none text-gray-100 select-none pointer-events-none">
             V
@@ -179,16 +179,16 @@ export default function ResultsView() {
       <div className="w-full max-w-6xl mx-auto px-12 relative z-10">
         {endedNotice ? (
           <div className="mb-8 border border-l-4 border-amber-300 border-l-amber-700 bg-amber-50 px-6 py-4 dark:border-rose-500/30 dark:border-l-rose-400 dark:bg-rose-950/25">
-            <p className="label-md tracking-widest text-black dark:text-rose-100">SESSION UPDATE</p>
+            <p className="label-md tracking-widest text-black dark:text-rose-100">NOTICE</p>
             <p className="text-sm mt-2 text-black dark:text-rose-100">{endedNotice}</p>
           </div>
         ) : null}
 
         {adminView && integrity ? (
-          <div className={`mb-10 border px-6 py-4 ${integrity.integrityStatus === 'clean' ? 'border-green-700 bg-green-50' : 'border-red-700 bg-red-60'}`}>
-            <p className="label-md tracking-widest">INTEGRITY CHECK</p>
+          <div className={`mb-10 border px-6 py-4 ${integrity.integrityStatus === 'clean' ? 'border-green-700 bg-green-50' : 'border-red-700 bg-red-50'}`}>
+            <p className="label-md tracking-widest">INTEGRITY AUDIT</p>
             <p className="text-sm mt-2">
-              Status: <strong>{integrity.integrityStatus === 'clean' ? 'CLEAN' : 'RIGGED'}</strong> | Real Votes: {integrity.realVotes} | Fake Votes: {integrity.fakeVotes}
+              Status: <strong>{integrity.integrityStatus === 'clean' ? 'CLEAN' : 'ANOMALY DETECTED'}</strong> | Real Votes: {integrity.realVotes} | Simulated Votes: {integrity.fakeVotes}
             </p>
           </div>
         ) : null}
@@ -202,7 +202,7 @@ export default function ResultsView() {
                 onClick={() => navigate('/admin')}
                 className="border border-[var(--on-surface)]/20 bg-[var(--surface-container-low)]/70 px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:border-[var(--on-surface)]/40 hover:-translate-y-0.5 shadow-sm active:translate-y-0"
               >
-                Back To Admin
+                Admin Dashboard
               </button>
             ) : null}
             <button
@@ -210,7 +210,7 @@ export default function ResultsView() {
               onClick={handleExitResults}
               className="bg-[var(--primary)] text-[var(--on-primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
             >
-              Exit Results
+              Exit
             </button>
           </div>
 
@@ -225,8 +225,8 @@ export default function ResultsView() {
           <div className="mt-12 max-w-xs label-md text-[0.6rem] leading-[1.8] text-[var(--on-surface)] opacity-50 tracking-[0.15em]">
             <p>
               {isTieResult
-                ? 'THE FINAL COUNT IS TIED AT THE TOP. A RUNOFF SESSION IS REQUIRED TO DECLARE A WINNER.'
-                : 'DECLARED WINNER OF THE CURRENT EDITORIAL SELECTION. THE FOLLOWING DATA REPRESENTS THE FINAL VERIFIED COUNT.'}
+                ? 'The final count ended in a tie. A runoff election is required to determine the winner.'
+                : 'Certified final election count.'}
             </p>
           </div>
         </div>
@@ -238,17 +238,14 @@ export default function ResultsView() {
           <div className="md:col-span-4 flex flex-col gap-6">
             <div>
               <h3 className="label-md font-bold text-[var(--on-surface)] opacity-60 tracking-[0.2em] mb-4 border-b-2 border-[var(--on-surface)] pb-2">
-                VOTE DISTRIBUTION
+                VOTE TOTALS
               </h3>
-              <p className="text-sm leading-relaxed text-[var(--on-surface)] opacity-80 mb-6">
-                Final tally generated directly from the election ledger. Bars are proportional to verified candidate vote totals.
-              </p>
             </div>
             
             <div className="bg-[var(--surface-container)] border border-[var(--outline-variant)] p-6 flex flex-col gap-4 mt-2 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1 h-full bg-[var(--primary)] opacity-40"></div>
               <div>
-                <p className="label-md text-[0.65rem] tracking-widest opacity-60 mb-1">TOTAL VOTERS</p>
+                <p className="label-md text-[0.65rem] tracking-widest opacity-60 mb-1">TOTAL VOTES</p>
                 <div className="font-muse text-5xl text-[var(--primary)]">{totalVotes}</div>
               </div>
 
@@ -258,7 +255,7 @@ export default function ResultsView() {
                   <p className="font-muse text-2xl text-[var(--on-surface)]">{totalCandidates}</p>
                 </div>
                 <div className="border-t border-[var(--outline-variant)]/50 pt-4">
-                  <p className="label-md text-[0.6rem] tracking-widest opacity-50 mb-1">AVERAGE / CANDIDATE</p>
+                  <p className="label-md text-[0.6rem] tracking-widest opacity-50 mb-1">AVG / CANDIDATE</p>
                   <p className="font-muse text-2xl text-[var(--on-surface)]">{averageVotesPerCandidate}</p>
                 </div>
                 <div className="border-t border-[var(--outline-variant)]/50 pt-4">
@@ -266,14 +263,14 @@ export default function ResultsView() {
                   <p className="font-muse text-2xl text-[var(--on-surface)]">{winnerShare}%</p>
                 </div>
                 <div className="border-t border-[var(--outline-variant)]/50 pt-4">
-                  <p className="label-md text-[0.6rem] tracking-widest opacity-50 mb-1">WINNER MARGIN</p>
+                  <p className="label-md text-[0.6rem] tracking-widest opacity-50 mb-1">VICTORY MARGIN</p>
                   <p className="font-muse text-2xl text-[var(--on-surface)]">{winnerMarginVotes}</p>
                 </div>
               </div>
 
               {maxVoters && (
                 <div className="pt-4 border-t border-[var(--outline-variant)]/50 mt-2">
-                  <p className="label-md text-[0.65rem] tracking-widest opacity-60 mb-1">ELIGIBLE VOTER CAP</p>
+                  <p className="label-md text-[0.65rem] tracking-widest opacity-60 mb-1">VOTER CAP</p>
                   <div className="flex items-end gap-3">
                     <p className="font-muse text-3xl">{maxVoters}</p>
                     <p className="text-xs opacity-60 mb-1 pb-0.5">({turnoutPercentage}% turnout)</p>
@@ -290,7 +287,7 @@ export default function ResultsView() {
                   <h4 className="font-muse italic text-3xl text-[var(--on-surface)] opacity-90">{candidate.name}</h4>
                   <div className="flex flex-col items-end">
                     <div className="flex items-center gap-3">
-                      <span className="label-md text-[0.65rem] tracking-widest opacity-50">VOTERS COUNT: {candidate.votes}</span>
+                      <span className="label-md text-[0.65rem] tracking-widest opacity-50">{candidate.votes} votes</span>
                       <span className="font-bold text-xl">{candidate.percentage}</span>
                     </div>
                   </div>
@@ -299,8 +296,8 @@ export default function ResultsView() {
                   <p className="label-md text-[0.6rem] text-[var(--on-surface)] opacity-60 mb-2">
                     {(() => {
                       const integrityCandidate = integrity.candidates.find((item) => item.id === candidate.id);
-                      if (!integrityCandidate) return 'Real: 0 | Fake: 0';
-                      return `Real: ${integrityCandidate.realVotes} | Fake: ${integrityCandidate.fakeVotes}`;
+                      if (!integrityCandidate) return 'Real: 0 | Simulated: 0';
+                      return `Real: ${integrityCandidate.realVotes} | Simulated: ${integrityCandidate.fakeVotes}`;
                     })()}
                   </p>
                 ) : null}
@@ -318,15 +315,15 @@ export default function ResultsView() {
         </div>
       </div>
 
-      <div className="w-full py-32 relative z-10">
+      <div className="w-full py-24 relative z-10">
          <div className="w-full max-w-6xl mx-auto px-12">
-           <h3 className="label-md font-bold italic text-[var(--on-surface)] opacity-50 tracking-[0.2em] mb-16 border-none">
-             METRIC DISSECTION
+           <h3 className="label-md font-bold italic text-[var(--on-surface)] opacity-50 tracking-[0.2em] mb-12 border-none">
+             AGE DEMOGRAPHICS
            </h3>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-24 gap-y-12">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-24 gap-y-10">
              {metrics.map((metric, i) => (
-               <div key={i} className="flex justify-between items-center border-b border-gray-100 pb-4">
+               <div key={i} className="flex justify-between items-center border-b border-[var(--on-surface)]/10 pb-4">
                  <span className="label-md text-[var(--on-surface)] opacity-50 text-[0.6rem]">{metric.group}</span>
                  <span className={`font-muse italic text-xl ${
                     metric.type === 'bold' ? 'font-bold text-[var(--on-surface)]' : 
@@ -340,14 +337,14 @@ export default function ResultsView() {
 
            {runoffElection ? (
              <div className="mt-16 p-8 bg-[var(--surface-container-low)] border border-[var(--outline-variant)]">
-               <p className="label-md text-[var(--secondary)] font-bold tracking-[0.2em] mb-3">RUNOFF AVAILABLE</p>
+               <p className="label-md text-[var(--secondary)] font-bold tracking-[0.2em] mb-3">RUNOFF ELECTION</p>
                <p className="text-sm text-[var(--on-surface)] opacity-80 mb-6">
-                 This election ended in a tie. A runoff has been opened as {runoffElection.title}.
+                 This election ended in a tie. A runoff election has been created: {runoffElection.title}.
                </p>
                {tiedTopCandidates.length ? (
                  <div className="mb-6 border border-[var(--outline-variant)] bg-[var(--surface-container)] px-4 py-3">
                    <p className="label-md text-[0.62rem] tracking-widest text-[var(--on-surface)] opacity-60 mb-2">
-                     TOP-TIE CANDIDATES MOVED TO RUNOFF ({tiedTopCandidates.length})
+                     TIED CANDIDATES ({tiedTopCandidates.length})
                    </p>
                    <p className="text-sm text-[var(--on-surface)] opacity-90">
                      {tiedTopCandidates.map((candidate) => candidate.name).join(' • ')}
@@ -359,45 +356,27 @@ export default function ResultsView() {
                    onClick={handleRunoffContinue}
                    className="bg-[var(--primary)] text-[var(--on-primary)] px-6 py-3 uppercase text-xs tracking-widest transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
                  >
-                   Return To Entry For Runoff
+                   Go to Runoff
                  </button>
                ) : (
-                 <p className="label-md text-[var(--on-surface)] opacity-80">Use the admin room to monitor the runoff session.</p>
+                 <p className="label-md text-[var(--on-surface)] opacity-80">Use the admin console to manage the runoff session.</p>
                )}
              </div>
            ) : results?.isTie ? (
              <div className="mt-16 p-8 bg-[var(--surface-container-low)] border border-[var(--outline-variant)]">
-               <p className="label-md text-[var(--secondary)] font-bold tracking-[0.2em] mb-3">TIE DETECTED</p>
+               <p className="label-md text-[var(--secondary)] font-bold tracking-[0.2em] mb-3">TIE</p>
                <p className="text-sm text-[var(--on-surface)] opacity-80 mb-3">
-                 Final results are tied at the top. A runoff session is being prepared.
+                 Final results are tied. A runoff session is being prepared.
                </p>
                {tiedTopCandidates.length ? (
                  <p className="text-sm text-[var(--on-surface)] opacity-90">
-                   Top-tied candidates: {tiedTopCandidates.map((candidate) => candidate.name).join(' • ')}
+                   Tied candidates: {tiedTopCandidates.map((candidate) => candidate.name).join(' • ')}
                  </p>
                ) : null}
              </div>
            ) : null}
          </div>
       </div>
-
-      <div className="bg-[var(--surface-container-high)] py-12 text-[0.6rem] uppercase tracking-widest text-[var(--on-surface)] opacity-60 relative z-10">
-         <div className="w-full max-w-6xl mx-auto px-12 flex justify-between items-end">
-            <div className="max-w-[30%] opacity-60">
-              * Data compiled by the Independent Editorial Commission (IEC). Results are binding and archived for a period of ten standard years. Any discrepancies must be filed via Form 12-B within 48 hours.
-            </div>
-            
-            <div className="flex flex-col items-end gap-6 text-[var(--on-surface)]">
-              <span className="font-bold">THE EDITORIAL BALLOT © 2026</span>
-              <div className="flex gap-6 font-bold">
-                 <a href="#" className="underline underline-offset-4 decoration-1">PRIVACY</a>
-                 <a href="#" className="underline underline-offset-4 decoration-1">LOG</a>
-                 <a href="#" className="underline underline-offset-4 decoration-1">AUDIT</a>
-              </div>
-            </div>
-         </div>
-      </div>
-
     </MotionDiv>
   );
 }

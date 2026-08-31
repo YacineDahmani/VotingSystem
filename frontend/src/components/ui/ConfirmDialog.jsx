@@ -38,7 +38,7 @@ export default function ConfirmDialog({
             disabled={busy}
             className={`px-5 py-2 text-xs uppercase tracking-widest transition-transform duration-200 shadow-md hover:-translate-y-0.5 active:translate-y-0 ${confirmClass}`}
           >
-            {busy ? 'Working...' : confirmLabel}
+            {busy ? 'Processing...' : confirmLabel}
           </button>
         </div>
       </div>

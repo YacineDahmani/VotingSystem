@@ -364,8 +364,8 @@ export default function CreateElectionView() {
     <>
       <div className="min-h-screen text-[var(--primary)] relative z-10 -mt-24 pt-32 px-12 pb-24">
         <div className="max-w-4xl">
-          <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em]">ADMIN CONSOLE</p>
-          <h2 className="font-muse font-bold text-6xl text-[var(--primary)]">Initialize New Election</h2>
+          <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em]">ADMIN</p>
+          <h2 className="font-muse font-bold text-6xl text-[var(--primary)]">Create Election</h2>
         </div>
 
         <form
@@ -377,18 +377,18 @@ export default function CreateElectionView() {
           <input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder="Editorial Ballot 2026"
+            placeholder="e.g. General Election 2026"
             className="w-full border border-[var(--outline-variant)] px-4 py-3"
             disabled={isSubmitting}
           />
         </div>
 
         <div>
-          <label className="label-md text-[var(--on-surface)] opacity-60 block mb-2">Description</label>
+          <label className="label-md text-[var(--on-surface)] opacity-60 block mb-2">Description (Optional)</label>
           <textarea
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="Session details"
+            placeholder="Description or notes about this election"
             rows={3}
             className="w-full border border-[var(--outline-variant)] px-4 py-3"
             disabled={isSubmitting}
@@ -448,7 +448,7 @@ export default function CreateElectionView() {
                   <input
                     value={candidate.description}
                     onChange={(e) => updateCandidate(index, 'description', e.target.value)}
-                    placeholder="Campaign Statement (Optional)"
+                    placeholder="Description (Optional)"
                     className="w-full border border-[var(--outline-variant)] px-4 py-2 text-sm text-[var(--on-surface)] opacity-80"
                     disabled={isSubmitting}
                   />
@@ -472,11 +472,11 @@ export default function CreateElectionView() {
             disabled={isSubmitting}
             className="mt-4 border border-dashed border-gray-400 text-[var(--on-surface)] opacity-80 w-full py-3 uppercase text-xs tracking-widest hover:bg-[var(--surface-container-low)] hover:text-[var(--on-surface)] transition-all duration-200"
           >
-            + Add Another Candidate
+            + Add Candidate
           </button>
 
           <div className="mt-4 border border-[var(--outline-variant)] p-4 bg-[var(--surface-container-low)]/40">
-            <p className="label-md text-[var(--on-surface)] opacity-70 mb-2">Import Candidates (CSV, TSV, JSON, NDJSON)</p>
+            <p className="label-md text-[var(--on-surface)] opacity-70 mb-2">Import Candidates (CSV, TSV, JSON)</p>
             <label className="inline-flex items-center gap-2 text-sm text-[var(--on-surface)] opacity-80 mb-3">
               <input
                 type="checkbox"
@@ -523,9 +523,9 @@ export default function CreateElectionView() {
         </div>
 
         <div className="border border-[var(--outline-variant)] p-4 bg-[var(--surface-container-low)]/30">
-          <label className="label-md text-[var(--on-surface)] opacity-70 block mb-2">Import Voter Rules (Optional)</label>
+          <label className="label-md text-[var(--on-surface)] opacity-70 block mb-2">Voter Eligibility List (Optional)</label>
           <p className="text-xs text-[var(--on-surface)] opacity-70 mb-3">
-            Fields can include name, id/identifier, and birthdate (YYYY-MM-DD). Missing fields are treated as unrestricted.
+            Upload a CSV, JSON, or TSV with voter names, IDs, or birthdates.
           </p>
           <label className="inline-flex items-center gap-2 text-sm text-[var(--on-surface)] opacity-80 mb-3">
             <input
@@ -580,7 +580,7 @@ export default function CreateElectionView() {
             onChange={(event) => setOpenImmediately(event.target.checked)}
             disabled={isSubmitting}
           />
-          <span className="label-md text-[var(--on-surface)] opacity-90">Open election immediately after creation</span>
+          <span className="label-md text-[var(--on-surface)] opacity-90">Open election for voting immediately</span>
         </label>
 
         {error ? <p className="label-md text-black dark:text-red-100">{error}</p> : null}
@@ -605,9 +605,9 @@ export default function CreateElectionView() {
 
         {createdSession ? (
           <div className="border border-l-4 border-green-300 border-l-green-700 bg-green-50 p-6 dark:border-green-500/30 dark:border-l-green-400 dark:bg-green-950/25">
-            <p className="label-md text-black tracking-widest dark:text-green-100">SESSION CREATED</p>
+            <p className="label-md text-black tracking-widest dark:text-green-100">ELECTION CREATED</p>
             <h3 className="font-muse text-3xl mt-2">{createdSession.title}</h3>
-            <p className="mt-3 text-sm text-[var(--on-surface)] opacity-90 dark:opacity-100">Share this session code with voters:</p>
+            <p className="mt-3 text-sm text-[var(--on-surface)] opacity-90 dark:opacity-100">Session Code:</p>
             <p className="font-bold text-2xl tracking-[0.2em] mt-1">{createdSession.code}</p>
             <div className="mt-4 flex gap-3 flex-wrap">
               <button
@@ -638,7 +638,7 @@ export default function CreateElectionView() {
                 onClick={() => navigate('/admin')}
                 className="bg-[var(--primary)] text-[var(--on-primary)] px-5 py-2 uppercase text-xs tracking-widest"
               >
-                Go To Session Manager
+                Go to Elections
               </button>
             </div>
           </div>
