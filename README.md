@@ -1,86 +1,84 @@
 # Voting System
 
-An immersive full-stack voting experience inspired by the "Analog Swiss" concept. The interface is built like a physical ceremony: a sliding voter strip, a gravity-style ballot drop, a pendulum waiting room, and a blueprint-like admin console.
+A digital voting platform inspired by the Swiss design aesthetic. Features a streamlined voter journey with cryptographic receipts, real-time results tallies, and an administrative operations dashboard.
 
-## Overview
+---
 
-The app is split into two main journeys:
+## Features
 
-- Voter flow: enter identity details, submit a unique code, cast a ballot, then wait on the pendulum view while results settle.
-- Admin flow: unlock the blueprint layer with a master key, tune influence, inject test votes when needed, and close polls to reveal the outcome.
+### 🗳️ Voter Experience
+- **Simple Onboarding**: Join using an 8-character session code, direct invite link (`/?code=XXXX`), or scannable mobile QR code.
+- **Voter Verification**: Optional voter eligibility lists supporting Name, Birthdate, and Voter ID.
+- **Vote Confirmation**: Clear selection review modal before casting.
+- **Cryptographic Receipt**: Receive a unique verification code (`SWISS-XXXX-XXXX-XXXX`) upon ballot submission.
+- **Waiting Room**: Real-time pendulum waiting screen with receipt badge until polls close.
 
-## Project Structure
+### ⚙️ Admin Operations
+- **Election Management**: Create, open, close, draft, and delete multiple elections.
+- **Roster Configuration**: Add and remove candidates with platform statements or import via CSV/JSON.
+- **Voter Eligibility Import**: Upload voter rosters (CSV/TSV/JSON) with sample template download.
+- **Share & QR Codes**: 1-click invite link copying, 8-digit session codes, and high-resolution mobile QR codes.
+- **Dedicated Live Results**: Real-time candidate leaderboard, demographic breakdown by age groups, and turnout metrics.
+- **Simulation Sandbox**: Isolated mock vote injector with integrity audit reports tracking real vs. simulated votes.
 
-```text
-VotingSystem/
-├─ backend/
-│  ├─ server.js
-│  ├─ database.js
-│  ├─ middleware/
-│  ├─ routes/
-│  └─ services/
-├─ frontend/
-│  ├─ src/
-│  │  ├─ App.jsx
-│  │  ├─ components/
-│  │  ├─ features/
-│  │  ├─ hooks/
-│  │  ├─ lib/
-│  │  └─ styles/
-│  ├─ public/
-│  └─ vite.config.js
-├─ README.md
-```
+---
 
 ## Tech Stack
 
-- Backend: Node.js, Express, Socket.IO, SQLite
-- Frontend: React, Vite
-- Authentication and election state are handled through the backend API and realtime events
+- **Backend**: Node.js, Express, SQLite, Socket.IO, JWT, bcrypt
+- **Frontend**: React 19, Vite, Tailwind CSS v4, Lucide Icons, Framer Motion
 
-## Setup
+---
 
-### 1. Configure the admin master key
+## Getting Started
 
-The backend requires `ADMIN_MASTER_KEY` at startup. This value becomes the default admin password and is also stored in the database on first run.
+### 1. Configure Environment Variables
 
-Example for PowerShell:
+The backend requires `ADMIN_MASTER_KEY` at startup.
 
+**PowerShell:**
 ```powershell
-$env:ADMIN_MASTER_KEY='your-admin-code-here'
+$env:ADMIN_MASTER_KEY='your-admin-password'
+$env:JWT_SECRET='your-jwt-secret' # optional
 ```
 
-You can also set `JWT_SECRET` if you want to replace the development default token secret:
-
-```powershell
-$env:JWT_SECRET='your-jwt-secret'
+**Bash / Linux / macOS:**
+```bash
+export ADMIN_MASTER_KEY='your-admin-password'
+export JWT_SECRET='your-jwt-secret' # optional
 ```
 
-### 2. Start the backend
+### 2. Start the Backend
 
 ```bash
 cd backend
 npm install
 npm start
 ```
+API runs on `http://localhost:3000`.
 
-The API runs on `http://localhost:3000` by default.
-
-### 3. Start the frontend
+### 3. Start the Frontend
 
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+Application runs on `http://localhost:5173`.
 
-Open the Vite URL shown in the terminal, then verify the frontend can reach the backend API.
+---
 
-## Admin Code
+## Testing
 
-The admin code is not hard-coded in the frontend. It is controlled by the `ADMIN_MASTER_KEY` environment variable on the backend.
+Run the automated test suite in the backend directory:
 
-- Set `ADMIN_MASTER_KEY` before launching the server.
-- Use the same value whenever you want the default admin password to be created or refreshed in a clean database.
-- If the variable is missing, the backend exits during startup with a clear error.
+```bash
+cd backend
+npm test
+```
 
+---
+
+## Credits
+
+Developed by **Yacine Dahmani**
