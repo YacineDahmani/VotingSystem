@@ -153,6 +153,8 @@ describe('Elections & Voter Workflow Test Suite', () => {
         const data = await response.json();
         assert.strictEqual(data.success, true);
         assert.strictEqual(data.nextPhase, 'waiting');
+        assert.ok(data.receiptCode, 'Response must include cryptographic receiptCode');
+        assert.match(data.receiptCode, /^SWISS-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/);
         assert.ok(data.totalVotes >= 1);
     });
 

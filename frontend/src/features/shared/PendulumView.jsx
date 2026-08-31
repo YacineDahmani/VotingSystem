@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
+import { ShieldCheck } from 'lucide-react';
 import { getResults } from '../../lib/api';
 import { useToast } from '../../components/ui/useToast';
 import { VOTER_PHASES, clearSession, getSession, markWaitingDismissed, setSession, setVoterPhase } from '../../store/session';
@@ -340,7 +341,17 @@ export default function PendulumView() {
       <div className="w-full flex justify-between items-start px-6 md:px-12 relative z-20 mt-4 md:mt-0">
         <div>
           <h2 className="font-muse text-[2.5rem] italic text-[var(--primary)] mb-2 font-normal leading-none">Waiting Room</h2>
-          <p className="text-[0.65rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-50 mt-4">Live Updates</p>
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            <span className="text-[0.65rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-50">Live Updates</span>
+            {session?.ballotReceiptCode && (
+              <div className="px-2.5 py-1 bg-[var(--surface-container)] border border-[var(--primary)]/20 flex items-center gap-1.5 shadow-sm">
+                <ShieldCheck size={12} className="text-emerald-600" />
+                <span className="text-[0.55rem] font-mono tracking-wider uppercase text-[var(--on-surface)] opacity-80">
+                  {session.ballotReceiptCode}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-col items-end gap-3">

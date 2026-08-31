@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 
 function parseBirthdate(rawBirthdate) {
     if (typeof rawBirthdate !== 'string' || !rawBirthdate.trim()) {
@@ -486,16 +487,28 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
             await db.recordVote(electionId, voterId, candidateId);
             const results = await emitElectionUpdate(electionId, 'vote:kick');
 
+            const rawHash = crypto.createHash('sha256')
+                .update(`${electionId}:${voterId}:${Date.now()}:${crypto.randomBytes(8).toString('hex')}`)
+                .digest('hex')
+                .toUpperCase();
+            const receiptCode = `SWISS-${rawHash.slice(0, 4)}-${rawHash.slice(4, 8)}-${rawHash.slice(8, 12)}`;
+
             return res.json({
                 success: true,
                 message: `Vote cast for ${candidate.name}`,
+                receiptCode,
+                candidate: {
+                    id: candidate.id,
+                    name: candidate.name,
+                },
+                votedAt: new Date().toISOString(),
                 isTie: results.isTie,
                 totalVotes: results.totalVotes,
                 nextPhase: 'waiting',
                 notification: {
                     type: 'success',
                     title: 'Vote Registered',
-                    body: `Your vote for ${candidate.name} has been recorded.`,
+                    body: `Your vote for ${candidate.name} has been securely recorded.`,
                 },
             });
         } catch (err) {

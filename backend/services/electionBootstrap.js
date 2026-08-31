@@ -8,18 +8,18 @@ async function ensureDefaultElection(db) {
     const end = new Date(now.getTime() + (24 * 60 * 60 * 1000));
 
     const election = await db.createElection(
-        'Editorial Ballot 2026',
-        'Analog Swiss ceremonial election session',
+        'Municipal Council 2026',
+        'Annual municipal administration and public council election',
         now.toISOString(),
         end.toISOString(),
         1,
     );
 
     const seedCandidates = [
-        { name: 'Yacine Dahmani', description: 'Progressive policies for a better tomorrow.' },
-        { name: 'Abdelmadjid Tebboune', description: 'Experience and stability you can trust.' },
-        { name: 'Donald Trump', description: 'A fresh perspective on economic reform.' },
-        { name: 'Lionel Messi', description: 'Dedicated to education and healthcare.' },
+        { name: 'Helena Vane', description: 'Public transit electrification and urban pedestrian zones.' },
+        { name: 'Dr. Arthur Pendelton', description: 'Municipal budget oversight and renewable energy infrastructure.' },
+        { name: 'Marcella Dubois', description: 'Civic digital archives and educational facility modernization.' },
+        { name: 'Julian Althaus', description: 'Heritage preservation and local enterprise development.' },
     ];
 
     for (const candidate of seedCandidates) {

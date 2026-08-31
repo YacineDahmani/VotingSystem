@@ -22,7 +22,7 @@ export default function Header() {
   } else if (isVoterSession(session)) {
     navItems = [
       { label: 'SIGN IN', path: '/', disabled: true },
-      { label: 'BALLOT', path: '/ballot', disabled: hasVoted || phase === 'results' },
+      { label: 'VOTE', path: '/ballot', disabled: hasVoted || phase === 'results' },
       { label: 'WAITING', path: '/waiting', disabled: !hasVoted || phase === 'results' },
       { label: 'RESULTS', path: '/results', disabled: phase !== 'results' },
     ];

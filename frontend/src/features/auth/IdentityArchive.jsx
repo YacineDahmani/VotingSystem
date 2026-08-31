@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { adminLogin, getAdminSetupStatus, setupInitialAdmin, submitIdentity, validateElectionCode } from '../../lib/api';
 import { clearSession, getSession, getVoterPhase, isAdminSession, isVoterSession, setSession } from '../../store/session';
@@ -29,11 +29,14 @@ const SESSION_STATUS_COPY = {
 
 export default function IdentityArchive() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialUrlCode = useMemo(() => (searchParams.get('code') || searchParams.get('session') || '').trim().toUpperCase(), [searchParams]);
+
   const [entryMode, setEntryMode] = useState('voter');
   const [name, setName] = useState('');
   const [birthdate, setBirthdate] = useState('');
   const [voterIdCode, setVoterIdCode] = useState('');
-  const [sessionCode, setSessionCode] = useState('');
+  const [sessionCode, setSessionCode] = useState(initialUrlCode);
   
   // Admin Authentication State
   const [adminIdentifier, setAdminIdentifier] = useState('');

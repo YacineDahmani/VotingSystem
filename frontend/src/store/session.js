@@ -86,13 +86,15 @@ export function setVoterPhase(phase) {
   return setSession({ phase });
 }
 
-export function markVoteSubmitted(candidateId) {
+export function markVoteSubmitted(candidateId, metadata = {}) {
   return setSession({
     selectedCandidateId: candidateId,
+    votedCandidateName: metadata.candidateName || null,
+    ballotReceiptCode: metadata.receiptCode || null,
     hasVoted: true,
     phase: VOTER_PHASES.WAITING,
     waitingDismissedAt: null,
-    votedAt: new Date().toISOString(),
+    votedAt: metadata.votedAt || new Date().toISOString(),
   });
 }
 
