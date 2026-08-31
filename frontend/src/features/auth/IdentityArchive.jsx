@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { adminLogin, getAdminSetupStatus, setupInitialAdmin, submitIdentity, validateElectionCode } from '../../lib/api';
 import { clearSession, getSession, getVoterPhase, isAdminSession, isVoterSession, setSession } from '../../store/session';
 
@@ -43,7 +43,6 @@ export default function IdentityArchive() {
   const [setupEmail, setSetupEmail] = useState('');
   const [setupPassword, setSetupPassword] = useState('');
   const [setupConfirmPassword, setSetupConfirmPassword] = useState('');
-  const [setupChecked, setSetupChecked] = useState(false);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState('');
@@ -390,9 +389,8 @@ export default function IdentityArchive() {
       try {
         const res = await getAdminSetupStatus();
         setIsSetupMode(!res.isInitialized);
-        setSetupChecked(true);
       } catch {
-        setSetupChecked(true);
+        // Fallback: keep existing setup mode state
       }
     };
     checkSetup();
@@ -515,8 +513,20 @@ export default function IdentityArchive() {
       {/* Main Content */}
       <div className="relative z-10 w-full max-w-2xl flex flex-col items-center mt-12">
         <div className="text-center mb-8">
-          <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em] font-bold text-[0.65rem]">VOTER VERIFICATION</p>
-          <h2 className="font-muse text-[2.5rem] md:text-5xl text-[var(--on-surface)]">Sign In</h2>
+          <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em] font-bold text-[0.65rem]">
+            {entryMode === 'voter'
+              ? 'VOTER VERIFICATION'
+              : isSetupMode
+                ? 'SYSTEM INITIALIZATION'
+                : 'ADMINISTRATIVE ACCESS'}
+          </p>
+          <h2 className="font-muse text-[2.5rem] md:text-5xl text-[var(--on-surface)]">
+            {entryMode === 'voter'
+              ? 'Identity Archive'
+              : isSetupMode
+                ? 'Admin Setup'
+                : 'Admin Sign In'}
+          </h2>
         </div>
 
         <div
@@ -634,16 +644,6 @@ export default function IdentityArchive() {
             </>
           ) : isSetupMode ? (
             <>
-              <div className="w-full mb-4 relative z-20 bg-[var(--surface-container)]/80 border border-[var(--primary)]/20 p-4">
-                <div className="flex items-center gap-2 mb-1 text-[var(--primary)]">
-                  <Sparkles size={14} />
-                  <p className="uppercase text-[0.62rem] tracking-[0.2em] font-bold">Admin Setup</p>
-                </div>
-                <p className="text-[0.65rem] text-[var(--on-surface)] opacity-70">
-                  Create an administrator account to manage elections.
-                </p>
-              </div>
-
               <div className="w-full space-y-4 mb-6 relative z-20">
                 <div>
                   <label className="uppercase text-[0.58rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-1.5 block">USERNAME</label>
