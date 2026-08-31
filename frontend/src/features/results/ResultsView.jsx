@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getActiveElection, getIntegrityReport, getResults } from '../../lib/api';
-import { VOTER_PHASES, clearSession, getSession, isAdminSession, setSession, setVoterPhase } from '../../store/session';
+import { getActiveElection, getAdminElections, getIntegrityReport, getResults } from '../../lib/api';
+import {
+  VOTER_PHASES,
+  clearSession,
+  getSession,
+  isAdminSession,
+  isVoterSession,
+  setSession,
+  setVoterPhase,
+} from '../../store/session';
 
 function isElectionFinished(election) {
   if (!election) {
@@ -23,24 +31,53 @@ function isElectionFinished(election) {
 
 export default function ResultsView() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const MotionDiv = motion.div;
   const session = useMemo(() => getSession(), []);
   const adminView = isAdminSession(session);
   const guestResultsView = !adminView && !session?.token && !!session?.resultsElectionId;
   const endedNotice = session?.resultsNotice || '';
+
+  const [adminElectionList, setAdminElectionList] = useState([]);
+  const [selectedElectionId, setSelectedElectionId] = useState(
+    searchParams.get('electionId') || searchParams.get('id') || session?.resultsElectionId || session?.electionId || null
+  );
   const [results, setResults] = useState(null);
   const [integrity, setIntegrity] = useState(null);
   const [error, setError] = useState('');
+
+  // Load elections for admin selector
+  useEffect(() => {
+    if (adminView) {
+      getAdminElections()
+        .then((data) => {
+          const list = Array.isArray(data) ? data : (data?.elections || []);
+          setAdminElectionList(list);
+          if (!selectedElectionId && list.length > 0) {
+            setSelectedElectionId(list[0].id);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [adminView, selectedElectionId]);
 
   useEffect(() => {
     let mounted = true;
 
     async function loadResults() {
       try {
-        let electionId = session.electionId || session.resultsElectionId;
+        setError('');
+
+        let electionId = selectedElectionId;
         if (!electionId) {
-          const active = await getActiveElection();
-          electionId = active?.election?.id;
+          if (adminView) {
+            const list = await getAdminElections().catch(() => []);
+            const elections = Array.isArray(list) ? list : (list?.elections || []);
+            electionId = elections[0]?.id;
+          } else {
+            const active = await getActiveElection().catch(() => null);
+            electionId = active?.election?.id;
+          }
         }
 
         if (!electionId) {
@@ -55,13 +92,15 @@ export default function ResultsView() {
           electionEndAt: response?.election?.end_date || null,
         });
 
-        if (!adminView && !guestResultsView && !isElectionFinished(response?.election)) {
+        const currentSession = getSession();
+        const isVoter = isVoterSession(currentSession);
+        if (isVoter && !isElectionFinished(response?.election) && currentSession?.electionId === response?.election?.id) {
           setVoterPhase(VOTER_PHASES.WAITING);
           navigate('/waiting');
           return;
         }
 
-        if (!adminView && !guestResultsView) {
+        if (isVoter && isElectionFinished(response?.election)) {
           setVoterPhase(VOTER_PHASES.RESULTS);
         }
 
@@ -90,7 +129,7 @@ export default function ResultsView() {
     return () => {
       mounted = false;
     };
-  }, [adminView, guestResultsView, navigate, session]);
+  }, [adminView, guestResultsView, navigate, selectedElectionId]);
 
   if (!results && !error) {
     return <div className="min-h-screen flex items-center justify-center">Loading results...</div>;
@@ -148,8 +187,12 @@ export default function ResultsView() {
   const winnerName = results?.leader?.name || distribution[0]?.name || 'No winner yet';
   const runoffElection = results?.runoffElection || null;
   const tiedTopCandidates = results?.isTie ? (results?.tiedCandidates || []) : [];
-  const isTieResult = !!results?.isTie;
-  const heroLabel = isTieResult ? 'TIE' : 'FINAL RESULTS';
+  const isOpenElection = results?.election?.status === 'open' && !isElectionFinished(results?.election);
+  const heroLabel = isTieResult
+    ? 'TIE'
+    : isOpenElection
+      ? 'LIVE STANDINGS (ELECTION IN PROGRESS)'
+      : 'FINAL RESULTS';
   const heroTitle = isTieResult ? 'Runoff Required' : winnerName;
 
   const handleRunoffContinue = () => {
@@ -177,6 +220,19 @@ export default function ResultsView() {
       </div>
 
       <div className="w-full max-w-6xl mx-auto px-12 relative z-10">
+        {adminView && isOpenElection ? (
+          <div className="mb-6 p-4 bg-[var(--surface-container)] border border-[var(--on-surface)]/15 text-xs text-[var(--on-surface)] flex items-center justify-between">
+            <span><strong>ADMIN LIVE PREVIEW</strong> — This election is currently ongoing. Displaying live interim votes.</span>
+            <button
+              type="button"
+              onClick={() => navigate('/admin')}
+              className="px-3 py-1 text-[0.6rem] uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container-high)]"
+            >
+              Return to Admin
+            </button>
+          </div>
+        ) : null}
+
         {endedNotice ? (
           <div className="mb-8 border border-[var(--on-surface)]/15 bg-[var(--surface-container-lowest)] p-4 text-[var(--on-surface)] shadow-sm">
             <p className="text-xs uppercase tracking-widest font-bold text-[var(--on-surface)]">NOTICE</p>
@@ -195,23 +251,49 @@ export default function ResultsView() {
 
         {/* Header section */}
         <div className="mb-24">
-          <div className="mb-8 flex justify-end gap-3">
-            {adminView ? (
+          <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+            {adminView && adminElectionList.length > 0 ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[0.62rem] uppercase tracking-widest font-bold text-[var(--on-surface)] opacity-70">
+                  ELECTION:
+                </span>
+                <select
+                  value={selectedElectionId || results?.election?.id || ''}
+                  onChange={(e) => {
+                    const newId = Number(e.target.value);
+                    setSelectedElectionId(newId);
+                    setSearchParams({ electionId: newId });
+                    setSession({ resultsElectionId: newId });
+                  }}
+                  className="p-1.5 text-xs bg-[var(--surface-container)] border border-[var(--outline-variant)] text-[var(--on-surface)] font-mono font-bold"
+                >
+                  {adminElectionList.map((el) => (
+                    <option key={el.id} value={el.id}>
+                      {el.code} — {el.title} [{el.status.toUpperCase()}]
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : <div />}
+
+            <div className="flex gap-3">
+              {adminView ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin')}
+                  className="border border-[var(--on-surface)]/20 bg-[var(--surface-container-low)]/70 px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:border-[var(--on-surface)]/40 hover:-translate-y-0.5 shadow-sm active:translate-y-0"
+                >
+                  Admin Dashboard
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={() => navigate('/admin')}
-                className="border border-[var(--on-surface)]/20 bg-[var(--surface-container-low)]/70 px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:border-[var(--on-surface)]/40 hover:-translate-y-0.5 shadow-sm active:translate-y-0"
+                onClick={handleExitResults}
+                className="bg-[var(--primary)] text-[var(--on-primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
               >
-                Admin Dashboard
+                Exit
               </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={handleExitResults}
-              className="bg-[var(--primary)] text-[var(--on-primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
-            >
-              Exit
-            </button>
+            </div>
           </div>
 
           <p className="label-md text-[var(--secondary)] mb-12 tracking-widest font-bold">
