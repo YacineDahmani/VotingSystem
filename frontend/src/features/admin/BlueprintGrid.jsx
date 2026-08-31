@@ -1,6 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Shield } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  ArrowUpRight,
+  Check,
+  CheckCircle2,
+  Clock,
+  Copy,
+  ExternalLink,
+  FlaskConical,
+  LogOut,
+  Plus,
+  QrCode,
+  Share2,
+  Shield,
+  Sliders,
+  Trash2,
+  Users,
+} from 'lucide-react';
 import {
   addCandidate,
   deleteCandidate,
@@ -17,7 +35,7 @@ import {
 } from '../../lib/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { useToast } from '../../components/ui/useToast';
-import { clearSession, getSession, isAdminSession, setSession } from '../../store/session';
+import { clearSession, getSession, isAdminSession } from '../../store/session';
 
 const FILTERS = ['all', 'open', 'draft', 'closed'];
 
@@ -70,6 +88,7 @@ export default function BlueprintGrid() {
   const [elections, setElections] = useState([]);
   const [selectedElectionId, setSelectedElectionId] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [adminTab, setAdminTab] = useState('operations'); // 'operations' | 'share' | 'sandbox'
 
   const [candidates, setCandidates] = useState([]);
   const [injectionMap, setInjectionMap] = useState({});
@@ -85,6 +104,8 @@ export default function BlueprintGrid() {
   const [maxVotersInput, setMaxVotersInput] = useState('');
   const [newCandidateName, setNewCandidateName] = useState('');
   const [newCandidateDescription, setNewCandidateDescription] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const [adminProfile, setAdminProfile] = useState(() => ({
     username: session?.adminUsername || 'Electoral Officer',
@@ -117,10 +138,19 @@ export default function BlueprintGrid() {
     [elections, selectedElectionId]
   );
 
+  const totalElectionVotes = useMemo(() => {
+    return candidates.reduce((sum, c) => sum + (c.votes || 0), 0);
+  }, [candidates]);
+
   const remainingTimeLabel = useMemo(
     () => formatRemainingTime(selectedElection?.end_date, clockNow),
     [clockNow, selectedElection?.end_date]
   );
+
+  const voterJoinUrl = useMemo(() => {
+    if (!selectedElection?.code) return '';
+    return `${window.location.origin}/?code=${selectedElection.code}`;
+  }, [selectedElection?.code]);
 
   const loadElections = useCallback(async (preferredElectionId = null) => {
     const electionListResponse = await getAdminElections();
@@ -188,7 +218,7 @@ export default function BlueprintGrid() {
     async function init() {
       try {
         if (!isAdminSession(session)) {
-          setError('Master key verification is required for admin controls.');
+          setError('Admin credentials required.');
           setLoading(false);
           return;
         }
@@ -196,7 +226,7 @@ export default function BlueprintGrid() {
         await refreshAll();
       } catch (err) {
         if (!mounted) return;
-        setError(err.message || 'Unable to load admin controls');
+        setError(err.message || 'Unable to load admin dashboard');
       } finally {
         if (mounted) setLoading(false);
       }
@@ -248,9 +278,10 @@ export default function BlueprintGrid() {
       setError('');
       setBusyAction(label);
       await fn();
+
       if (successToast) {
         pushToast({
-          type: 'success',
+          type: successToast.type || 'success',
           title: successToast.title,
           message: successToast.message,
         });
@@ -268,115 +299,75 @@ export default function BlueprintGrid() {
     }
   };
 
-  const openConfirm = ({ title, message, confirmTone = 'primary', onConfirm }) => {
-    setConfirmState({ title, message, confirmTone, onConfirm });
-  };
-
-  const handleInject = async (candidateId, candidateName) => {
-    if (!selectedElection) return;
-
-    const rawCount = Number.parseInt(String(injectionMap[candidateId] ?? 10), 10);
-    const count = Math.max(1, Math.min(10000, Number.isNaN(rawCount) ? 1 : rawCount));
-    openConfirm({
-      title: 'Simulate Votes',
-      message: `Add ${count} simulated votes for ${candidateName}?`,
-      onConfirm: async () => {
-        await withBusy('inject', async () => {
-          await injectFakeVotes(selectedElection.id, { candidateId, count });
-          await refreshAll(selectedElection.id);
-        }, {
-          title: 'Votes Simulated',
-          message: `${count} test votes added for ${candidateName}.`,
-        });
-      },
+  const openConfirm = ({ title, message, onConfirm, confirmTone = 'default' }) => {
+    setConfirmState({
+      title,
+      message,
+      onConfirm,
+      confirmTone,
     });
   };
 
-  const handleDeleteCandidate = async (candidateId, candidateName) => {
+  const handleStatusChange = async (nextStatus) => {
     if (!selectedElection) return;
 
     openConfirm({
-      title: 'Remove Candidate',
-      message: `Remove ${candidateName}?`,
-      confirmTone: 'danger',
+      title: 'Update Election Status',
+      message: `Change "${selectedElection.title}" to "${nextStatus.toUpperCase()}"?`,
+      confirmTone: nextStatus === 'closed' ? 'danger' : 'default',
       onConfirm: async () => {
-        await withBusy('delete-candidate', async () => {
-          await deleteCandidate(candidateId);
+        await withBusy(`status-${nextStatus}`, async () => {
+          await updateElectionStatus(selectedElection.id, nextStatus);
           await refreshAll(selectedElection.id);
         }, {
-          title: 'Candidate Removed',
-          message: `${candidateName} was removed.`,
+          title: 'Status Updated',
+          message: `Election status set to ${nextStatus}.`,
         });
       },
-    });
-  };
-
-  const handleAddCandidate = async () => {
-    if (!selectedElection) return;
-
-    const trimmedName = newCandidateName.trim();
-    if (!trimmedName) {
-      setError('Candidate name is required.');
-      return;
-    }
-
-    await withBusy('add-candidate', async () => {
-      await addCandidate(selectedElection.id, {
-        name: trimmedName,
-        description: newCandidateDescription.trim(),
-      });
-      setNewCandidateName('');
-      setNewCandidateDescription('');
-      await refreshAll(selectedElection.id);
-    }, {
-      title: 'Candidate Added',
-      message: `${trimmedName} added.`,
     });
   };
 
   const handleRegenerateCode = async () => {
     if (!selectedElection) return;
-    await withBusy('regen-code', async () => {
-      await regenerateElectionCode(selectedElection.id);
-      await refreshAll(selectedElection.id);
-    }, {
-      title: 'Code Regenerated',
-      message: 'A new session code was generated.',
+
+    openConfirm({
+      title: 'Regenerate Session Code',
+      message: 'Regenerate session code? Existing links using the old code will expire.',
+      onConfirm: async () => {
+        await withBusy('regenerate-code', async () => {
+          const response = await regenerateElectionCode(selectedElection.id);
+          await refreshAll(selectedElection.id);
+          pushToast({
+            type: 'info',
+            title: 'Code Updated',
+            message: `New session code: ${response.code}`,
+          });
+        });
+      },
     });
   };
 
-  const handleStatusChange = async (status) => {
-    if (!selectedElection) return;
-    if (selectedElection.status === status) return;
-    await withBusy(`status-${status}`, async () => {
-      await updateElectionStatus(selectedElection.id, status);
-      await refreshAll(selectedElection.id);
-    }, {
-      title: 'Status Updated',
-      message: `Status changed to ${status}.`,
-    });
-  };
-
-  const handleExtendEndTime = async (deltaMs) => {
+  const handleExtendEndTime = async (millisecondsToAdd) => {
     if (!selectedElection) return;
 
-    const existingEnd = selectedElection.end_date ? new Date(selectedElection.end_date) : null;
-    const baseTime = existingEnd && !Number.isNaN(existingEnd.getTime())
-      ? Math.max(existingEnd.getTime(), Date.now())
+    const baseTime = selectedElection.end_date
+      ? new Date(selectedElection.end_date).getTime()
       : Date.now();
-    const nextEndDate = new Date(baseTime + deltaMs).toISOString();
+    const safeBase = Number.isNaN(baseTime) ? Date.now() : Math.max(Date.now(), baseTime);
+    const nextEndDate = new Date(safeBase + millisecondsToAdd).toISOString();
 
-    await withBusy('extend-end-time', async () => {
+    await withBusy(`extend-${millisecondsToAdd}`, async () => {
       await updateElectionDetails(selectedElection.id, { end_date: nextEndDate });
       await refreshAll(selectedElection.id);
     }, {
-      title: 'End Time Extended',
-      message: 'End time updated.',
+      title: 'Duration Extended',
+      message: 'Election end time updated.',
     });
   };
 
   const handleApplyCustomEndDate = async () => {
     if (!selectedElection) return;
+
     if (!customEndDate) {
       setError('Choose a valid end date and time.');
       return;
@@ -393,7 +384,7 @@ export default function BlueprintGrid() {
       await refreshAll(selectedElection.id);
     }, {
       title: 'End Time Updated',
-      message: 'End time set successfully.',
+      message: 'End time updated successfully.',
     });
   };
 
@@ -402,7 +393,7 @@ export default function BlueprintGrid() {
 
     openConfirm({
       title: 'Delete Election',
-      message: `Delete "${selectedElection.title}"? This cannot be undone.`,
+      message: `Delete "${selectedElection.title}"? This action cannot be undone.`,
       confirmTone: 'danger',
       onConfirm: async () => {
         await withBusy('delete-session', async () => {
@@ -423,7 +414,7 @@ export default function BlueprintGrid() {
     const payload = raw ? Number.parseInt(raw, 10) : null;
 
     if (raw && (Number.isNaN(payload) || payload < 1)) {
-      setError('Max voters must be empty for unlimited, or a positive number.');
+      setError('Max voters must be empty for unlimited, or a positive integer.');
       return;
     }
 
@@ -432,358 +423,747 @@ export default function BlueprintGrid() {
       await refreshAll(selectedElection.id);
     }, {
       title: 'Voter Limit Updated',
-      message: payload ? `Maximum voters set to ${payload}.` : 'Voter limit removed (unlimited).',
+      message: payload ? `Maximum voters set to ${payload}.` : 'Voter limit set to unlimited.',
+    });
+  };
+
+  const handleAddCandidate = async () => {
+    if (!selectedElection) return;
+
+    const name = newCandidateName.trim();
+    const description = newCandidateDescription.trim();
+
+    if (!name) {
+      setError('Candidate name is required.');
+      return;
+    }
+
+    await withBusy('add-candidate', async () => {
+      await addCandidate(selectedElection.id, {
+        name,
+        description: description || null,
+      });
+
+      setNewCandidateName('');
+      setNewCandidateDescription('');
+      await refreshAll(selectedElection.id);
+    }, {
+      title: 'Candidate Added',
+      message: `${name} has been added to the ballot.`,
+    });
+  };
+
+  const handleDeleteCandidate = async (candidateId, candidateName) => {
+    if (!selectedElection) return;
+
+    openConfirm({
+      title: 'Remove Candidate',
+      message: `Remove candidate "${candidateName}" from this election?`,
+      confirmTone: 'danger',
+      onConfirm: async () => {
+        await withBusy(`delete-candidate-${candidateId}`, async () => {
+          await deleteCandidate(selectedElection.id, candidateId);
+          await refreshAll(selectedElection.id);
+        }, {
+          title: 'Candidate Removed',
+          message: `${candidateName} has been removed.`,
+        });
+      },
+    });
+  };
+
+  const handleInjectFakeVotes = async (candidateId, count) => {
+    if (!selectedElection) return;
+
+    const parsedCount = Number.parseInt(count, 10);
+    if (Number.isNaN(parsedCount) || parsedCount <= 0) {
+      setError('Enter a valid positive number of votes.');
+      return;
+    }
+
+    await withBusy(`inject-${candidateId}`, async () => {
+      await injectFakeVotes(selectedElection.id, {
+        candidateId,
+        count: parsedCount,
+      });
+      await refreshAll(selectedElection.id);
+    }, {
+      title: 'Test Votes Injected',
+      message: `Injected ${parsedCount} simulation votes.`,
     });
   };
 
   const copySessionCode = async () => {
     if (!selectedElection?.code) return;
-
     try {
       await navigator.clipboard.writeText(selectedElection.code);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
       pushToast({
         type: 'info',
-        title: 'Session Code Copied',
-        message: 'The election code was copied to clipboard.',
+        title: 'Code Copied',
+        message: `Session code ${selectedElection.code} copied.`,
       });
     } catch {
-      setError('Unable to copy session code to clipboard');
+      setError('Unable to copy code to clipboard.');
+    }
+  };
+
+  const copyJoinLink = async () => {
+    if (!voterJoinUrl) return;
+    try {
+      await navigator.clipboard.writeText(voterJoinUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
       pushToast({
-        type: 'error',
-        title: 'Copy Failed',
-        message: 'Unable to copy session code to clipboard.',
+        type: 'info',
+        title: 'Voter Link Copied',
+        message: 'Direct invite link copied to clipboard.',
       });
+    } catch {
+      setError('Unable to copy invite link.');
     }
-  };
-
-  const setInjectionCount = (candidateId, value) => {
-    const parsed = Number.parseInt(String(value), 10);
-    const safe = Number.isNaN(parsed) ? 1 : Math.max(1, Math.min(10000, parsed));
-    setInjectionMap((current) => ({ ...current, [candidateId]: safe }));
-  };
-
-  const bumpInjectionCount = (candidateId, delta) => {
-    const currentValue = Number.parseInt(String(injectionMap[candidateId] ?? 10), 10);
-    const base = Number.isNaN(currentValue) ? 1 : currentValue;
-    setInjectionCount(candidateId, base + delta);
-  };
-
-  const handleViewResults = () => {
-    if (selectedElection?.id) {
-      setSession({ electionId: selectedElection.id });
-    }
-    navigate('/results');
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-[var(--primary)]">Loading admin console...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center p-8">
+        <p className="font-muse text-2xl text-[var(--on-surface)]">Loading Administrative Dashboard...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen text-[var(--primary)] relative z-10 -mt-24 pt-32 px-8 pb-20">
-      <div className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+    <div className="min-h-screen pt-24 pb-20 px-6 md:px-12 bg-[var(--surface)]">
+      {/* Top Header Bar */}
+      <div className="w-full max-w-[1400px] mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--on-surface)]/10 pb-6">
         <div>
-          <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em]">ADMIN</p>
-          <h2 className="font-muse font-bold text-6xl text-[var(--primary)]">Elections</h2>
-        </div>
-        <div className="flex gap-3 flex-wrap items-center">
-          <div className="hidden sm:flex items-center gap-2 px-3.5 py-2.5 bg-[var(--surface-container)] border border-[var(--primary)]/20 shadow-sm">
-            <Shield size={14} className="text-[var(--primary)]" />
-            <div>
-              <span className="font-bold tracking-wider uppercase text-[0.65rem]">{adminProfile.username}</span>
-              <span className="opacity-60 text-[0.6rem] ml-1.5 uppercase font-mono">[{adminProfile.role}]</span>
-            </div>
+          <div className="flex items-center gap-3">
+            <span className="px-2 py-0.5 text-[0.55rem] uppercase tracking-[0.2em] font-bold bg-[var(--primary)] text-[var(--on-primary)]">
+              ADMIN CONTROL
+            </span>
+            <p className="text-[0.62rem] uppercase tracking-[0.16em] text-[var(--on-surface)] opacity-60">
+              Officer: <strong>{adminProfile.username}</strong> ({adminProfile.role})
+            </p>
           </div>
+          <h2 className="font-muse text-4xl text-[var(--primary)] mt-1 font-bold">
+            Electoral Operations
+          </h2>
+        </div>
+
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate('/admin/new')}
-            className="bg-[var(--primary)] text-[var(--on-primary)] px-6 py-3 uppercase text-xs tracking-widest transition-transform duration-200 hover:-translate-y-0.5 shadow-md hover:shadow-lg active:translate-y-0"
+            onClick={() => navigate('/admin/create')}
+            className="bg-[var(--primary)] text-[var(--on-primary)] px-5 py-2.5 text-xs uppercase tracking-widest font-bold hover:bg-[var(--primary)]/90 transition-all shadow-sm flex items-center gap-2"
           >
-            New Election
-          </button>
-          <button
-            type="button"
-            onClick={handleViewResults}
-            className="border border-[var(--on-surface)]/20 text-[var(--primary)] px-6 py-3 uppercase text-xs tracking-widest hover:bg-[var(--primary)]/90/5 transition-all duration-200 shadow-sm hover:shadow-md active:translate-y-0.5"
-          >
-            View Results
+            <Plus size={14} />
+            <span>Create Election</span>
           </button>
           <button
             type="button"
             onClick={handleLogout}
-            title="Log out"
-            className="border border-red-500/30 text-red-600 dark:text-red-400 px-4 py-3 uppercase text-xs tracking-widest hover:bg-red-500/10 transition-all duration-200 shadow-sm flex items-center gap-1.5"
+            className="border border-[var(--outline-variant)] px-4 py-2.5 text-xs uppercase tracking-widest hover:bg-[var(--surface-container)] transition-colors flex items-center gap-2"
+            title="Log out of admin"
           >
             <LogOut size={14} />
-            <span className="hidden md:inline">Log Out</span>
+            <span>Exit</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
-        <aside className="col-span-12 lg:col-span-4 bg-[var(--surface-container-lowest)] text-[var(--primary)] p-6 shadow-xl">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-muse italic text-3xl">Elections</h3>
-            <span className="label-md text-[var(--on-surface)] opacity-60">{filteredElections.length}</span>
+      {/* Main Grid */}
+      <div className="w-full max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-8">
+        {/* Left Column: Election List */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs uppercase tracking-[0.16em] font-bold text-[var(--on-surface)] opacity-70">
+              ELECTIONS ({filteredElections.length})
+            </p>
+            <div className="flex gap-1">
+              {FILTERS.map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  className={`px-2 py-0.5 text-[0.58rem] uppercase tracking-wider ${
+                    filter === f
+                      ? 'bg-[var(--primary)] text-[var(--on-primary)] font-bold'
+                      : 'border border-[var(--outline-variant)] text-[var(--on-surface)] opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="flex gap-2 mb-5 flex-wrap">
-            {FILTERS.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setFilter(item)}
-                className={`px-3 py-1 text-[0.65rem] uppercase tracking-wider border transition-all duration-200 hover:-translate-y-0.5 shadow-sm hover:shadow-md active:translate-y-0 ${filter === item ? 'bg-[var(--primary)] text-[var(--on-primary)]' : 'border-[var(--outline-variant)] text-[var(--on-surface)] opacity-80 hover:bg-[var(--surface-container)]'}`}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+          <div className="space-y-3">
             {filteredElections.map((item) => {
-              const isSelected = item.id === selectedElectionId;
+              const isSelected = selectedElectionId === item.id;
               return (
                 <button
                   type="button"
                   key={item.id}
                   onClick={() => setSelectedElectionId(item.id)}
-                  className={`w-full text-left border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 ${isSelected ? 'border-[var(--primary)] bg-[var(--surface-container-low)] shadow-sm' : 'border-[var(--outline-variant)] hover:bg-[var(--surface-container-low)]'}`}
+                  className={`w-full text-left p-5 transition-all duration-200 border ${
+                    isSelected
+                      ? 'bg-[var(--surface-container-lowest)] border-[var(--primary)] shadow-md'
+                      : 'bg-[var(--surface-container)]/50 border-transparent hover:border-[var(--on-surface)]/20'
+                  }`}
                 >
-                  <div className="flex justify-between items-start gap-3">
-                    <p className="font-semibold text-sm">{item.title}</p>
-                    <span className={`text-[0.55rem] uppercase tracking-widest ${item.status === 'open' ? 'text-green-700' : item.status === 'closed' ? 'text-[var(--on-surface)] opacity-60' : 'text-amber-700'}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-mono text-xs font-bold text-[var(--primary)]">
+                      {item.code}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 text-[0.52rem] uppercase tracking-widest font-bold ${
+                        item.status === 'open'
+                          ? 'bg-emerald-500/15 text-emerald-700'
+                          : item.status === 'draft'
+                            ? 'bg-amber-500/15 text-amber-700'
+                            : 'bg-rose-500/15 text-rose-700'
+                      }`}
+                    >
                       {item.status}
                     </span>
                   </div>
-                  <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">Code: {item.code}</p>
-                  <p className="label-md text-[var(--on-surface)] opacity-50 mt-1">
-                    Votes: {item.totalVotes || 0} • Registered: {item.voterCount || 0}
+                  <h4 className="font-muse text-lg font-bold text-[var(--on-surface)] leading-snug">
+                    {item.title}
+                  </h4>
+                  <p className="text-[0.62rem] text-[var(--on-surface)] opacity-60 mt-1">
+                    End: {item.end_date ? new Date(item.end_date).toLocaleDateString() : 'Unscheduled'}
                   </p>
                 </button>
               );
             })}
-            {!filteredElections.length ? <p className="text-sm text-[var(--on-surface)] opacity-60">No elections found.</p> : null}
           </div>
-        </aside>
+        </div>
 
-        <section className="col-span-12 lg:col-span-8 space-y-6">
-          <div className="bg-[var(--surface-container-lowest)] text-[var(--primary)] p-6 shadow-xl">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="label-md text-[var(--on-surface)] opacity-60">Election Details</p>
-                <h3 className="font-muse italic text-4xl">{selectedElection ? selectedElection.title : 'None selected'}</h3>
-                <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">Code: {selectedElection?.code || '-'}</p>
-                <p className="label-md text-[var(--on-surface)] opacity-60 mt-1">Ends: {selectedElection?.end_date ? new Date(selectedElection.end_date).toLocaleString() : 'Not scheduled'}</p>
-                <p className="label-md text-[var(--on-surface)] opacity-90 mt-1">Time Remaining: {remainingTimeLabel}</p>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <button type="button" onClick={copySessionCode} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50" disabled={!selectedElection}>Copy Code</button>
-                <button type="button" onClick={handleRegenerateCode} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50" disabled={!selectedElection || !!busyAction}>Regenerate Code</button>
-                <button type="button" onClick={() => handleStatusChange('open')} className="border border-green-300 bg-green-50 text-green-800 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-green-100 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 dark:border-green-500/30 dark:bg-transparent dark:text-green-100 dark:hover:bg-green-950/25" disabled={!selectedElection || !!busyAction || selectedElection.status === 'open'}>Open</button>
-                <button type="button" onClick={() => handleStatusChange('closed')} className="border border-[var(--on-surface)] text-[var(--on-surface)] opacity-90 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container-low)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50" disabled={!selectedElection || !!busyAction || selectedElection.status === 'closed'}>Close</button>
-                <button type="button" onClick={() => handleStatusChange('draft')} className="border border-amber-300 bg-amber-50 text-amber-800 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-amber-100 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 dark:border-amber-500/30 dark:bg-transparent dark:text-amber-100 dark:hover:bg-amber-950/25" disabled={!selectedElection || !!busyAction || selectedElection.status === 'draft'}>Draft</button>
-                <button type="button" onClick={handleDeleteSession} className="border border-red-300 bg-red-50 text-red-800 px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-red-100 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 dark:border-rose-500/30 dark:bg-transparent dark:text-rose-100 dark:hover:bg-rose-950/25" disabled={!selectedElection || !!busyAction}>Delete</button>
-              </div>
-            </div>
-            {error ? <p className="label-md text-black mt-4 dark:text-red-100">{error}</p> : null}
-
-            <div className="mt-5 border-t border-[var(--outline-variant)] pt-4">
-              <p className="label-md text-[var(--on-surface)] opacity-60 mb-3">Extend End Time</p>
-              <div className="flex flex-wrap gap-2 mb-3">
-                <button type="button" onClick={() => handleExtendEndTime(5 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50">+5 min</button>
-                <button type="button" onClick={() => handleExtendEndTime(15 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50">+15 min</button>
-                <button type="button" onClick={() => handleExtendEndTime(60 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50">+1 hour</button>
-                <button type="button" onClick={() => handleExtendEndTime(24 * 60 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50">+1 day</button>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-2 md:items-center">
-                <input
-                  type="datetime-local"
-                  value={customEndDate}
-                  onChange={(event) => setCustomEndDate(event.target.value)}
-                  disabled={!selectedElection || !!busyAction}
-                  className="border border-[var(--outline-variant)] px-3 py-2"
-                />
-                <button
-                  type="button"
-                  onClick={handleApplyCustomEndDate}
-                  disabled={!selectedElection || !!busyAction}
-                  className="border border-[var(--primary)] text-[var(--primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50"
-                >
-                  Set End Time
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-5 border-t border-[var(--outline-variant)] pt-4">
-              <p className="label-md text-[var(--on-surface)] opacity-60 mb-3">Voter Limit</p>
-              <div className="flex flex-col md:flex-row gap-2 md:items-center">
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={maxVotersInput}
-                  onChange={(event) => setMaxVotersInput(event.target.value)}
-                  placeholder="Leave empty for unlimited"
-                  disabled={!selectedElection || !!busyAction}
-                  className="border border-[var(--outline-variant)] px-3 py-2"
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveMaxVoters}
-                  disabled={!selectedElection || !!busyAction}
-                  className="border border-[var(--primary)] text-[var(--primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50"
-                >
-                  Save Limit
-                </button>
-              </div>
-              <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">
-                Current: {selectedElection?.max_voters ? `${selectedElection.max_voters} voters` : 'Unlimited'}
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-[var(--surface-container-lowest)] text-[var(--primary)] p-6 shadow-xl">
-            <h4 className="font-muse italic text-3xl mb-4">Integrity & Audit</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Total Votes</p><p className="text-3xl font-bold">{integrity?.totalVotes || 0}</p></div>
-              <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Real Votes</p><p className="text-3xl font-bold text-green-700">{integrity?.realVotes || 0}</p></div>
-              <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Simulated Votes</p><p className="text-3xl font-bold text-red-700">{integrity?.fakeVotes || 0}</p></div>
-              <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Status</p><p className={`text-2xl font-bold ${integrity?.integrityStatus === 'clean' ? 'text-green-700' : 'text-red-700'}`}>{integrity?.integrityStatus === 'clean' ? 'CLEAN' : 'DISCREPANCY'}</p></div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(integrity?.candidates || []).map((item) => (
-                <div key={item.id} className="border border-[var(--outline-variant)] p-4">
-                  <div className="flex justify-between items-center">
-                    <p className="font-semibold">{item.name}</p>
-                    {item.fakeVotes > 0 ? <span className="text-[0.6rem] uppercase tracking-widest text-red-700">discrepancy</span> : <span className="text-[0.6rem] uppercase tracking-widest text-green-700">clean</span>}
-                  </div>
-                  <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">Real: {item.realVotes} | Simulated: {item.fakeVotes} | Total: {item.totalVotes}</p>
-                </div>
-              ))}
-            </div>
-
-            <p className="label-md text-[var(--on-surface)] opacity-60 mt-4">Simulated voter records: {fakeVoterAudit.length}</p>
-          </div>
-
-          <div className="bg-[var(--surface-container-lowest)] text-[var(--primary)] p-6 shadow-xl">
-            <h4 className="font-muse italic text-3xl mb-4">Simulate Votes</h4>
-            <p className="text-sm text-[var(--on-surface)] opacity-80 mb-5">
-              Simulate test votes to test live tallies and UI updates.
-            </p>
-
-            <div className="mb-6 border border-[var(--outline-variant)] p-4">
-              <p className="label-md text-[var(--on-surface)] opacity-60 mb-3">Add Candidate</p>
-              <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2">
-                <input
-                  type="text"
-                  value={newCandidateName}
-                  onChange={(event) => setNewCandidateName(event.target.value)}
-                  placeholder="Candidate name"
-                  disabled={!selectedElection || !!busyAction}
-                  className="border border-[var(--outline-variant)] px-3 py-2"
-                />
-                <input
-                  type="text"
-                  value={newCandidateDescription}
-                  onChange={(event) => setNewCandidateDescription(event.target.value)}
-                  placeholder="Description (optional)"
-                  disabled={!selectedElection || !!busyAction}
-                  className="border border-[var(--outline-variant)] px-3 py-2"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddCandidate}
-                  disabled={!selectedElection || !!busyAction}
-                  className="border border-[var(--primary)] text-[var(--primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50"
-                >
-                  Add Candidate
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {candidates.map((candidate) => (
-                <div key={candidate.id} className="border border-[var(--outline-variant)] p-4">
-                  <div className="flex justify-between items-center">
-                    <p className="font-semibold">{candidate.name}</p>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteCandidate(candidate.id, candidate.name)}
-                      disabled={!!busyAction}
-                      className="text-red-700 text-xs uppercase tracking-widest transition-colors hover:text-red-900 disabled:opacity-50"
+        {/* Right Column: Selected Election Workspace */}
+        {selectedElection ? (
+          <div className="space-y-6">
+            {/* Top Election Detail Card */}
+            <div className="bg-[var(--surface-container-lowest)] p-6 md:p-8 border border-[var(--on-surface)]/15 shadow-sm">
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="font-mono text-sm font-bold text-[var(--primary)] bg-[var(--surface-container)] px-2.5 py-0.5">
+                      CODE: {selectedElection.code}
+                    </span>
+                    <span
+                      className={`px-2.5 py-0.5 text-[0.55rem] uppercase tracking-widest font-bold ${
+                        selectedElection.status === 'open'
+                          ? 'bg-emerald-500/15 text-emerald-700'
+                          : selectedElection.status === 'draft'
+                            ? 'bg-amber-500/15 text-amber-700'
+                            : 'bg-rose-500/15 text-rose-700'
+                      }`}
                     >
-                      Remove
-                    </button>
+                      {selectedElection.status}
+                    </span>
                   </div>
-                  <p className="label-md text-[var(--on-surface)] opacity-60 mt-1">Current votes: {candidate.votes}</p>
-                  <label className="label-md text-[var(--on-surface)] opacity-60 mt-3 block">Vote Count</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10000"
-                    value={injectionMap[candidate.id] ?? 10}
-                    onChange={(event) => setInjectionCount(candidate.id, event.target.value)}
-                    className="w-full mt-2 border border-[var(--outline-variant)] px-3 py-2"
-                  />
-                  <div className="mt-3 flex gap-2 flex-wrap">
-                    {[10, 25, 50, 100].map((step) => (
-                      <button
-                        key={step}
-                        type="button"
-                        onClick={() => bumpInjectionCount(candidate.id, step)}
-                        className="border border-[var(--outline-variant)] px-2 py-1 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:-translate-y-0.5 shadow-sm active:translate-y-0"
-                      >
-                        +{step}
-                      </button>
-                    ))}
-                    {[10, 25].map((step) => (
-                      <button
-                        key={`minus-${step}`}
-                        type="button"
-                        onClick={() => bumpInjectionCount(candidate.id, -step)}
-                        className="border border-[var(--outline-variant)] px-2 py-1 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:-translate-y-0.5 shadow-sm active:translate-y-0"
-                      >
-                        -{step}
-                      </button>
-                    ))}
-                  </div>
+                  <h3 className="font-muse text-3xl font-bold text-[var(--primary)] leading-tight">
+                    {selectedElection.title}
+                  </h3>
+                  {selectedElection.description && (
+                    <p className="text-xs text-[var(--on-surface)] opacity-70 mt-1">
+                      {selectedElection.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleInject(candidate.id, candidate.name)}
-                    disabled={!!busyAction}
-                    className="mt-3 bg-[var(--primary)] text-[var(--on-primary)] w-full py-2 uppercase text-xs tracking-widest transition-all duration-200 hover:-translate-y-0.5 shadow-sm hover:shadow-md active:translate-y-0 disabled:opacity-50"
+                    onClick={() => handleStatusChange('open')}
+                    disabled={selectedElection.status === 'open' || !!busyAction}
+                    className="px-3 py-1.5 text-[0.62rem] uppercase tracking-wider font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 transition-colors"
                   >
-                    Simulate Votes
+                    Open
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStatusChange('closed')}
+                    disabled={selectedElection.status === 'closed' || !!busyAction}
+                    className="px-3 py-1.5 text-[0.62rem] uppercase tracking-wider font-bold bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-40 transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStatusChange('draft')}
+                    disabled={selectedElection.status === 'draft' || !!busyAction}
+                    className="px-3 py-1.5 text-[0.62rem] uppercase tracking-wider font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] disabled:opacity-40 transition-colors"
+                  >
+                    Draft
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteSession}
+                    disabled={!!busyAction}
+                    className="p-1.5 text-rose-700 hover:text-rose-900 border border-rose-300 hover:bg-rose-50 transition-colors"
+                    title="Delete election"
+                  >
+                    <Trash2 size={15} />
                   </button>
                 </div>
-              ))}
+              </div>
+
+              {/* Stat Summary Strip */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-[var(--on-surface)]/10">
+                <div>
+                  <p className="text-[0.58rem] uppercase tracking-[0.16em] text-[var(--on-surface)] opacity-50 font-bold">TOTAL VOTES</p>
+                  <p className="font-muse text-2xl font-bold text-[var(--primary)]">{totalElectionVotes}</p>
+                </div>
+                <div>
+                  <p className="text-[0.58rem] uppercase tracking-[0.16em] text-[var(--on-surface)] opacity-50 font-bold">CANDIDATES</p>
+                  <p className="font-muse text-2xl font-bold text-[var(--primary)]">{candidates.length}</p>
+                </div>
+                <div>
+                  <p className="text-[0.58rem] uppercase tracking-[0.16em] text-[var(--on-surface)] opacity-50 font-bold">TIME REMAINING</p>
+                  <p className="text-xs font-bold font-mono text-[var(--primary)] mt-1">{remainingTimeLabel}</p>
+                </div>
+                <div>
+                  <p className="text-[0.58rem] uppercase tracking-[0.16em] text-[var(--on-surface)] opacity-50 font-bold">VOTER CAPACITY</p>
+                  <p className="text-xs font-bold text-[var(--on-surface)] mt-1">
+                    {selectedElection.max_voters ? `${selectedElection.max_voters} Max` : 'Unlimited'}
+                  </p>
+                </div>
+              </div>
             </div>
+
+            {/* Sub-Tab Navigation Bar */}
+            <div className="flex border-b border-[var(--on-surface)]/15">
+              <button
+                type="button"
+                onClick={() => setAdminTab('operations')}
+                className={`flex items-center gap-2 px-6 py-3 text-xs uppercase tracking-widest font-bold border-b-2 transition-all ${
+                  adminTab === 'operations'
+                    ? 'border-[var(--primary)] text-[var(--primary)]'
+                    : 'border-transparent text-[var(--on-surface)] opacity-50 hover:opacity-100'
+                }`}
+              >
+                <Sliders size={15} />
+                <span>Operations & Candidates</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAdminTab('share')}
+                className={`flex items-center gap-2 px-6 py-3 text-xs uppercase tracking-widest font-bold border-b-2 transition-all ${
+                  adminTab === 'share'
+                    ? 'border-[var(--primary)] text-[var(--primary)]'
+                    : 'border-transparent text-[var(--on-surface)] opacity-50 hover:opacity-100'
+                }`}
+              >
+                <Share2 size={15} />
+                <span>Voter Access & Links</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAdminTab('sandbox')}
+                className={`flex items-center gap-2 px-6 py-3 text-xs uppercase tracking-widest font-bold border-b-2 transition-all ${
+                  adminTab === 'sandbox'
+                    ? 'border-[var(--primary)] text-[var(--primary)]'
+                    : 'border-transparent text-[var(--on-surface)] opacity-50 hover:opacity-100'
+                }`}
+              >
+                <FlaskConical size={15} />
+                <span>Simulation Sandbox</span>
+              </button>
+            </div>
+
+            {/* TAB 1: Operations & Candidates */}
+            {adminTab === 'operations' && (
+              <div className="space-y-6">
+                {/* Candidate Roster */}
+                <div className="bg-[var(--surface-container-lowest)] p-6 md:p-8 border border-[var(--on-surface)]/15">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-muse text-2xl font-bold text-[var(--primary)]">Candidate Roster</h4>
+                    <span className="text-[0.62rem] uppercase tracking-widest text-[var(--on-surface)] opacity-60">
+                      {candidates.length} Registered
+                    </span>
+                  </div>
+
+                  {/* Add Candidate Sub-form */}
+                  <div className="mb-6 bg-[var(--surface-container)] p-4 border border-[var(--on-surface)]/10">
+                    <p className="text-[0.58rem] uppercase tracking-[0.16em] text-[var(--primary)] font-bold mb-2">
+                      ADD NEW CANDIDATE
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
+                      <input
+                        type="text"
+                        placeholder="Candidate Full Name"
+                        value={newCandidateName}
+                        onChange={(e) => setNewCandidateName(e.target.value)}
+                        className="p-2.5 text-sm bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Platform Statement / Bio"
+                        value={newCandidateDescription}
+                        onChange={(e) => setNewCandidateDescription(e.target.value)}
+                        className="p-2.5 text-sm bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCandidate}
+                        disabled={!!busyAction}
+                        className="bg-[var(--primary)] text-[var(--on-primary)] px-5 py-2.5 text-xs uppercase tracking-widest font-bold hover:bg-[var(--primary)]/90 transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <Plus size={14} />
+                        <span>Add</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Candidate List */}
+                  <div className="space-y-3">
+                    {candidates.map((c, i) => {
+                      const votePct = totalElectionVotes > 0 ? Math.round((c.votes / totalElectionVotes) * 100) : 0;
+                      return (
+                        <div
+                          key={c.id}
+                          className="p-4 bg-[var(--surface)] border border-[var(--on-surface)]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                          <div className="flex items-start gap-4">
+                            <span className="font-mono text-sm font-bold text-[var(--on-surface)] opacity-40">
+                              {String(i + 1).padStart(2, '0')}
+                            </span>
+                            <div>
+                              <p className="font-muse text-lg font-bold text-[var(--on-surface)]">{c.name}</p>
+                              {c.description && (
+                                <p className="text-xs text-[var(--on-surface)] opacity-70 mt-0.5">{c.description}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4 self-end sm:self-center">
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-[var(--primary)]">{c.votes} Votes</p>
+                              <p className="text-[0.6rem] text-[var(--on-surface)] opacity-60 font-mono">{votePct}% of tally</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCandidate(c.id, c.name)}
+                              className="p-2 text-rose-700 hover:text-rose-900 border border-rose-300/40 hover:bg-rose-50 transition-colors"
+                              title="Delete candidate"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Duration & Capacity Controls */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* End Time Extension */}
+                  <div className="bg-[var(--surface-container-lowest)] p-6 border border-[var(--on-surface)]/15">
+                    <p className="text-xs uppercase tracking-[0.16em] font-bold text-[var(--primary)] mb-3 flex items-center gap-2">
+                      <Clock size={15} />
+                      <span>ELECTION SCHEDULE & DURATION</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <button
+                        type="button"
+                        onClick={() => handleExtendEndTime(15 * 60 * 1000)}
+                        className="px-3 py-1.5 text-[0.62rem] uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)]"
+                      >
+                        +15 Min
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExtendEndTime(60 * 60 * 1000)}
+                        className="px-3 py-1.5 text-[0.62rem] uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)]"
+                      >
+                        +1 Hour
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExtendEndTime(24 * 60 * 60 * 1000)}
+                        className="px-3 py-1.5 text-[0.62rem] uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)]"
+                      >
+                        +1 Day
+                      </button>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="datetime-local"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className="p-2 text-xs bg-[var(--surface-container)] border border-[var(--outline-variant)] text-[var(--on-surface)] flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyCustomEndDate}
+                        className="px-4 py-2 text-[0.62rem] uppercase tracking-widest font-bold bg-[var(--primary)] text-[var(--on-primary)] hover:bg-[var(--primary)]/90"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Voter Capacity Limit */}
+                  <div className="bg-[var(--surface-container-lowest)] p-6 border border-[var(--on-surface)]/15">
+                    <p className="text-xs uppercase tracking-[0.16em] font-bold text-[var(--primary)] mb-3 flex items-center gap-2">
+                      <Users size={15} />
+                      <span>VOTER CAPACITY LIMIT</span>
+                    </p>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="Leave empty for unlimited"
+                        value={maxVotersInput}
+                        onChange={(e) => setMaxVotersInput(e.target.value)}
+                        className="p-2 text-xs bg-[var(--surface-container)] border border-[var(--outline-variant)] text-[var(--on-surface)] flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveMaxVoters}
+                        className="px-4 py-2 text-[0.62rem] uppercase tracking-widest font-bold bg-[var(--primary)] text-[var(--on-primary)] hover:bg-[var(--primary)]/90"
+                      >
+                        Save
+                      </button>
+                    </div>
+                    <p className="text-[0.62rem] text-[var(--on-surface)] opacity-60">
+                      Cap total valid voter registrations for this session.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: Voter Access & Links */}
+            {adminTab === 'share' && (
+              <div className="bg-[var(--surface-container-lowest)] p-6 md:p-8 border border-[var(--on-surface)]/15 space-y-6">
+                <div>
+                  <h4 className="font-muse text-2xl font-bold text-[var(--primary)] mb-1">
+                    Voter Access & Share Links
+                  </h4>
+                  <p className="text-xs text-[var(--on-surface)] opacity-70">
+                    Distribute this direct link or session code to voters for immediate onboarding.
+                  </p>
+                </div>
+
+                {/* Direct Link Box */}
+                <div className="bg-[var(--surface)] p-6 border border-[var(--on-surface)]/15 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[0.58rem] uppercase tracking-[0.2em] font-bold text-[var(--primary)]">
+                      DIRECT VOTER INVITE LINK
+                    </span>
+                    <span className="text-[0.55rem] font-mono text-emerald-600 font-bold">READY TO SHARE</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={voterJoinUrl}
+                      className="w-full p-3 text-sm font-mono bg-[var(--surface-container)] border border-[var(--outline-variant)] text-[var(--on-surface)] select-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={copyJoinLink}
+                      className="px-5 py-3 text-xs uppercase tracking-widest font-bold bg-[var(--primary)] text-[var(--on-primary)] hover:bg-[var(--primary)]/90 flex items-center gap-1.5 shrink-0"
+                    >
+                      {copiedLink ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                      <span>{copiedLink ? 'Copied' : 'Copy Link'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Session Code Card */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-[var(--surface)] p-6 border border-[var(--on-surface)]/15 flex flex-col justify-between">
+                    <div>
+                      <p className="text-[0.58rem] uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-50 mb-1">
+                        8-DIGIT SESSION CODE
+                      </p>
+                      <p className="font-mono text-3xl font-bold tracking-widest text-[var(--primary)]">
+                        {selectedElection.code}
+                      </p>
+                      <p className="text-xs text-[var(--on-surface)] opacity-60 mt-2">
+                        Voters can type this code manually on the home page sign-in.
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        type="button"
+                        onClick={copySessionCode}
+                        className="px-4 py-2 text-xs uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] flex items-center gap-1.5"
+                      >
+                        {copiedCode ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                        <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRegenerateCode}
+                        className="px-4 py-2 text-xs uppercase tracking-widest border border-[var(--outline-variant)] hover:bg-[var(--surface-container)]"
+                      >
+                        Regenerate
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-[var(--surface)] p-6 border border-[var(--on-surface)]/15 flex flex-col justify-between">
+                    <div>
+                      <p className="text-[0.58rem] uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-50 mb-1">
+                        TEST AS VOTER
+                      </p>
+                      <h5 className="font-muse text-xl font-bold text-[var(--primary)]">Open Voter Chamber</h5>
+                      <p className="text-xs text-[var(--on-surface)] opacity-60 mt-1">
+                        Opens a new window pre-loaded with this election's invite code to test the voter flow.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => window.open(voterJoinUrl, '_blank')}
+                      className="mt-4 px-5 py-2.5 text-xs uppercase tracking-widest font-bold bg-[var(--primary)] text-[var(--on-primary)] hover:bg-[var(--primary)]/90 flex items-center justify-center gap-2"
+                    >
+                      <span>Open Voter Tab</span>
+                      <ArrowUpRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: Simulation Sandbox */}
+            {adminTab === 'sandbox' && (
+              <div className="space-y-6">
+                {/* Sandbox Info Banner */}
+                <div className="bg-amber-500/10 border border-amber-500/30 p-5 flex items-start gap-3">
+                  <AlertTriangle size={18} className="text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs uppercase tracking-wider font-bold text-amber-900">
+                      ISOLATED TEST & SIMULATION SANDBOX
+                    </p>
+                    <p className="text-xs text-amber-800/80 mt-0.5">
+                      Inject mock votes to simulate high turnout, test live chart animations, and verify tie/runoff handling.
+                      All simulated votes are tracked separately in the audit report.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Audit Stats */}
+                <div className="bg-[var(--surface-container-lowest)] p-6 border border-[var(--on-surface)]/15">
+                  <h4 className="font-muse text-xl font-bold text-[var(--primary)] mb-4">Integrity & Audit Metrics</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-4 bg-[var(--surface)] border border-[var(--outline-variant)]">
+                      <p className="text-[0.58rem] uppercase tracking-wider text-[var(--on-surface)] opacity-60">TOTAL VOTES</p>
+                      <p className="text-2xl font-bold font-muse text-[var(--primary)]">{integrity?.totalVotes || 0}</p>
+                    </div>
+                    <div className="p-4 bg-[var(--surface)] border border-[var(--outline-variant)]">
+                      <p className="text-[0.58rem] uppercase tracking-wider text-[var(--on-surface)] opacity-60">REAL CITIZEN VOTES</p>
+                      <p className="text-2xl font-bold font-muse text-emerald-700">{integrity?.realVotes || 0}</p>
+                    </div>
+                    <div className="p-4 bg-[var(--surface)] border border-[var(--outline-variant)]">
+                      <p className="text-[0.58rem] uppercase tracking-wider text-[var(--on-surface)] opacity-60">SIMULATED VOTES</p>
+                      <p className="text-2xl font-bold font-muse text-amber-700">{integrity?.fakeVotes || 0}</p>
+                    </div>
+                    <div className="p-4 bg-[var(--surface)] border border-[var(--outline-variant)]">
+                      <p className="text-[0.58rem] uppercase tracking-wider text-[var(--on-surface)] opacity-60">INTEGRITY STATUS</p>
+                      <p className={`text-lg font-bold font-muse ${integrity?.integrityStatus === 'clean' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                        {integrity?.integrityStatus === 'clean' ? 'CLEAN' : 'SIMULATED DATA'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Candidate Injection Knobs */}
+                <div className="bg-[var(--surface-container-lowest)] p-6 border border-[var(--on-surface)]/15">
+                  <h4 className="font-muse text-xl font-bold text-[var(--primary)] mb-4">Batch Vote Injectors</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {candidates.map((c) => (
+                      <div key={c.id} className="p-4 bg-[var(--surface)] border border-[var(--outline-variant)] space-y-3">
+                        <div className="flex justify-between items-center">
+                          <p className="font-bold text-[var(--on-surface)]">{c.name}</p>
+                          <span className="text-xs font-mono text-[var(--primary)] font-bold">{c.votes} votes</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            max="10000"
+                            value={injectionMap[c.id] ?? 10}
+                            onChange={(e) => setInjectionMap((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                            className="w-24 p-2 text-xs bg-[var(--surface-container)] border border-[var(--outline-variant)] text-[var(--on-surface)] font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleInjectFakeVotes(c.id, injectionMap[c.id] ?? 10)}
+                            disabled={!!busyAction}
+                            className="flex-1 py-2 px-3 text-xs uppercase tracking-widest font-bold bg-[var(--primary)] text-[var(--on-primary)] hover:bg-[var(--primary)]/90"
+                          >
+                            Inject Votes
+                          </button>
+                        </div>
+
+                        <div className="flex gap-1.5 flex-wrap pt-1">
+                          {[10, 25, 50, 100].map((count) => (
+                            <button
+                              key={count}
+                              type="button"
+                              onClick={() => handleInjectFakeVotes(c.id, count)}
+                              disabled={!!busyAction}
+                              className="px-2 py-1 text-[0.55rem] uppercase tracking-wider font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)]"
+                            >
+                              +{count}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </section>
+        ) : (
+          <div className="bg-[var(--surface-container-lowest)] p-12 border border-[var(--on-surface)]/15 text-center flex flex-col items-center justify-center">
+            <p className="font-muse text-2xl text-[var(--primary)] mb-2">No Election Selected</p>
+            <p className="text-xs text-[var(--on-surface)] opacity-60 mb-6">
+              Select an existing election on the left or create a new session.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/admin/create')}
+              className="bg-[var(--primary)] text-[var(--on-primary)] px-6 py-3 text-xs uppercase tracking-widest font-bold hover:bg-[var(--primary)]/90"
+            >
+              Create New Election
+            </button>
+          </div>
+        )}
       </div>
 
-      <ConfirmDialog
-        open={!!confirmState}
-        title={confirmState?.title || 'Confirm'}
-        message={confirmState?.message || ''}
-        confirmTone={confirmState?.confirmTone || 'primary'}
-        confirmLabel="Proceed"
-        cancelLabel="Cancel"
-        busy={!!busyAction}
-        onCancel={() => {
-          if (!busyAction) {
+      {/* Confirmation Modal */}
+      {confirmState && (
+        <ConfirmDialog
+          open={!!confirmState}
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel="Confirm"
+          cancelLabel="Cancel"
+          confirmTone={confirmState.confirmTone}
+          onCancel={() => setConfirmState(null)}
+          onConfirm={async () => {
+            const action = confirmState.onConfirm;
             setConfirmState(null);
-          }
-        }}
-        onConfirm={async () => {
-          if (!confirmState?.onConfirm) return;
-          await confirmState.onConfirm();
-          setConfirmState(null);
-        }}
-      />
+            if (action) await action();
+          }}
+          busy={!!busyAction}
+        />
+      )}
     </div>
   );
 }
