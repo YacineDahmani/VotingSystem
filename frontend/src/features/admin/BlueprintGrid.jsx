@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LogOut, Shield } from 'lucide-react';
 import {
   addCandidate,
   deleteCandidate,
   deleteElection,
   getAdminElections,
+  getAdminProfile,
   getCandidates,
   getFakeVoters,
   getIntegrityReport,
@@ -15,7 +17,7 @@ import {
 } from '../../lib/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { useToast } from '../../components/ui/useToast';
-import { getSession, isAdminSession, setSession } from '../../store/session';
+import { clearSession, getSession, isAdminSession, setSession } from '../../store/session';
 
 const FILTERS = ['all', 'open', 'draft', 'closed'];
 
@@ -83,6 +85,27 @@ export default function BlueprintGrid() {
   const [maxVotersInput, setMaxVotersInput] = useState('');
   const [newCandidateName, setNewCandidateName] = useState('');
   const [newCandidateDescription, setNewCandidateDescription] = useState('');
+
+  const [adminProfile, setAdminProfile] = useState(() => ({
+    username: session?.adminUsername || 'Electoral Officer',
+    role: session?.adminRole || 'super_admin',
+    email: session?.adminEmail || '',
+  }));
+
+  useEffect(() => {
+    getAdminProfile()
+      .then((res) => {
+        if (res?.admin) {
+          setAdminProfile(res.admin);
+        }
+      })
+      .catch(() => null);
+  }, []);
+
+  const handleLogout = () => {
+    clearSession();
+    navigate('/', { replace: true });
+  };
 
   const filteredElections = useMemo(() => {
     if (filter === 'all') return elections;
@@ -255,15 +278,15 @@ export default function BlueprintGrid() {
     const rawCount = Number.parseInt(String(injectionMap[candidateId] ?? 10), 10);
     const count = Math.max(1, Math.min(10000, Number.isNaN(rawCount) ? 1 : rawCount));
     openConfirm({
-      title: 'Inject Votes',
-      message: `Inject ${count} synthetic votes into ${candidateName}?`,
+      title: 'Simulate Votes',
+      message: `Add ${count} simulated votes for ${candidateName}?`,
       onConfirm: async () => {
         await withBusy('inject', async () => {
           await injectFakeVotes(selectedElection.id, { candidateId, count });
           await refreshAll(selectedElection.id);
         }, {
-          title: 'Votes Injected',
-          message: `${count} votes were injected into ${candidateName}.`,
+          title: 'Votes Simulated',
+          message: `${count} test votes added for ${candidateName}.`,
         });
       },
     });
@@ -274,7 +297,7 @@ export default function BlueprintGrid() {
 
     openConfirm({
       title: 'Remove Candidate',
-      message: `Remove ${candidateName} from this session?`,
+      message: `Remove ${candidateName}?`,
       confirmTone: 'danger',
       onConfirm: async () => {
         await withBusy('delete-candidate', async () => {
@@ -282,7 +305,7 @@ export default function BlueprintGrid() {
           await refreshAll(selectedElection.id);
         }, {
           title: 'Candidate Removed',
-          message: `${candidateName} was removed from the session.`,
+          message: `${candidateName} was removed.`,
         });
       },
     });
@@ -307,7 +330,7 @@ export default function BlueprintGrid() {
       await refreshAll(selectedElection.id);
     }, {
       title: 'Candidate Added',
-      message: `${trimmedName} is now available on this ballot.`,
+      message: `${trimmedName} added.`,
     });
   };
 
@@ -317,8 +340,8 @@ export default function BlueprintGrid() {
       await regenerateElectionCode(selectedElection.id);
       await refreshAll(selectedElection.id);
     }, {
-      title: 'Session Code Regenerated',
-      message: 'A new code was issued for this election.',
+      title: 'Code Regenerated',
+      message: 'A new session code was generated.',
     });
   };
 
@@ -330,7 +353,7 @@ export default function BlueprintGrid() {
       await refreshAll(selectedElection.id);
     }, {
       title: 'Status Updated',
-      message: `Election status changed to ${status}.`,
+      message: `Status changed to ${status}.`,
     });
   };
 
@@ -348,20 +371,20 @@ export default function BlueprintGrid() {
       await refreshAll(selectedElection.id);
     }, {
       title: 'End Time Extended',
-      message: 'Voting end time was updated successfully.',
+      message: 'End time updated.',
     });
   };
 
   const handleApplyCustomEndDate = async () => {
     if (!selectedElection) return;
     if (!customEndDate) {
-      setError('Choose a valid end date/time.');
+      setError('Choose a valid end date and time.');
       return;
     }
 
     const parsed = new Date(customEndDate);
     if (Number.isNaN(parsed.getTime())) {
-      setError('Choose a valid end date/time.');
+      setError('Choose a valid end date and time.');
       return;
     }
 
@@ -370,7 +393,7 @@ export default function BlueprintGrid() {
       await refreshAll(selectedElection.id);
     }, {
       title: 'End Time Updated',
-      message: 'Voting end time was set successfully.',
+      message: 'End time set successfully.',
     });
   };
 
@@ -378,16 +401,16 @@ export default function BlueprintGrid() {
     if (!selectedElection) return;
 
     openConfirm({
-      title: 'Delete Session',
-      message: `Delete session "${selectedElection.title}"? This cannot be undone.`,
+      title: 'Delete Election',
+      message: `Delete "${selectedElection.title}"? This cannot be undone.`,
       confirmTone: 'danger',
       onConfirm: async () => {
         await withBusy('delete-session', async () => {
           await deleteElection(selectedElection.id);
           await refreshAll(null);
         }, {
-          title: 'Session Deleted',
-          message: 'Election session was removed permanently.',
+          title: 'Election Deleted',
+          message: 'Election was deleted permanently.',
         });
       },
     });
@@ -453,23 +476,30 @@ export default function BlueprintGrid() {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-[var(--primary)]">Loading admin manager...</div>;
+    return <div className="min-h-screen flex items-center justify-center text-[var(--primary)]">Loading admin console...</div>;
   }
 
   return (
     <div className="min-h-screen text-[var(--primary)] relative z-10 -mt-24 pt-32 px-8 pb-20">
       <div className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em]">ADMIN CONTROL ROOM</p>
-          <h2 className="font-muse font-bold text-6xl text-[var(--primary)]">Session Manager</h2>
+          <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em]">ADMIN</p>
+          <h2 className="font-muse font-bold text-6xl text-[var(--primary)]">Elections</h2>
         </div>
-        <div className="flex gap-3 flex-wrap">
+        <div className="flex gap-3 flex-wrap items-center">
+          <div className="hidden sm:flex items-center gap-2 px-3.5 py-2.5 bg-[var(--surface-container)] border border-[var(--primary)]/20 shadow-sm">
+            <Shield size={14} className="text-[var(--primary)]" />
+            <div>
+              <span className="font-bold tracking-wider uppercase text-[0.65rem]">{adminProfile.username}</span>
+              <span className="opacity-60 text-[0.6rem] ml-1.5 uppercase font-mono">[{adminProfile.role}]</span>
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => navigate('/admin/new')}
             className="bg-[var(--primary)] text-[var(--on-primary)] px-6 py-3 uppercase text-xs tracking-widest transition-transform duration-200 hover:-translate-y-0.5 shadow-md hover:shadow-lg active:translate-y-0"
           >
-            Create Session
+            New Election
           </button>
           <button
             type="button"
@@ -478,13 +508,22 @@ export default function BlueprintGrid() {
           >
             View Results
           </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            title="Log out"
+            className="border border-red-500/30 text-red-600 dark:text-red-400 px-4 py-3 uppercase text-xs tracking-widest hover:bg-red-500/10 transition-all duration-200 shadow-sm flex items-center gap-1.5"
+          >
+            <LogOut size={14} />
+            <span className="hidden md:inline">Log Out</span>
+          </button>
         </div>
       </div>
 
       <div className="grid grid-cols-12 gap-6">
         <aside className="col-span-12 lg:col-span-4 bg-[var(--surface-container-lowest)] text-[var(--primary)] p-6 shadow-xl">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-muse italic text-3xl">Voting Sessions</h3>
+            <h3 className="font-muse italic text-3xl">Elections</h3>
             <span className="label-md text-[var(--on-surface)] opacity-60">{filteredElections.length}</span>
           </div>
 
@@ -517,14 +556,14 @@ export default function BlueprintGrid() {
                       {item.status}
                     </span>
                   </div>
-                  <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">Session Code: {item.code}</p>
+                  <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">Code: {item.code}</p>
                   <p className="label-md text-[var(--on-surface)] opacity-50 mt-1">
-                    Votes {item.totalVotes || 0} | Real IDs {item.voterCount || 0}
+                    Votes: {item.totalVotes || 0} • Registered: {item.voterCount || 0}
                   </p>
                 </button>
               );
             })}
-            {!filteredElections.length ? <p className="text-sm text-[var(--on-surface)] opacity-60">No sessions for this filter.</p> : null}
+            {!filteredElections.length ? <p className="text-sm text-[var(--on-surface)] opacity-60">No elections found.</p> : null}
           </div>
         </aside>
 
@@ -532,7 +571,7 @@ export default function BlueprintGrid() {
           <div className="bg-[var(--surface-container-lowest)] text-[var(--primary)] p-6 shadow-xl">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="label-md text-[var(--on-surface)] opacity-60">Selected Session</p>
+                <p className="label-md text-[var(--on-surface)] opacity-60">Election Details</p>
                 <h3 className="font-muse italic text-4xl">{selectedElection ? selectedElection.title : 'None selected'}</h3>
                 <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">Code: {selectedElection?.code || '-'}</p>
                 <p className="label-md text-[var(--on-surface)] opacity-60 mt-1">Ends: {selectedElection?.end_date ? new Date(selectedElection.end_date).toLocaleString() : 'Not scheduled'}</p>
@@ -550,7 +589,7 @@ export default function BlueprintGrid() {
             {error ? <p className="label-md text-black mt-4 dark:text-red-100">{error}</p> : null}
 
             <div className="mt-5 border-t border-[var(--outline-variant)] pt-4">
-              <p className="label-md text-[var(--on-surface)] opacity-60 mb-3">Extend Voting End Time</p>
+              <p className="label-md text-[var(--on-surface)] opacity-60 mb-3">Extend End Time</p>
               <div className="flex flex-wrap gap-2 mb-3">
                 <button type="button" onClick={() => handleExtendEndTime(5 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50">+5 min</button>
                 <button type="button" onClick={() => handleExtendEndTime(15 * 60 * 1000)} disabled={!selectedElection || !!busyAction} className="border border-[var(--outline-variant)] px-3 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] disabled:opacity-50">+15 min</button>
@@ -578,7 +617,7 @@ export default function BlueprintGrid() {
             </div>
 
             <div className="mt-5 border-t border-[var(--outline-variant)] pt-4">
-              <p className="label-md text-[var(--on-surface)] opacity-60 mb-3">Maximum Voters</p>
+              <p className="label-md text-[var(--on-surface)] opacity-60 mb-3">Voter Limit</p>
               <div className="flex flex-col md:flex-row gap-2 md:items-center">
                 <input
                   type="number"
@@ -606,12 +645,12 @@ export default function BlueprintGrid() {
           </div>
 
           <div className="bg-[var(--surface-container-lowest)] text-[var(--primary)] p-6 shadow-xl">
-            <h4 className="font-muse italic text-3xl mb-4">Integrity Console</h4>
+            <h4 className="font-muse italic text-3xl mb-4">Integrity & Audit</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Total Votes</p><p className="text-3xl font-bold">{integrity?.totalVotes || 0}</p></div>
               <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Real Votes</p><p className="text-3xl font-bold text-green-700">{integrity?.realVotes || 0}</p></div>
-              <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Fake Votes</p><p className="text-3xl font-bold text-red-700">{integrity?.fakeVotes || 0}</p></div>
-              <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Validity</p><p className={`text-2xl font-bold ${integrity?.integrityStatus === 'clean' ? 'text-green-700' : 'text-red-700'}`}>{integrity?.integrityStatus === 'clean' ? 'CLEAN' : 'RIGGED'}</p></div>
+              <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Simulated Votes</p><p className="text-3xl font-bold text-red-700">{integrity?.fakeVotes || 0}</p></div>
+              <div className="border border-[var(--outline-variant)] p-4"><p className="label-md text-[var(--on-surface)] opacity-60">Status</p><p className={`text-2xl font-bold ${integrity?.integrityStatus === 'clean' ? 'text-green-700' : 'text-red-700'}`}>{integrity?.integrityStatus === 'clean' ? 'CLEAN' : 'DISCREPANCY'}</p></div>
             </div>
 
             <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -619,20 +658,20 @@ export default function BlueprintGrid() {
                 <div key={item.id} className="border border-[var(--outline-variant)] p-4">
                   <div className="flex justify-between items-center">
                     <p className="font-semibold">{item.name}</p>
-                    {item.fakeVotes > 0 ? <span className="text-[0.6rem] uppercase tracking-widest text-red-700">rigged</span> : <span className="text-[0.6rem] uppercase tracking-widest text-green-700">valid</span>}
+                    {item.fakeVotes > 0 ? <span className="text-[0.6rem] uppercase tracking-widest text-red-700">discrepancy</span> : <span className="text-[0.6rem] uppercase tracking-widest text-green-700">clean</span>}
                   </div>
-                  <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">Real: {item.realVotes} | Fake: {item.fakeVotes} | Total: {item.totalVotes}</p>
+                  <p className="label-md text-[var(--on-surface)] opacity-60 mt-2">Real: {item.realVotes} | Simulated: {item.fakeVotes} | Total: {item.totalVotes}</p>
                 </div>
               ))}
             </div>
 
-            <p className="label-md text-[var(--on-surface)] opacity-60 mt-4">Fake voter records tracked: {fakeVoterAudit.length}</p>
+            <p className="label-md text-[var(--on-surface)] opacity-60 mt-4">Simulated voter records: {fakeVoterAudit.length}</p>
           </div>
 
           <div className="bg-[var(--surface-container-lowest)] text-[var(--primary)] p-6 shadow-xl">
-            <h4 className="font-muse italic text-3xl mb-4">Injection Controls</h4>
+            <h4 className="font-muse italic text-3xl mb-4">Simulate Votes</h4>
             <p className="text-sm text-[var(--on-surface)] opacity-80 mb-5">
-              Set an exact number of votes to inject. Use quick-step buttons for larger stress tests.
+              Simulate test votes to test live tallies and UI updates.
             </p>
 
             <div className="mb-6 border border-[var(--outline-variant)] p-4">
@@ -680,7 +719,7 @@ export default function BlueprintGrid() {
                     </button>
                   </div>
                   <p className="label-md text-[var(--on-surface)] opacity-60 mt-1">Current votes: {candidate.votes}</p>
-                  <label className="label-md text-[var(--on-surface)] opacity-60 mt-3 block">Inject Count</label>
+                  <label className="label-md text-[var(--on-surface)] opacity-60 mt-3 block">Vote Count</label>
                   <input
                     type="number"
                     min="1"
@@ -717,7 +756,7 @@ export default function BlueprintGrid() {
                     disabled={!!busyAction}
                     className="mt-3 bg-[var(--primary)] text-[var(--on-primary)] w-full py-2 uppercase text-xs tracking-widest transition-all duration-200 hover:-translate-y-0.5 shadow-sm hover:shadow-md active:translate-y-0 disabled:opacity-50"
                   >
-                    Inject
+                    Simulate Votes
                   </button>
                 </div>
               ))}

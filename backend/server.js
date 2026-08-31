@@ -54,11 +54,14 @@ app.get('*', (req, res) => {
 
 async function startServer() {
     try {
-        if (!ADMIN_MASTER_KEY) {
-            throw new Error('Missing required ADMIN_MASTER_KEY environment variable');
+        await db.initializeDatabase();
+        
+        const adminCount = await db.countAdmins();
+        if (adminCount === 0 && ADMIN_MASTER_KEY) {
+            console.log('Bootstrapping initial admin account from ADMIN_MASTER_KEY...');
+            await db.createAdmin('admin', 'admin@votingsystem.local', ADMIN_MASTER_KEY, 'super_admin');
         }
 
-        await db.initializeDatabase();
         await ensureDefaultElection(db);
         console.log('Database initialized');
 

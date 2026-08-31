@@ -90,6 +90,28 @@ export function getResults(electionId) {
   return request(`/api/elections/${electionId}/results`);
 }
 
+export function getAdminSetupStatus() {
+  return request('/api/admin/setup-status');
+}
+
+export function setupInitialAdmin(payload) {
+  return request('/api/admin/setup', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function adminLogin(payload) {
+  return request('/api/admin/login', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getAdminProfile() {
+  return request('/api/admin/me');
+}
+
 export function getAdminElections() {
   return request('/api/admin/elections');
 }

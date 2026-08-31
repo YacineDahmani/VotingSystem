@@ -1,28 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Shield } from 'lucide-react';
-import { submitIdentity, validateElectionCode } from '../../lib/api';
+import { ArrowRight, Sparkles } from 'lucide-react';
+import { adminLogin, getAdminSetupStatus, setupInitialAdmin, submitIdentity, validateElectionCode } from '../../lib/api';
 import { clearSession, getSession, getVoterPhase, isAdminSession, isVoterSession, setSession } from '../../store/session';
 
 const SESSION_STATUS_COPY = {
   open: {
     label: 'OPEN',
-    detail: 'Voting is currently active. You can vote.',
+    detail: 'Voting is open.',
     badgeClass: 'bg-emerald-500/15 text-emerald-700',
   },
   waiting: {
     label: 'WAITING',
-    detail: 'This session is not open yet.',
+    detail: 'Voting has not started yet.',
     badgeClass: 'bg-amber-500/15 text-amber-700',
   },
   closed: {
     label: 'CLOSED',
-    detail: 'This session has ended. You can view results.',
+    detail: 'Voting has ended.',
     badgeClass: 'bg-rose-500/15 text-rose-700',
   },
   invalid: {
     label: 'INVALID',
-    detail: 'Session code not found. Check and try again.',
+    detail: 'Session code not found.',
     badgeClass: 'bg-slate-500/15 text-slate-700',
   },
 };
@@ -34,7 +34,17 @@ export default function IdentityArchive() {
   const [birthdate, setBirthdate] = useState('');
   const [voterIdCode, setVoterIdCode] = useState('');
   const [sessionCode, setSessionCode] = useState('');
-  const [adminKey, setAdminKey] = useState('');
+  
+  // Admin Authentication State
+  const [adminIdentifier, setAdminIdentifier] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isSetupMode, setIsSetupMode] = useState(false);
+  const [setupUsername, setSetupUsername] = useState('');
+  const [setupEmail, setSetupEmail] = useState('');
+  const [setupPassword, setSetupPassword] = useState('');
+  const [setupConfirmPassword, setSetupConfirmPassword] = useState('');
+  const [setupChecked, setSetupChecked] = useState(false);
+
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -134,30 +144,30 @@ export default function IdentityArchive() {
   const steps = useMemo(() => ([
     {
       label: 'SESSION CODE',
-      placeholder: 'ENTER VOTING SESSION CODE',
+      placeholder: '8-CHARACTER CODE',
       value: sessionCode,
       onChange: setSessionCode,
       type: 'text',
       maxLength: 8,
     },
     {
-      label: 'NAME',
-      placeholder: 'ENTER FULL NAME',
+      label: 'FULL NAME',
+      placeholder: 'YOUR FULL NAME',
       value: name,
       onChange: setName,
       type: 'text',
       maxLength: 100,
     },
     {
-      label: 'BIRTHDATE',
+      label: 'DATE OF BIRTH',
       placeholder: '',
       value: birthdate,
       onChange: handleBirthdateChange,
       type: 'date',
     },
     {
-      label: 'VOTER ID CODE',
-      placeholder: 'ENTER YOUR VOTER ID CODE',
+      label: 'VOTER ID',
+      placeholder: 'YOUR VOTER ID',
       value: voterIdCode,
       onChange: setVoterIdCode,
       type: 'text',
@@ -375,29 +385,96 @@ export default function IdentityArchive() {
     }
   };
 
+  useEffect(() => {
+    const checkSetup = async () => {
+      try {
+        const res = await getAdminSetupStatus();
+        setIsSetupMode(!res.isInitialized);
+        setSetupChecked(true);
+      } catch {
+        setSetupChecked(true);
+      }
+    };
+    checkSetup();
+  }, []);
+
   const handleAdminAccess = async () => {
     if (isSubmitting) return;
 
-    const normalizedAdminKey = adminKey.trim();
-    if (!normalizedAdminKey) {
-      triggerSnag('Admin master key is required for admin access.');
+    if (isSetupMode) {
+      const u = setupUsername.trim();
+      const e = setupEmail.trim();
+      const p = setupPassword;
+      const cp = setupConfirmPassword;
+
+      if (!u || u.length < 3) {
+        triggerSnag('Username must be at least 3 characters.');
+        return;
+      }
+      if (!e || !e.includes('@')) {
+        triggerSnag('A valid email address is required.');
+        return;
+      }
+      if (!p || p.length < 6) {
+        triggerSnag('Password must be at least 6 characters.');
+        return;
+      }
+      if (p !== cp) {
+        triggerSnag('Passwords do not match.');
+        return;
+      }
+
+      setIsSubmitting(true);
+      try {
+        const result = await setupInitialAdmin({ username: u, email: e, password: p });
+        clearSession();
+        setSession({
+          role: 'admin',
+          token: result.token,
+          adminId: result.admin?.id,
+          adminUsername: result.admin?.username,
+          adminEmail: result.admin?.email,
+          adminRole: result.admin?.role,
+        });
+        setIsFlipping(true);
+        setTimeout(() => navigate('/admin'), 600);
+      } catch (err) {
+        triggerSnag(err.message || 'Failed to initialize administrator account.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    const idVal = adminIdentifier.trim();
+    const passVal = adminPassword;
+
+    if (!idVal && !passVal) {
+      triggerSnag('Admin username and password are required.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const result = await submitIdentity({ adminKey: normalizedAdminKey });
+      const result = await adminLogin({ identifier: idVal, password: passVal });
 
-      if (result.role !== 'admin') {
+      if (!result.token) {
         throw new Error('Admin authentication failed.');
       }
 
       clearSession();
-      setSession({ role: 'admin', token: result.token });
+      setSession({
+        role: 'admin',
+        token: result.token,
+        adminId: result.admin?.id,
+        adminUsername: result.admin?.username,
+        adminEmail: result.admin?.email,
+        adminRole: result.admin?.role,
+      });
       setIsFlipping(true);
       setTimeout(() => navigate('/admin'), 600);
     } catch (err) {
-      triggerSnag(err.message || 'Unable to verify admin key.');
+      triggerSnag(err.message || 'Invalid admin credentials.');
     } finally {
       setIsSubmitting(false);
     }
@@ -438,8 +515,8 @@ export default function IdentityArchive() {
       {/* Main Content */}
       <div className="relative z-10 w-full max-w-2xl flex flex-col items-center mt-12">
         <div className="text-center mb-8">
-          <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em] font-bold text-[0.65rem]">VERIFICATION PHASE</p>
-          <h2 className="font-muse text-[2.5rem] md:text-5xl text-[var(--on-surface)]">Identity Archive</h2>
+          <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em] font-bold text-[0.65rem]">VOTER VERIFICATION</p>
+          <h2 className="font-muse text-[2.5rem] md:text-5xl text-[var(--on-surface)]">Sign In</h2>
         </div>
 
         <div
@@ -459,7 +536,7 @@ export default function IdentityArchive() {
                 className={`uppercase text-[0.65rem] tracking-[0.2em] pb-1 border-b-2 transition-all duration-300 ${entryMode === 'voter' ? 'text-[var(--on-surface)] border-[var(--on-surface)] font-bold' : 'text-[var(--on-surface)] opacity-50 border-transparent hover:text-[var(--on-surface)] opacity-80'}`}
                 disabled={isSubmitting}
               >
-                Voter Entry
+                Voter
               </button>
               <button
                 type="button"
@@ -470,14 +547,14 @@ export default function IdentityArchive() {
                 className={`uppercase text-[0.65rem] tracking-[0.2em] pb-1 border-b-2 transition-all duration-300 ${entryMode === 'admin' ? 'text-[var(--on-surface)] border-[var(--on-surface)] font-bold' : 'text-[var(--on-surface)] opacity-50 border-transparent hover:text-[var(--on-surface)] opacity-80'}`}
                 disabled={isSubmitting}
               >
-                Admin Entry
+                Admin
               </button>
             </div>
 
             {entryMode === 'voter' && sessionStatus.isLoaded ? (
               <div className="w-full bg-[var(--surface-container)]/75 border border-black/10 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="uppercase text-[0.58rem] tracking-[0.2em] text-[var(--on-surface)] opacity-60">Election Session</p>
+                  <p className="uppercase text-[0.58rem] tracking-[0.2em] text-[var(--on-surface)] opacity-60">Session</p>
                   <span className={`px-2 py-1 text-[0.55rem] uppercase tracking-[0.18em] font-semibold ${statusMeta.badgeClass}`}>
                     {statusMeta.label}
                   </span>
@@ -488,12 +565,12 @@ export default function IdentityArchive() {
                 {sessionStatus.electionTitle ? (
                   <p className="mt-1 text-[0.58rem] uppercase tracking-[0.14em] text-[var(--on-surface)] opacity-60">
                     {sessionStatus.electionTitle}
-                    {sessionStatus.electionCode ? ` / CODE ${sessionStatus.electionCode}` : ''}
+                    {sessionStatus.electionCode ? ` / ${sessionStatus.electionCode}` : ''}
                   </p>
                 ) : (
                   sessionStatus.electionCode ? (
                     <p className="mt-1 text-[0.58rem] uppercase tracking-[0.14em] text-[var(--on-surface)] opacity-60">
-                      CODE {sessionStatus.electionCode}
+                      {sessionStatus.electionCode}
                     </p>
                   ) : null
                 )}
@@ -527,7 +604,7 @@ export default function IdentityArchive() {
               </div>
 
               <div className="w-full flex items-center justify-between mb-6 h-4 relative z-20">
-                <p className="uppercase text-[0.6rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50">STEP {stepIndex + 1}</p>
+                <p className="uppercase text-[0.6rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50">STEP {stepIndex + 1} OF {steps.length}</p>
                 {error ? <p className="uppercase text-[0.6rem] tracking-[0.1em] text-red-600 absolute right-0 bg-[var(--surface-container-lowest)]/90 pl-2">{error}</p> : null}
               </div>
 
@@ -539,7 +616,7 @@ export default function IdentityArchive() {
                     disabled={isSubmitting}
                     className="mr-auto text-[0.65rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-50 hover:text-[var(--on-surface)] transition-colors"
                   >
-                    Previous
+                    Back
                   </button>
                 )}
 
@@ -549,25 +626,77 @@ export default function IdentityArchive() {
                   className="group bg-[var(--primary)] text-[var(--on-primary)] px-6 py-4 flex items-center gap-4 transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
                 >
                   <span className="text-[0.65rem] uppercase tracking-[0.2em]">
-                    {isSubmitting ? 'VERIFYING' : stepIndex < steps.length - 1 ? 'NEXT SEQUENCE' : 'ENTER CHAMBER'}
+                    {isSubmitting ? 'VERIFYING...' : stepIndex < steps.length - 1 ? 'NEXT' : 'CONTINUE'}
                   </span>
                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
             </>
-          ) : (
+          ) : isSetupMode ? (
             <>
-              <div className="w-full mb-6 relative z-20">
-                <label className="uppercase text-[0.6rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-3 block">ADMIN MASTER KEY</label>
-                <input
-                  type="password"
-                  placeholder="ENTER ADMIN MASTER KEY"
-                  className="w-full p-4 text-xl tracking-widest font-muse uppercase bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/50 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors border-none"
-                  value={adminKey}
-                  onChange={(event) => setAdminKey(event.target.value)}
-                  onKeyDown={handleKeyDown}
-                  disabled={isSubmitting}
-                />
+              <div className="w-full mb-4 relative z-20 bg-[var(--surface-container)]/80 border border-[var(--primary)]/20 p-4">
+                <div className="flex items-center gap-2 mb-1 text-[var(--primary)]">
+                  <Sparkles size={14} />
+                  <p className="uppercase text-[0.62rem] tracking-[0.2em] font-bold">Admin Setup</p>
+                </div>
+                <p className="text-[0.65rem] text-[var(--on-surface)] opacity-70">
+                  Create an administrator account to manage elections.
+                </p>
+              </div>
+
+              <div className="w-full space-y-4 mb-6 relative z-20">
+                <div>
+                  <label className="uppercase text-[0.58rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-1.5 block">USERNAME</label>
+                  <input
+                    type="text"
+                    placeholder="USERNAME"
+                    className="w-full p-3.5 text-base tracking-widest font-muse uppercase bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/40 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors"
+                    value={setupUsername}
+                    onChange={(e) => setSetupUsername(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="uppercase text-[0.58rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-1.5 block">EMAIL</label>
+                  <input
+                    type="email"
+                    placeholder="EMAIL ADDRESS"
+                    className="w-full p-3.5 text-base tracking-widest font-muse bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/40 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors"
+                    value={setupEmail}
+                    onChange={(e) => setSetupEmail(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="uppercase text-[0.58rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-1.5 block">PASSWORD</label>
+                    <input
+                      type="password"
+                      placeholder="MIN 6 CHARACTERS"
+                      className="w-full p-3.5 text-base tracking-widest font-muse bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/40 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors"
+                      value={setupPassword}
+                      onChange={(e) => setSetupPassword(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div>
+                    <label className="uppercase text-[0.58rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-1.5 block">CONFIRM PASSWORD</label>
+                    <input
+                      type="password"
+                      placeholder="REPEAT PASSWORD"
+                      className="w-full p-3.5 text-base tracking-widest font-muse bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/40 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors"
+                      value={setupConfirmPassword}
+                      onChange={(e) => setSetupConfirmPassword(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="w-full flex justify-end h-4 mb-6 relative z-20">
@@ -582,22 +711,61 @@ export default function IdentityArchive() {
                   className="group bg-[var(--primary)] text-[var(--on-primary)] px-6 py-4 flex items-center gap-4 transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
                 >
                   <span className="text-[0.65rem] uppercase tracking-[0.2em] text-[var(--on-primary)]">
-                    {isSubmitting ? 'VERIFYING' : 'ENTER CHAMBER'}
+                    {isSubmitting ? 'CREATING...' : 'CREATE ACCOUNT'}
+                  </span>
+                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-full space-y-4 mb-6 relative z-20">
+                <div>
+                  <label className="uppercase text-[0.6rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-2 block">USERNAME OR EMAIL</label>
+                  <input
+                    type="text"
+                    placeholder="ENTER USERNAME OR EMAIL"
+                    className="w-full p-4 text-lg tracking-widest font-muse bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/50 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors border-none"
+                    value={adminIdentifier}
+                    onChange={(event) => setAdminIdentifier(event.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="uppercase text-[0.6rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-2 block">PASSWORD</label>
+                  <input
+                    type="password"
+                    placeholder="ENTER PASSWORD"
+                    className="w-full p-4 text-lg tracking-widest font-muse bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/50 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors border-none"
+                    value={adminPassword}
+                    onChange={(event) => setAdminPassword(event.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+
+              <div className="w-full flex justify-end h-4 mb-6 relative z-20">
+                {error ? <p className="uppercase text-[0.6rem] tracking-[0.1em] text-red-600">{error}</p> : null}
+              </div>
+
+              <div className="w-full flex justify-end relative z-20">
+                <button
+                  type="button"
+                  onClick={handleAdminAccess}
+                  disabled={isSubmitting}
+                  className="group bg-[var(--primary)] text-[var(--on-primary)] px-6 py-4 flex items-center gap-4 transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+                >
+                  <span className="text-[0.65rem] uppercase tracking-[0.2em] text-[var(--on-primary)]">
+                    {isSubmitting ? 'SIGNING IN...' : 'SIGN IN'}
                   </span>
                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
             </>
           )}
-        </div>
-
-        {/* Footer Meta */}
-        <div className="w-full max-w-xl flex justify-between items-center mt-6 text-[var(--on-surface)] opacity-50 z-10 pl-2">
-          <div className="flex items-center gap-2">
-            <Shield size={12} className="text-[var(--on-surface)] opacity-50" />
-            <span className="text-[0.55rem] uppercase tracking-[0.2em]">PROTOCOL SECURED</span>    
-          </div>
-          <span className="text-[0.55rem] uppercase tracking-[0.2em]">SERIAL: A-2949-V01</span>    
         </div>
       </div>
     </div>

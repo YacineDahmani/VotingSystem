@@ -173,15 +173,58 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
 
             const normalizedAdminKey = typeof adminKey === 'string'
                 ? adminKey.trim()
-                : (typeof code === 'string' ? code.trim() : '');
+                : (typeof req.body.password === 'string' ? req.body.password.trim() : '');
+            const adminIdentifier = typeof req.body.username === 'string'
+                ? req.body.username.trim()
+                : (typeof req.body.identifier === 'string' ? req.body.identifier.trim() : '');
 
-            if (normalizedAdminKey) {
-                if (normalizedAdminKey === adminMasterKey) {
-                    const token = issueAuthToken({ role: 'admin' });
-                    return res.json({ role: 'admin', success: true, token });
+            if (normalizedAdminKey || adminIdentifier) {
+                if (adminIdentifier && normalizedAdminKey) {
+                    const verifiedAdmin = await db.verifyAdminCredentials(adminIdentifier, normalizedAdminKey);
+                    if (verifiedAdmin) {
+                        await db.updateAdminLastLogin(verifiedAdmin.id);
+                        const token = issueAuthToken({
+                            role: 'admin',
+                            adminId: verifiedAdmin.id,
+                            username: verifiedAdmin.username,
+                            email: verifiedAdmin.email,
+                            adminRole: verifiedAdmin.role,
+                        });
+                        return res.json({ role: 'admin', success: true, token, admin: verifiedAdmin });
+                    }
                 }
 
-                return res.status(401).json({ error: 'Wrong admin key' });
+                if (normalizedAdminKey && adminMasterKey && normalizedAdminKey === adminMasterKey) {
+                    const token = issueAuthToken({
+                        role: 'admin',
+                        adminId: 0,
+                        username: 'MasterAdmin',
+                        email: 'admin@system.local',
+                        adminRole: 'super_admin',
+                    });
+                    return res.json({ role: 'admin', success: true, token, admin: { username: 'MasterAdmin', role: 'super_admin' } });
+                }
+
+                const adminCount = await db.countAdmins();
+                if (adminCount === 1 && normalizedAdminKey) {
+                    const firstAdmin = await db.getAdminById(1);
+                    if (firstAdmin) {
+                        const verified = await db.verifyAdminCredentials(firstAdmin.username, normalizedAdminKey);
+                        if (verified) {
+                            await db.updateAdminLastLogin(verified.id);
+                            const token = issueAuthToken({
+                                role: 'admin',
+                                adminId: verified.id,
+                                username: verified.username,
+                                email: verified.email,
+                                adminRole: verified.role,
+                            });
+                            return res.json({ role: 'admin', success: true, token, admin: verified });
+                        }
+                    }
+                }
+
+                return res.status(401).json({ error: 'Invalid admin credentials' });
             }
 
             const normalizedSessionCode = typeof sessionCode === 'string' ? sessionCode.trim().toUpperCase() : '';
@@ -452,7 +495,7 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 notification: {
                     type: 'success',
                     title: 'Vote Registered',
-                    body: `Your vote for ${candidate.name} has been securely recorded.`,
+                    body: `Your vote for ${candidate.name} has been recorded.`,
                 },
             });
         } catch (err) {

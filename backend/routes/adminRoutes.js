@@ -268,22 +268,180 @@ function buildElectionSignature({ title, description, startDate, endDate, candid
 function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionUpdate, adminMasterKey }) {
     const router = express.Router();
 
-    router.post('/login', async (req, res) => {
+    router.get('/setup-status', async (req, res) => {
         try {
-            const { password } = req.body;
+            const adminCount = await db.countAdmins();
+            return res.json({
+                isInitialized: adminCount > 0,
+                adminCount,
+            });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
 
-            if (password === adminMasterKey) {
-                const token = issueAuthToken({ role: 'admin' });
-                return res.json({ success: true, message: 'Admin authenticated', token });
+    router.post('/setup', async (req, res) => {
+        try {
+            const adminCount = await db.countAdmins();
+            if (adminCount > 0) {
+                return res.status(403).json({ error: 'System has already been initialized with an administrator.' });
             }
 
-            return res.status(401).json({ error: 'Wrong password' });
+            const { username, email, password } = req.body;
+
+            const normalizedUsername = normalizeText(username);
+            const normalizedEmail = normalizeText(email).toLowerCase();
+            const rawPassword = typeof password === 'string' ? password : '';
+
+            if (!normalizedUsername || normalizedUsername.length < 3) {
+                return res.status(400).json({ error: 'Username must be at least 3 characters long.' });
+            }
+
+            if (!normalizedEmail || !normalizedEmail.includes('@')) {
+                return res.status(400).json({ error: 'A valid email address is required.' });
+            }
+
+            if (!rawPassword || rawPassword.length < 6) {
+                return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+            }
+
+            const admin = await db.createAdmin(normalizedUsername, normalizedEmail, rawPassword, 'super_admin');
+            await db.updateAdminLastLogin(admin.id);
+
+            const token = issueAuthToken({
+                role: 'admin',
+                adminId: admin.id,
+                username: admin.username,
+                email: admin.email,
+                adminRole: admin.role,
+            });
+
+            return res.json({
+                success: true,
+                message: 'Super Admin initialized successfully',
+                admin: {
+                    id: admin.id,
+                    username: admin.username,
+                    email: admin.email,
+                    role: admin.role,
+                },
+                token,
+            });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.post('/login', async (req, res) => {
+        try {
+            const { identifier, username, email, password } = req.body;
+            const loginIdentifier = normalizeText(identifier || username || email);
+            const loginPassword = typeof password === 'string' ? password : '';
+
+            if (!loginPassword) {
+                return res.status(400).json({ error: 'Password is required' });
+            }
+
+            // 1. Try DB-backed authentication if identifier is provided
+            if (loginIdentifier) {
+                const admin = await db.verifyAdminCredentials(loginIdentifier, loginPassword);
+                if (admin) {
+                    await db.updateAdminLastLogin(admin.id);
+                    const token = issueAuthToken({
+                        role: 'admin',
+                        adminId: admin.id,
+                        username: admin.username,
+                        email: admin.email,
+                        adminRole: admin.role,
+                    });
+                    return res.json({
+                        success: true,
+                        message: 'Admin authenticated',
+                        admin,
+                        token,
+                    });
+                }
+            }
+
+            // 2. If no identifier was supplied but password was, or fallback check against single admin
+            const adminCount = await db.countAdmins();
+            if (adminCount === 1 && !loginIdentifier) {
+                // If there's only one admin, allow logging in with just password if valid
+                const singleAdmin = (await db.getAllElections(), await db.getAdminById(1));
+                if (singleAdmin) {
+                    const verified = await db.verifyAdminCredentials(singleAdmin.username, loginPassword);
+                    if (verified) {
+                        await db.updateAdminLastLogin(verified.id);
+                        const token = issueAuthToken({
+                            role: 'admin',
+                            adminId: verified.id,
+                            username: verified.username,
+                            email: verified.email,
+                            adminRole: verified.role,
+                        });
+                        return res.json({
+                            success: true,
+                            message: 'Admin authenticated',
+                            admin: verified,
+                            token,
+                        });
+                    }
+                }
+            }
+
+            // 3. Fallback to ADMIN_MASTER_KEY if configured
+            if (adminMasterKey && loginPassword === adminMasterKey) {
+                const token = issueAuthToken({
+                    role: 'admin',
+                    adminId: 0,
+                    username: 'MasterAdmin',
+                    email: 'admin@system.local',
+                    adminRole: 'super_admin',
+                });
+                return res.json({
+                    success: true,
+                    message: 'Master Admin authenticated',
+                    admin: {
+                        id: 0,
+                        username: 'MasterAdmin',
+                        email: 'admin@system.local',
+                        role: 'super_admin',
+                    },
+                    token,
+                });
+            }
+
+            return res.status(401).json({ error: 'Invalid admin credentials' });
         } catch (err) {
             return res.status(500).json({ error: err.message });
         }
     });
 
     router.use(requireAdminAuth);
+
+    router.get('/me', async (req, res) => {
+        try {
+            const adminId = req.auth?.adminId;
+            if (adminId) {
+                const admin = await db.getAdminById(adminId);
+                if (admin) {
+                    return res.json({ success: true, admin });
+                }
+            }
+
+            return res.json({
+                success: true,
+                admin: {
+                    id: req.auth?.adminId || 0,
+                    username: req.auth?.username || 'Admin',
+                    email: req.auth?.email || '',
+                    role: req.auth?.adminRole || 'admin',
+                },
+            });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
 
     router.get('/elections', async (req, res) => {
         try {

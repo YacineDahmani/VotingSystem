@@ -113,6 +113,20 @@ function initializeDatabase() {
                 )
             `);
 
+            db.run(`
+                CREATE TABLE IF NOT EXISTS admins (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    salt TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'super_admin',
+                    is_active BOOLEAN DEFAULT 1,
+                    last_login_at DATETIME,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
             // Schema Migrations (safely add columns if missing in existing DB)
             const migrations = [
                 'ALTER TABLE elections ADD COLUMN round INTEGER DEFAULT 1',
@@ -1083,6 +1097,111 @@ function addFakeVotes(electionId, candidateId, count) {
     });
 }
 
+function hashPassword(password) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+    return { hash, salt };
+}
+
+function verifyPassword(password, storedHash, salt) {
+    if (!password || !storedHash || !salt) return false;
+    try {
+        const computedHash = crypto.scryptSync(password, salt, 64).toString('hex');
+        const hashBuf = Buffer.from(storedHash, 'hex');
+        const computedBuf = Buffer.from(computedHash, 'hex');
+        if (hashBuf.length !== computedBuf.length) return false;
+        return crypto.timingSafeEqual(hashBuf, computedBuf);
+    } catch {
+        return false;
+    }
+}
+
+function countAdmins() {
+    return new Promise((resolve, reject) => {
+        db.get('SELECT COUNT(*) as count FROM admins', (err, row) => {
+            if (err) reject(err);
+            else resolve(row ? row.count : 0);
+        });
+    });
+}
+
+function createAdmin(username, email, password, role = 'super_admin') {
+    return new Promise((resolve, reject) => {
+        const { hash, salt } = hashPassword(password);
+        db.run(
+            'INSERT INTO admins (username, email, password_hash, salt, role) VALUES (?, ?, ?, ?, ?)',
+            [username.trim(), email.trim().toLowerCase(), hash, salt, role],
+            function (err) {
+                if (err) reject(err);
+                else {
+                    getAdminById(this.lastID)
+                        .then(resolve)
+                        .catch(reject);
+                }
+            }
+        );
+    });
+}
+
+function getAdminById(id) {
+    return new Promise((resolve, reject) => {
+        db.get(
+            'SELECT id, username, email, role, is_active, last_login_at, created_at FROM admins WHERE id = ?',
+            [id],
+            (err, row) => {
+                if (err) reject(err);
+                else resolve(row || null);
+            }
+        );
+    });
+}
+
+function getAdminByUsernameOrEmail(identifier) {
+    return new Promise((resolve, reject) => {
+        const normalized = (identifier || '').trim().toLowerCase();
+        db.get(
+            'SELECT * FROM admins WHERE LOWER(username) = ? OR LOWER(email) = ?',
+            [normalized, normalized],
+            (err, row) => {
+                if (err) reject(err);
+                else resolve(row || null);
+            }
+        );
+    });
+}
+
+async function verifyAdminCredentials(identifier, password) {
+    const admin = await getAdminByUsernameOrEmail(identifier);
+    if (!admin || !admin.is_active) {
+        return null;
+    }
+
+    const isValid = verifyPassword(password, admin.password_hash, admin.salt);
+    if (!isValid) {
+        return null;
+    }
+
+    return {
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        role: admin.role,
+        is_active: admin.is_active,
+        last_login_at: admin.last_login_at,
+        created_at: admin.created_at,
+    };
+}
+
+function updateAdminLastLogin(id) {
+    return new Promise((resolve, reject) => {
+        const now = new Date().toISOString();
+        db.run('UPDATE admins SET last_login_at = ? WHERE id = ?', [now, id], (err) => {
+            if (err) reject(err);
+            else resolve(now);
+        });
+    });
+}
+
 module.exports = {
     db,
     initializeDatabase,
@@ -1090,6 +1209,13 @@ module.exports = {
     // Settings
     getSetting,
     setSetting,
+    // Admin Auth
+    countAdmins,
+    createAdmin,
+    getAdminById,
+    getAdminByUsernameOrEmail,
+    verifyAdminCredentials,
+    updateAdminLastLogin,
     // Elections
     createElection,
     getElectionByCode,
