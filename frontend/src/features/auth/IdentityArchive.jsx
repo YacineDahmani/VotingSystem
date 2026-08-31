@@ -110,6 +110,19 @@ export default function IdentityArchive() {
   });
 
   useEffect(() => {
+    const isTestingVoter = !!(initialUrlCode || searchParams.get('test') === 'voter' || searchParams.get('mode') === 'voter');
+
+    if (isTestingVoter) {
+      try {
+        sessionStorage.removeItem('analog-voting-session');
+      } catch {}
+      setEntryMode('voter');
+      if (initialUrlCode) {
+        setSessionCode(initialUrlCode);
+      }
+      return;
+    }
+
     const currentSession = getSession();
 
     if (isAdminSession(currentSession)) {
@@ -133,7 +146,7 @@ export default function IdentityArchive() {
     }
 
     navigate('/ballot', { replace: true });
-  }, [navigate]);
+  }, [navigate, initialUrlCode, searchParams]);
 
   const statusMeta = SESSION_STATUS_COPY[sessionStatus.state] || SESSION_STATUS_COPY.waiting;
 

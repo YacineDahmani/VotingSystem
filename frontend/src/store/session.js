@@ -28,15 +28,24 @@ function hasElectionEnded(session) {
 
 function readSession() {
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : {};
+    const rawSession = sessionStorage.getItem(SESSION_KEY);
+    if (rawSession) {
+      return JSON.parse(rawSession);
+    }
+    const rawLocal = localStorage.getItem(SESSION_KEY);
+    return rawLocal ? JSON.parse(rawLocal) : {};
   } catch {
     return {};
   }
 }
 
 function writeSession(next) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
+    if (next?.role === 'admin') {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+    }
+  } catch {}
 }
 
 export function getSession() {
@@ -51,7 +60,10 @@ export function setSession(partial) {
 }
 
 export function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
+  } catch {}
 }
 
 export function isAdminSession(session = readSession()) {

@@ -3,10 +3,17 @@ const REQUEST_TIMEOUT_MS = 15000;
 
 function getAuthToken() {
   try {
-    const raw = localStorage.getItem('analog-voting-session');
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed?.token || null;
+    const rawSession = sessionStorage.getItem('analog-voting-session');
+    if (rawSession) {
+      const parsed = JSON.parse(rawSession);
+      if (parsed?.token) return parsed.token;
+    }
+    const rawLocal = localStorage.getItem('analog-voting-session');
+    if (rawLocal) {
+      const parsed = JSON.parse(rawLocal);
+      return parsed?.token || null;
+    }
+    return null;
   } catch {
     return null;
   }

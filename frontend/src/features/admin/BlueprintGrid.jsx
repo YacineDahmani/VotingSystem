@@ -152,7 +152,7 @@ export default function BlueprintGrid() {
 
   const voterJoinUrl = useMemo(() => {
     if (!selectedElection?.code) return '';
-    return `${window.location.origin}/?code=${selectedElection.code}`;
+    return `${window.location.origin}/?code=${selectedElection.code}&test=voter`;
   }, [selectedElection?.code]);
 
   const loadElections = useCallback(async (preferredElectionId = null) => {
