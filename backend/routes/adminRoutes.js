@@ -1,4 +1,5 @@
 const express = require('express');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 function normalizeText(value) {
     return typeof value === 'string' ? value.trim() : '';
@@ -290,6 +291,12 @@ function buildElectionSignature({ title, description, startDate, endDate, candid
 function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionUpdate, adminMasterKey }) {
     const router = express.Router();
 
+    const adminAuthLimiter = createRateLimiter({
+        windowMs: 60 * 1000,
+        max: 20,
+        message: 'Too many administrative authentication attempts. Please wait a minute before retrying.',
+    });
+
     router.get('/setup-status', async (req, res) => {
         try {
             const adminCount = await db.countAdmins();
@@ -302,7 +309,7 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
         }
     });
 
-    router.post('/setup', async (req, res) => {
+    router.post('/setup', adminAuthLimiter, async (req, res) => {
         try {
             const adminCount = await db.countAdmins();
             if (adminCount > 0) {
@@ -355,7 +362,7 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
         }
     });
 
-    router.post('/login', async (req, res) => {
+    router.post('/login', adminAuthLimiter, async (req, res) => {
         try {
             const { identifier, username, email, password } = req.body;
             const loginIdentifier = normalizeText(identifier || username || email);

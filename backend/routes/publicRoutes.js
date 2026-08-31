@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 function parseBirthdate(rawBirthdate) {
     if (typeof rawBirthdate !== 'string' || !rawBirthdate.trim()) {
@@ -119,6 +120,18 @@ function resolveSessionStatus(election) {
 function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, requireVoterAuth, emitElectionUpdate, adminMasterKey }) {
     const router = express.Router();
 
+    const identityLimiter = createRateLimiter({
+        windowMs: 60 * 1000,
+        max: 30,
+        message: 'Too many identity verification attempts. Please wait a minute before retrying.',
+    });
+
+    const voteLimiter = createRateLimiter({
+        windowMs: 60 * 1000,
+        max: 30,
+        message: 'Too many vote requests submitted from this IP. Please wait a minute.',
+    });
+
     router.get('/status', async (req, res) => {
         try {
             res.json({
@@ -161,7 +174,7 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
         }
     });
 
-    router.post('/session/identity', async (req, res) => {
+    router.post('/session/identity', identityLimiter, async (req, res) => {
         try {
             const {
                 name,
@@ -341,7 +354,7 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 sessionCode: election.code,
                 hasVoted,
                 phase,
-                selectedCandidateId: voterProgress?.voted_candidate_id || null,
+                selectedCandidateId: null,
                 votedAt: voterProgress?.voted_at || null,
             });
         } catch (err) {
@@ -442,7 +455,7 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
         }
     });
 
-    router.post('/elections/:id/vote', requireVoterAuth, async (req, res) => {
+    router.post('/elections/:id/vote', voteLimiter, requireVoterAuth, async (req, res) => {
         try {
             const electionId = Number.parseInt(req.params.id, 10);
             const { candidateId } = req.body;
@@ -484,14 +497,14 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 return res.status(403).json({ error: 'Election has ended' });
             }
 
-            await db.recordVote(electionId, voterId, candidateId);
-            const results = await emitElectionUpdate(electionId, 'vote:kick');
-
             const rawHash = crypto.createHash('sha256')
-                .update(`${electionId}:${voterId}:${Date.now()}:${crypto.randomBytes(8).toString('hex')}`)
+                .update(`${electionId}:${voterId}:${Date.now()}:${crypto.randomBytes(16).toString('hex')}`)
                 .digest('hex')
                 .toUpperCase();
             const receiptCode = `SWISS-${rawHash.slice(0, 4)}-${rawHash.slice(4, 8)}-${rawHash.slice(8, 12)}`;
+
+            await db.recordVote(electionId, voterId, candidateId, receiptCode);
+            const results = await emitElectionUpdate(electionId, 'vote:kick');
 
             return res.json({
                 success: true,
@@ -513,6 +526,34 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
             });
         } catch (err) {
             return res.status(400).json({ error: err.message });
+        }
+    });
+
+    router.get('/elections/:id/receipts/:receiptCode', async (req, res) => {
+        try {
+            const electionId = Number.parseInt(req.params.id, 10);
+            const receiptCode = (req.params.receiptCode || '').trim().toUpperCase();
+
+            if (Number.isNaN(electionId) || !receiptCode) {
+                return res.status(400).json({ error: 'Election ID and receipt code are required.' });
+            }
+
+            const verification = await db.verifyReceipt(electionId, receiptCode);
+            if (!verification) {
+                return res.status(404).json({
+                    verified: false,
+                    error: 'Receipt not found or invalid for this election.',
+                });
+            }
+
+            return res.json({
+                verified: true,
+                receiptCode: verification.receiptCode,
+                recordedAt: verification.recordedAt,
+                message: 'Ballot receipt cryptographically verified as recorded.',
+            });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
         }
     });
 

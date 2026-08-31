@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -14,15 +15,24 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: '*'
+        origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*'
     }
 });
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-local-jwt-secret-change-me';
+
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'dev-local-jwt-secret-change-me') {
+    console.warn('[SECURITY WARNING] Running in production with default insecure JWT_SECRET. Set JWT_SECRET environment variable immediately.');
+}
+
 const ADMIN_MASTER_KEY = process.env.ADMIN_MASTER_KEY;
 const auth = createAuthMiddleware(JWT_SECRET);
 const emitElectionUpdate = createElectionEmitter({ io, db });
 
+app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+}));
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend/dist')));

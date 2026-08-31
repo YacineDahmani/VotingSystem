@@ -136,7 +136,8 @@ function initializeDatabase() {
                 'ALTER TABLE voters ADD COLUMN birthdate TEXT',
                 'ALTER TABLE voters ADD COLUMN has_voted BOOLEAN DEFAULT 0',
                 'ALTER TABLE voters ADD COLUMN voted_candidate_id INTEGER',
-                'ALTER TABLE voters ADD COLUMN voted_at DATETIME'
+                'ALTER TABLE voters ADD COLUMN voted_at DATETIME',
+                'ALTER TABLE votes ADD COLUMN receipt_code TEXT'
             ];
 
             migrations.forEach(query => {
@@ -658,11 +659,11 @@ function updateVoterIdentity(voterId, name, age, birthdate) {
     });
 }
 
-function setVoterVoteState(voterId, candidateId, votedAt = new Date().toISOString()) {
+function setVoterVoteState(voterId, candidateId = null, votedAt = new Date().toISOString()) {
     return new Promise((resolve, reject) => {
         db.run(
-            'UPDATE voters SET has_voted = 1, voted_candidate_id = ?, voted_at = ? WHERE id = ?',
-            [candidateId, votedAt, voterId],
+            'UPDATE voters SET has_voted = 1, voted_candidate_id = NULL, voted_at = ? WHERE id = ?',
+            [votedAt, voterId],
             function (err) {
                 if (err) reject(err);
                 else resolve(this.changes > 0);
@@ -677,7 +678,6 @@ function getVoterProgress(voterId, electionId) {
             `SELECT
                 v.id,
                 v.has_voted,
-                v.voted_candidate_id,
                 v.voted_at,
                 e.status AS election_status
              FROM voters v
@@ -719,7 +719,7 @@ function getVoterByIdAndElection(voterId, electionId) {
     });
 }
 
-function recordVote(electionId, voterId, candidateId) {
+function recordVote(electionId, voterId, candidateId, receiptCode = null) {
     return new Promise(async (resolve, reject) => {
         try {
             const alreadyVoted = await hasVoted(electionId, voterId);
@@ -728,8 +728,8 @@ function recordVote(electionId, voterId, candidateId) {
             }
 
             db.run(
-                'INSERT INTO votes (election_id, voter_id, candidate_id) VALUES (?, ?, ?)',
-                [electionId, voterId, candidateId],
+                'INSERT INTO votes (election_id, voter_id, candidate_id, receipt_code) VALUES (?, ?, ?, ?)',
+                [electionId, voterId, candidateId, receiptCode],
                 async function (err) {
                     if (err) {
                         if (err.message.includes('UNIQUE constraint failed')) {
@@ -739,14 +739,27 @@ function recordVote(electionId, voterId, candidateId) {
                         }
                     } else {
                         await incrementVote(candidateId);
-                        await setVoterVoteState(voterId, candidateId);
-                        resolve({ voteId: this.lastID });
+                        await setVoterVoteState(voterId, null);
+                        resolve({ voteId: this.lastID, receiptCode });
                     }
                 }
             );
         } catch (err) {
             reject(err);
         }
+    });
+}
+
+function verifyReceipt(electionId, receiptCode) {
+    return new Promise((resolve, reject) => {
+        db.get(
+            'SELECT election_id, created_at, receipt_code FROM votes WHERE election_id = ? AND receipt_code = ? LIMIT 1',
+            [electionId, receiptCode],
+            (err, row) => {
+                if (err) reject(err);
+                else resolve(row ? { valid: true, recordedAt: row.created_at, receiptCode: row.receipt_code } : null);
+            }
+        );
     });
 }
 
@@ -1249,6 +1262,7 @@ module.exports = {
     getVoterByIdAndElection,
     hasVoted,
     recordVote,
+    verifyReceipt,
     countRealVoters,
     getAgeGroupStats,
     // Results & Fraud
