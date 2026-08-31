@@ -6,6 +6,8 @@ dist/
 build/
 *.log
 .env.*
+docs/
 frontend/.vite/
 backend/.cache/
 .txt
+context.md
