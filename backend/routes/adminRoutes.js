@@ -9,6 +9,28 @@ function normalizeNullableText(value) {
     return normalized ? normalized : null;
 }
 
+function validatePasswordStrength(password) {
+    if (!password || typeof password !== 'string') {
+        return { valid: false, error: 'Password is required.' };
+    }
+    if (password.length < 8) {
+        return { valid: false, error: 'Password must be at least 8 characters long.' };
+    }
+    if (!/[A-Z]/.test(password)) {
+        return { valid: false, error: 'Password must include at least one uppercase letter.' };
+    }
+    if (!/[a-z]/.test(password)) {
+        return { valid: false, error: 'Password must include at least one lowercase letter.' };
+    }
+    if (!/[0-9]/.test(password)) {
+        return { valid: false, error: 'Password must include at least one number.' };
+    }
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password)) {
+        return { valid: false, error: 'Password must include at least one special character.' };
+    }
+    return { valid: true };
+}
+
 function normalizeDateValue(value) {
     if (!value) {
         return null;
@@ -301,8 +323,9 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
                 return res.status(400).json({ error: 'A valid email address is required.' });
             }
 
-            if (!rawPassword || rawPassword.length < 6) {
-                return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+            const passwordStrength = validatePasswordStrength(rawPassword);
+            if (!passwordStrength.valid) {
+                return res.status(400).json({ error: passwordStrength.error });
             }
 
             const admin = await db.createAdmin(normalizedUsername, normalizedEmail, rawPassword, 'super_admin');
@@ -789,4 +812,5 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
 
 module.exports = {
     createAdminRoutes,
+    validatePasswordStrength,
 };

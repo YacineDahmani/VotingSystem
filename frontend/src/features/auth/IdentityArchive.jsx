@@ -1,8 +1,52 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Check, Eye, EyeOff } from 'lucide-react';
 import { adminLogin, getAdminSetupStatus, setupInitialAdmin, submitIdentity, validateElectionCode } from '../../lib/api';
 import { clearSession, getSession, getVoterPhase, isAdminSession, isVoterSession, setSession } from '../../store/session';
+
+const evaluatePasswordStrength = (password) => {
+  const checks = {
+    length: (password || '').length >= 8,
+    hasUpper: /[A-Z]/.test(password || ''),
+    hasLower: /[a-z]/.test(password || ''),
+    hasNumber: /[0-9]/.test(password || ''),
+    hasSpecial: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password || ''),
+  };
+
+  const passedCount = Object.values(checks).filter(Boolean).length;
+  let label = 'EMPTY';
+  let color = 'bg-transparent';
+  let textColor = 'text-[var(--on-surface)]/40';
+
+  if (password) {
+    if (passedCount <= 2) {
+      label = 'WEAK';
+      color = 'bg-red-500';
+      textColor = 'text-red-600';
+    } else if (passedCount === 3) {
+      label = 'FAIR';
+      color = 'bg-amber-500';
+      textColor = 'text-amber-600';
+    } else if (passedCount === 4) {
+      label = 'GOOD';
+      color = 'bg-blue-500';
+      textColor = 'text-blue-600';
+    } else if (passedCount === 5) {
+      label = 'STRONG';
+      color = 'bg-[var(--secondary)]';
+      textColor = 'text-[var(--secondary)]';
+    }
+  }
+
+  return {
+    checks,
+    passedCount,
+    label,
+    color,
+    textColor,
+    isStrong: passedCount === 5,
+  };
+};
 
 const SESSION_STATUS_COPY = {
   open: {
@@ -41,11 +85,16 @@ export default function IdentityArchive() {
   // Admin Authentication State
   const [adminIdentifier, setAdminIdentifier] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [isSetupMode, setIsSetupMode] = useState(false);
   const [setupUsername, setSetupUsername] = useState('');
   const [setupEmail, setSetupEmail] = useState('');
   const [setupPassword, setSetupPassword] = useState('');
   const [setupConfirmPassword, setSetupConfirmPassword] = useState('');
+  const [showSetupPassword, setShowSetupPassword] = useState(false);
+  const [showSetupConfirmPassword, setShowSetupConfirmPassword] = useState(false);
+
+  const passwordStrength = useMemo(() => evaluatePasswordStrength(setupPassword), [setupPassword]);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState('');
@@ -416,8 +465,22 @@ export default function IdentityArchive() {
         triggerSnag('A valid email address is required.');
         return;
       }
-      if (!p || p.length < 6) {
-        triggerSnag('Password must be at least 6 characters.');
+      if (!p || p.length < 8) {
+        triggerSnag('Password must be at least 8 characters long.');
+        return;
+      }
+      if (!passwordStrength.isStrong) {
+        if (!passwordStrength.checks.hasUpper) {
+          triggerSnag('Password must include at least one uppercase letter.');
+        } else if (!passwordStrength.checks.hasLower) {
+          triggerSnag('Password must include at least one lowercase letter.');
+        } else if (!passwordStrength.checks.hasNumber) {
+          triggerSnag('Password must include at least one number.');
+        } else if (!passwordStrength.checks.hasSpecial) {
+          triggerSnag('Password must include at least one special character.');
+        } else {
+          triggerSnag('Password does not meet the security requirements.');
+        }
         return;
       }
       if (p !== cp) {
@@ -518,14 +581,14 @@ export default function IdentityArchive() {
         <div className="text-center mb-8">
           <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em] font-bold text-[0.65rem]">
             {entryMode === 'voter'
-              ? 'VOTER VERIFICATION'
+              ? 'VERIFICATION'
               : isSetupMode
                 ? 'SYSTEM INITIALIZATION'
                 : 'ADMINISTRATIVE ACCESS'}
           </p>
           <h2 className="font-muse text-[2.5rem] md:text-5xl text-[var(--on-surface)]">
             {entryMode === 'voter'
-              ? 'Identity Archive'
+              ? 'Voter Entry'
               : isSetupMode
                 ? 'Admin Setup'
                 : 'Admin Sign In'}
@@ -677,29 +740,110 @@ export default function IdentityArchive() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="uppercase text-[0.58rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-1.5 block">PASSWORD</label>
-                    <input
-                      type="password"
-                      placeholder="MIN 6 CHARACTERS"
-                      className="w-full p-3.5 text-base tracking-widest font-muse bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/40 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors"
-                      value={setupPassword}
-                      onChange={(e) => setSetupPassword(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      disabled={isSubmitting}
-                    />
+                    <div className="relative">
+                      <input
+                        type={showSetupPassword ? 'text' : 'password'}
+                        placeholder="MIN 8 CHARACTERS"
+                        className="w-full p-3.5 pr-11 text-base tracking-widest font-muse bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/40 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors"
+                        value={setupPassword}
+                        onChange={(e) => setSetupPassword(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={isSubmitting}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSetupPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--on-surface)] opacity-40 hover:opacity-90 transition-opacity p-1 focus:outline-none"
+                        title={showSetupPassword ? 'Hide password' : 'Show password'}
+                        aria-label={showSetupPassword ? 'Hide password' : 'Show password'}
+                        tabIndex={-1}
+                      >
+                        {showSetupPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="uppercase text-[0.58rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-1.5 block">CONFIRM PASSWORD</label>
-                    <input
-                      type="password"
-                      placeholder="REPEAT PASSWORD"
-                      className="w-full p-3.5 text-base tracking-widest font-muse bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/40 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors"
-                      value={setupConfirmPassword}
-                      onChange={(e) => setSetupConfirmPassword(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      disabled={isSubmitting}
-                    />
+                    <div className="relative">
+                      <input
+                        type={showSetupConfirmPassword ? 'text' : 'password'}
+                        placeholder="REPEAT PASSWORD"
+                        className="w-full p-3.5 pr-11 text-base tracking-widest font-muse bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/40 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors"
+                        value={setupConfirmPassword}
+                        onChange={(e) => setSetupConfirmPassword(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={isSubmitting}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSetupConfirmPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--on-surface)] opacity-40 hover:opacity-90 transition-opacity p-1 focus:outline-none"
+                        title={showSetupConfirmPassword ? 'Hide password' : 'Show password'}
+                        aria-label={showSetupConfirmPassword ? 'Hide password' : 'Show password'}
+                        tabIndex={-1}
+                      >
+                        {showSetupConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+                {setupPassword ? (
+                  <div className="bg-[var(--surface-container)]/70 border border-black/10 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="uppercase text-[0.55rem] tracking-[0.18em] text-[var(--on-surface)] opacity-60">
+                        Password Strength
+                      </span>
+                      <span className={`text-[0.55rem] uppercase tracking-[0.18em] font-semibold ${passwordStrength.textColor}`}>
+                        {passwordStrength.label}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-1.5 h-1.5 w-full">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <div
+                          key={level}
+                          className={`h-full transition-all duration-300 ${
+                            level <= passwordStrength.passedCount
+                              ? passwordStrength.color
+                              : 'bg-[var(--on-surface)]/10'
+                          }`}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {[
+                        { label: '8+ Chars', met: passwordStrength.checks.length },
+                        { label: 'Uppercase', met: passwordStrength.checks.hasUpper },
+                        { label: 'Lowercase', met: passwordStrength.checks.hasLower },
+                        { label: 'Number', met: passwordStrength.checks.hasNumber },
+                        { label: 'Symbol', met: passwordStrength.checks.hasSpecial },
+                      ].map((item) => (
+                        <span
+                          key={item.label}
+                          className={`inline-flex items-center gap-1 text-[0.52rem] uppercase tracking-[0.12em] px-1.5 py-0.5 border transition-colors ${
+                            item.met
+                              ? 'border-[var(--secondary)]/40 text-[var(--secondary)] bg-[var(--secondary)]/10 font-medium'
+                              : 'border-[var(--on-surface)]/15 text-[var(--on-surface)]/45'
+                          }`}
+                        >
+                          {item.met ? <Check size={10} strokeWidth={2.5} /> : <span className="inline-block w-2 text-center leading-none">·</span>}
+                          {item.label}
+                        </span>
+                      ))}
+                    </div>
+
+                    {setupConfirmPassword ? (
+                      <div className="pt-1 border-t border-black/5 flex items-center justify-between text-[0.52rem] uppercase tracking-[0.14em]">
+                        <span className="text-[var(--on-surface)] opacity-60">Confirmation Match</span>
+                        <span className={setupPassword === setupConfirmPassword ? 'text-[var(--secondary)] font-medium' : 'text-red-600 font-medium'}>
+                          {setupPassword === setupConfirmPassword ? 'MATCHED' : 'DOES NOT MATCH'}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
               <div className="w-full flex justify-end h-4 mb-6 relative z-20">
@@ -738,15 +882,27 @@ export default function IdentityArchive() {
 
                 <div>
                   <label className="uppercase text-[0.6rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50 mb-2 block">PASSWORD</label>
-                  <input
-                    type="password"
-                    placeholder="ENTER PASSWORD"
-                    className="w-full p-4 text-lg tracking-widest font-muse bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/50 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors border-none"
-                    value={adminPassword}
-                    onChange={(event) => setAdminPassword(event.target.value)}
-                    onKeyDown={handleKeyDown}
-                    disabled={isSubmitting}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showAdminPassword ? 'text' : 'password'}
+                      placeholder="ENTER PASSWORD"
+                      className="w-full p-4 pr-12 text-lg tracking-widest font-muse bg-[var(--surface-container)] text-[var(--on-surface)] placeholder-[var(--on-surface)]/50 focus:outline-none focus:bg-[var(--surface-container-high)] transition-colors border-none"
+                      value={adminPassword}
+                      onChange={(event) => setAdminPassword(event.target.value)}
+                      onKeyDown={handleKeyDown}
+                      disabled={isSubmitting}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPassword((prev) => !prev)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--on-surface)] opacity-40 hover:opacity-90 transition-opacity p-1 focus:outline-none"
+                      title={showAdminPassword ? 'Hide password' : 'Show password'}
+                      aria-label={showAdminPassword ? 'Hide password' : 'Show password'}
+                      tabIndex={-1}
+                    >
+                      {showAdminPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
                 </div>
               </div>
 

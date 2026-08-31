@@ -4,7 +4,7 @@ const express = require('express');
 const http = require('http');
 const db = require('../database');
 const { createAuthMiddleware } = require('../middleware/auth');
-const { createAdminRoutes } = require('../routes/adminRoutes');
+const { createAdminRoutes, validatePasswordStrength } = require('../routes/adminRoutes');
 const { createPublicRoutes } = require('../routes/publicRoutes');
 
 describe('Admin Authentication & Setup Test Suite', () => {
@@ -95,6 +95,31 @@ describe('Admin Authentication & Setup Test Suite', () => {
         const data = await response.json();
         assert.strictEqual(data.isInitialized, true);
         assert.ok(data.adminCount >= 1);
+    });
+
+    it('should validate strong password requirements for admin accounts', () => {
+        // Less than 8 characters
+        assert.strictEqual(validatePasswordStrength('Short1!').valid, false);
+        assert.ok(validatePasswordStrength('Short1!').error.includes('8 characters'));
+
+        // Missing uppercase
+        assert.strictEqual(validatePasswordStrength('password123!').valid, false);
+        assert.ok(validatePasswordStrength('password123!').error.includes('uppercase'));
+
+        // Missing lowercase
+        assert.strictEqual(validatePasswordStrength('PASSWORD123!').valid, false);
+        assert.ok(validatePasswordStrength('PASSWORD123!').error.includes('lowercase'));
+
+        // Missing number
+        assert.strictEqual(validatePasswordStrength('PasswordOnly!').valid, false);
+        assert.ok(validatePasswordStrength('PasswordOnly!').error.includes('number'));
+
+        // Missing special character
+        assert.strictEqual(validatePasswordStrength('Password123').valid, false);
+        assert.ok(validatePasswordStrength('Password123').error.includes('special character'));
+
+        // Valid strong password
+        assert.strictEqual(validatePasswordStrength('StrongPassword987!').valid, true);
     });
 
     it('POST /api/admin/setup should reject registration when admin already exists', async () => {
