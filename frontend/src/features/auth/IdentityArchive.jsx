@@ -8,22 +8,22 @@ const SESSION_STATUS_COPY = {
   open: {
     label: 'OPEN',
     detail: 'Voting is open.',
-    badgeClass: 'bg-emerald-500/15 text-emerald-700',
+    badgeClass: 'border border-[var(--on-surface)]/20 text-[var(--on-surface)]',
   },
   waiting: {
     label: 'WAITING',
     detail: 'Voting has not started yet.',
-    badgeClass: 'bg-amber-500/15 text-amber-700',
+    badgeClass: 'border border-[var(--on-surface)]/20 text-[var(--on-surface)]',
   },
   closed: {
     label: 'CLOSED',
     detail: 'Voting has ended.',
-    badgeClass: 'bg-rose-500/15 text-rose-700',
+    badgeClass: 'border border-[var(--on-surface)]/20 text-[var(--on-surface)]',
   },
   invalid: {
     label: 'INVALID',
     detail: 'Session code not found.',
-    badgeClass: 'bg-slate-500/15 text-slate-700',
+    badgeClass: 'border border-[var(--on-surface)]/20 text-[var(--on-surface)]',
   },
 };
 

@@ -375,12 +375,8 @@ export default function GravitySlot() {
       {/* Official Cryptographic Ballot Receipt Modal */}
       {receiptData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in">
-          <div className="w-full max-w-md bg-[var(--surface-container-lowest)] p-8 md:p-10 border border-[var(--primary)] shadow-2xl text-center flex flex-col items-center">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center mb-4">
-              <CheckCircle2 size={24} />
-            </div>
-
-            <p className="text-[0.62rem] uppercase tracking-[0.2em] font-bold text-emerald-700 mb-1">
+          <div className="w-full max-w-md bg-[var(--surface-container-lowest)] p-8 md:p-10 border border-[var(--on-surface)]/20 shadow-2xl text-center flex flex-col items-center">
+            <p className="text-[0.62rem] uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-60 mb-1">
               VOTE RECORDED
             </p>
             <h3 className="font-muse text-3xl font-bold text-[var(--primary)] mb-2">Vote Receipt</h3>
@@ -389,17 +385,17 @@ export default function GravitySlot() {
             </p>
 
             {/* Receipt Hash Box */}
-            <div className="w-full bg-[var(--surface-container)] p-4 border border-black/10 mb-6 text-left">
+            <div className="w-full bg-[var(--surface-container)] p-4 border border-[var(--on-surface)]/10 mb-6 text-left">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-[0.55rem] uppercase tracking-[0.18em] text-[var(--on-surface)] opacity-50 font-bold">
                   RECEIPT CODE
                 </span>
-                <span className="text-[0.55rem] font-mono text-emerald-600 font-bold">VERIFIED</span>
+                <span className="text-[0.55rem] font-mono font-bold text-[var(--on-surface)] opacity-70">VERIFIED</span>
               </div>
               <p className="font-mono text-base font-bold tracking-wider text-[var(--primary)] select-all">
                 {receiptData.receiptCode}
               </p>
-              <div className="mt-3 pt-2 border-t border-black/5 flex justify-between text-[0.6rem] text-[var(--on-surface)] opacity-60">
+              <div className="mt-3 pt-2 border-t border-[var(--on-surface)]/10 flex justify-between text-[0.6rem] text-[var(--on-surface)] opacity-60">
                 <span>Timestamp</span>
                 <span>{new Date(receiptData.votedAt).toLocaleTimeString()}</span>
               </div>
@@ -410,9 +406,9 @@ export default function GravitySlot() {
               <button
                 type="button"
                 onClick={copyReceiptCode}
-                className="w-full py-3 border border-[var(--primary)]/30 text-[var(--primary)] text-xs uppercase tracking-widest hover:bg-[var(--primary)]/5 transition-colors flex items-center justify-center gap-2 font-bold"
+                className="w-full py-3 border border-[var(--primary)]/30 text-[var(--primary)] text-xs uppercase tracking-widest hover:bg-[var(--surface-container)] transition-colors flex items-center justify-center gap-2 font-bold"
               >
-                {copiedReceipt ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                {copiedReceipt ? <Check size={14} /> : <Copy size={14} />}
                 <span>{copiedReceipt ? 'COPIED' : 'COPY CODE'}</span>
               </button>
 

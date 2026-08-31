@@ -178,17 +178,17 @@ export default function ResultsView() {
 
       <div className="w-full max-w-6xl mx-auto px-12 relative z-10">
         {endedNotice ? (
-          <div className="mb-8 border border-l-4 border-amber-300 border-l-amber-700 bg-amber-50 px-6 py-4 dark:border-rose-500/30 dark:border-l-rose-400 dark:bg-rose-950/25">
-            <p className="label-md tracking-widest text-black dark:text-rose-100">NOTICE</p>
-            <p className="text-sm mt-2 text-black dark:text-rose-100">{endedNotice}</p>
+          <div className="mb-8 border border-[var(--on-surface)]/15 bg-[var(--surface-container-lowest)] p-4 text-[var(--on-surface)] shadow-sm">
+            <p className="text-xs uppercase tracking-widest font-bold text-[var(--on-surface)]">NOTICE</p>
+            <p className="text-xs mt-1 text-[var(--on-surface)] opacity-80 leading-relaxed">{endedNotice}</p>
           </div>
         ) : null}
 
         {adminView && integrity ? (
-          <div className={`mb-10 border px-6 py-4 ${integrity.integrityStatus === 'clean' ? 'border-green-700 bg-green-50' : 'border-red-700 bg-red-50'}`}>
-            <p className="label-md tracking-widest">INTEGRITY AUDIT</p>
-            <p className="text-sm mt-2">
-              Status: <strong>{integrity.integrityStatus === 'clean' ? 'CLEAN' : 'ANOMALY DETECTED'}</strong> | Real Votes: {integrity.realVotes} | Simulated Votes: {integrity.fakeVotes}
+          <div className="mb-10 border border-[var(--on-surface)]/15 p-4 bg-[var(--surface-container-lowest)] text-[var(--on-surface)] shadow-sm">
+            <p className="text-xs uppercase tracking-widest font-bold text-[var(--on-surface)]">INTEGRITY AUDIT</p>
+            <p className="text-xs mt-1 text-[var(--on-surface)] opacity-80">
+              Status: <strong>{integrity.integrityStatus === 'clean' ? 'CLEAN' : 'SIMULATED DATA DETECTED'}</strong> | Real Votes: {integrity.realVotes} | Simulated Votes: {integrity.fakeVotes}
             </p>
           </div>
         ) : null}

@@ -616,15 +616,7 @@ export default function BlueprintGrid() {
                     <span className="font-mono text-xs font-bold text-[var(--primary)]">
                       {item.code}
                     </span>
-                    <span
-                      className={`px-2 py-0.5 text-[0.52rem] uppercase tracking-widest font-bold ${
-                        item.status === 'open'
-                          ? 'bg-emerald-500/15 text-emerald-700'
-                          : item.status === 'draft'
-                            ? 'bg-amber-500/15 text-amber-700'
-                            : 'bg-rose-500/15 text-rose-700'
-                      }`}
-                    >
+                    <span className="px-2 py-0.5 text-[0.52rem] uppercase tracking-widest font-bold border border-[var(--on-surface)]/20 text-[var(--on-surface)]">
                       {item.status}
                     </span>
                   </div>
@@ -651,15 +643,7 @@ export default function BlueprintGrid() {
                     <span className="font-mono text-sm font-bold text-[var(--primary)] bg-[var(--surface-container)] px-2.5 py-0.5">
                       CODE: {selectedElection.code}
                     </span>
-                    <span
-                      className={`px-2.5 py-0.5 text-[0.55rem] uppercase tracking-widest font-bold ${
-                        selectedElection.status === 'open'
-                          ? 'bg-emerald-500/15 text-emerald-700'
-                          : selectedElection.status === 'draft'
-                            ? 'bg-amber-500/15 text-amber-700'
-                            : 'bg-rose-500/15 text-rose-700'
-                      }`}
-                    >
+                    <span className="px-2.5 py-0.5 text-[0.55rem] uppercase tracking-widest font-bold border border-[var(--on-surface)]/20 text-[var(--on-surface)]">
                       {selectedElection.status}
                     </span>
                   </div>
@@ -1041,17 +1025,14 @@ export default function BlueprintGrid() {
             {adminTab === 'sandbox' && (
               <div className="space-y-6">
                 {/* Sandbox Info Banner */}
-                <div className="bg-amber-500/10 border border-amber-500/30 p-5 flex items-start gap-3">
-                  <AlertTriangle size={18} className="text-amber-700 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs uppercase tracking-wider font-bold text-amber-900">
-                      ISOLATED TEST & SIMULATION SANDBOX
-                    </p>
-                    <p className="text-xs text-amber-800/80 mt-0.5">
-                      Inject mock votes to simulate high turnout, test live chart animations, and verify tie/runoff handling.
-                      All simulated votes are tracked separately in the audit report.
-                    </p>
-                  </div>
+                <div className="bg-[var(--surface-container-lowest)] border border-[var(--on-surface)]/15 p-5 shadow-sm">
+                  <p className="text-xs uppercase tracking-wider font-bold text-[var(--on-surface)]">
+                    ISOLATED TEST & SIMULATION SANDBOX
+                  </p>
+                  <p className="text-xs text-[var(--on-surface)] opacity-75 mt-1 leading-relaxed">
+                    Inject mock votes to simulate high turnout, test live chart animations, and verify tie/runoff handling.
+                    All simulated votes are tracked separately in the audit report.
+                  </p>
                 </div>
 
                 {/* Audit Stats */}
@@ -1064,15 +1045,15 @@ export default function BlueprintGrid() {
                     </div>
                     <div className="p-4 bg-[var(--surface)] border border-[var(--outline-variant)]">
                       <p className="text-[0.58rem] uppercase tracking-wider text-[var(--on-surface)] opacity-60">REAL CITIZEN VOTES</p>
-                      <p className="text-2xl font-bold font-muse text-emerald-700">{integrity?.realVotes || 0}</p>
+                      <p className="text-2xl font-bold font-muse text-[var(--on-surface)]">{integrity?.realVotes || 0}</p>
                     </div>
                     <div className="p-4 bg-[var(--surface)] border border-[var(--outline-variant)]">
                       <p className="text-[0.58rem] uppercase tracking-wider text-[var(--on-surface)] opacity-60">SIMULATED VOTES</p>
-                      <p className="text-2xl font-bold font-muse text-amber-700">{integrity?.fakeVotes || 0}</p>
+                      <p className="text-2xl font-bold font-muse text-[var(--on-surface)]">{integrity?.fakeVotes || 0}</p>
                     </div>
                     <div className="p-4 bg-[var(--surface)] border border-[var(--outline-variant)]">
                       <p className="text-[0.58rem] uppercase tracking-wider text-[var(--on-surface)] opacity-60">INTEGRITY STATUS</p>
-                      <p className={`text-lg font-bold font-muse ${integrity?.integrityStatus === 'clean' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      <p className="text-lg font-bold font-muse text-[var(--on-surface)]">
                         {integrity?.integrityStatus === 'clean' ? 'CLEAN' : 'SIMULATED DATA'}
                       </p>
                     </div>
