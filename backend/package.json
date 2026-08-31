@@ -16,5 +16,8 @@
         "nodemon": "^3.1.14",
         "socket.io": "^4.8.3",
         "sqlite3": "^5.1.6"
+    },
+    "devDependencies": {
+        "socket.io-client": "^4.8.3"
     }
 }

@@ -37,7 +37,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
-configureSocket(io);
+configureSocket(io, { db, jwtSecret: JWT_SECRET });
 
 app.use('/api', createPublicRoutes({
     db,

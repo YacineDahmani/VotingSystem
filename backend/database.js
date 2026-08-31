@@ -149,6 +149,24 @@ function initializeDatabase() {
                 });
             });
 
+            // Indexes for query performance and rapid validation
+            const indexes = [
+                'CREATE INDEX IF NOT EXISTS idx_elections_status ON elections(status)',
+                'CREATE INDEX IF NOT EXISTS idx_elections_code ON elections(code)',
+                'CREATE INDEX IF NOT EXISTS idx_voters_election_identifier ON voters(election_id, identifier)',
+                'CREATE INDEX IF NOT EXISTS idx_voter_rules_election_identifier ON voter_eligibility_rules(election_id, identifier)',
+                'CREATE INDEX IF NOT EXISTS idx_votes_election_voter ON votes(election_id, voter_id)',
+                'CREATE INDEX IF NOT EXISTS idx_votes_election_candidate ON votes(election_id, candidate_id)',
+                'CREATE INDEX IF NOT EXISTS idx_votes_election_receipt ON votes(election_id, receipt_code)',
+                'CREATE INDEX IF NOT EXISTS idx_candidates_election ON candidates(election_id)'
+            ];
+
+            indexes.forEach(query => {
+                db.run(query, (err) => {
+                    if (err) console.warn('Index creation warning:', err.message);
+                });
+            });
+
             const defaults = [];
             if (process.env.ADMIN_MASTER_KEY) {
                 defaults.push(['admin_password', process.env.ADMIN_MASTER_KEY]);
@@ -719,34 +737,90 @@ function getVoterByIdAndElection(voterId, electionId) {
     });
 }
 
-function recordVote(electionId, voterId, candidateId, receiptCode = null) {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const alreadyVoted = await hasVoted(electionId, voterId);
-            if (alreadyVoted) {
-                return reject(new Error('You have already voted in this election'));
-            }
+let transactionQueue = Promise.resolve();
 
-            db.run(
-                'INSERT INTO votes (election_id, voter_id, candidate_id, receipt_code) VALUES (?, ?, ?, ?)',
-                [electionId, voterId, candidateId, receiptCode],
-                async function (err) {
-                    if (err) {
-                        if (err.message.includes('UNIQUE constraint failed')) {
-                            reject(new Error('You have already voted in this election'));
-                        } else {
-                            reject(err);
-                        }
-                    } else {
-                        await incrementVote(candidateId);
-                        await setVoterVoteState(voterId, null);
-                        resolve({ voteId: this.lastID, receiptCode });
-                    }
+function withTransaction(fn) {
+    const next = transactionQueue.then(() => new Promise((resolve, reject) => {
+        db.serialize(() => {
+            db.run('BEGIN IMMEDIATE TRANSACTION', (beginErr) => {
+                if (beginErr) {
+                    return reject(beginErr);
                 }
-            );
-        } catch (err) {
-            reject(err);
-        }
+
+                fn(
+                    (result) => {
+                        db.run('COMMIT', (commitErr) => {
+                            if (commitErr) {
+                                db.run('ROLLBACK', () => reject(commitErr));
+                            } else {
+                                resolve(result);
+                            }
+                        });
+                    },
+                    (error) => {
+                        db.run('ROLLBACK', () => reject(error));
+                    }
+                );
+            });
+        });
+    }));
+
+    transactionQueue = next.catch(() => {});
+    return next;
+}
+
+function recordVote(electionId, voterId, candidateId, receiptCode = null) {
+    return withTransaction((commit, rollback) => {
+        db.get(
+            'SELECT id FROM votes WHERE election_id = ? AND voter_id = ? LIMIT 1',
+            [electionId, voterId],
+            (checkErr, existingVote) => {
+                if (checkErr) {
+                    return rollback(checkErr);
+                }
+                if (existingVote) {
+                    return rollback(new Error('You have already voted in this election'));
+                }
+
+                db.run(
+                    'INSERT INTO votes (election_id, voter_id, candidate_id, receipt_code) VALUES (?, ?, ?, ?)',
+                    [electionId, voterId, candidateId, receiptCode],
+                    function (insertErr) {
+                        if (insertErr) {
+                            if (insertErr.message && insertErr.message.includes('UNIQUE constraint failed')) {
+                                return rollback(new Error('You have already voted in this election'));
+                            }
+                            return rollback(insertErr);
+                        }
+
+                        const voteId = this.lastID;
+                        const now = new Date().toISOString();
+
+                        db.run(
+                            'UPDATE candidates SET votes = votes + 1, last_vote_timestamp = ? WHERE id = ?',
+                            [now, candidateId],
+                            (candErr) => {
+                                if (candErr) {
+                                    return rollback(candErr);
+                                }
+
+                                db.run(
+                                    'UPDATE voters SET has_voted = 1, voted_candidate_id = NULL, voted_at = ? WHERE id = ?',
+                                    [now, voterId],
+                                    (voterErr) => {
+                                        if (voterErr) {
+                                            return rollback(voterErr);
+                                        }
+
+                                        commit({ voteId, receiptCode });
+                                    }
+                                );
+                            }
+                        );
+                    }
+                );
+            }
+        );
     });
 }
 
