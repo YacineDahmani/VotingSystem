@@ -1,5 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Check,
+  Clock,
+  Copy,
+  FileText,
+  Plus,
+  Trash2,
+  UploadCloud,
+  Users,
+} from 'lucide-react';
 import { createElection, updateElectionStatus } from '../../lib/api';
 import { useToast } from '../../components/ui/useToast';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -147,12 +159,16 @@ export default function CreateElectionView() {
   const navigate = useNavigate();
   const session = useMemo(() => getSession(), []);
   const { pushToast } = useToast();
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [maxVoters, setMaxVoters] = useState('');
-  const [candidates, setCandidates] = useState([{ name: '', description: '' }]);
+  const [candidates, setCandidates] = useState([
+    { name: '', description: '' },
+    { name: '', description: '' },
+  ]);
   const [voterRules, setVoterRules] = useState([]);
   const [candidateImportReplace, setCandidateImportReplace] = useState(false);
   const [voterImportReplace, setVoterImportReplace] = useState(true);
@@ -166,11 +182,14 @@ export default function CreateElectionView() {
   const [createdSession, setCreatedSession] = useState(null);
   const [replacePrompt, setReplacePrompt] = useState(null);
 
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
   const buildPayload = () => {
     const trimmedTitle = title.trim();
     const validCandidates = candidates
-      .map(c => ({ name: c.name.trim(), description: c.description.trim() }))
-      .filter(c => c.name);
+      .map((c) => ({ name: c.name.trim(), description: c.description.trim() }))
+      .filter((c) => c.name);
     const parsedMaxVoters = maxVoters.trim()
       ? Number.parseInt(maxVoters.trim(), 10)
       : null;
@@ -202,7 +221,7 @@ export default function CreateElectionView() {
         if (candidateImportReplace) {
           return imported;
         }
-        return [...current, ...imported];
+        return [...current.filter((c) => c.name.trim()), ...imported];
       });
       setCandidateImportPreview(imported.slice(0, 5));
       setCandidateImportFileName(file.name);
@@ -263,6 +282,7 @@ export default function CreateElectionView() {
       id: electionId,
       title: response.election.title,
       code: response.election.code,
+      joinUrl: `${window.location.origin}/?code=${response.election.code}`,
     });
 
     if (replaceExisting && Array.isArray(response?.replaced) && response.replaced.length) {
@@ -277,7 +297,7 @@ export default function CreateElectionView() {
     pushToast({
       type: 'success',
       title: 'Session Created',
-      message: `Election ${response.election.title} is ready.`,
+      message: `Election "${response.election.title}" is ready.`,
     });
   };
 
@@ -311,11 +331,11 @@ export default function CreateElectionView() {
     }
 
     const validCandidates = candidates
-      .map(c => ({ name: c.name.trim(), description: c.description.trim() }))
-      .filter(c => c.name);
+      .map((c) => ({ name: c.name.trim(), description: c.description.trim() }))
+      .filter((c) => c.name);
 
-    if (!validCandidates.length) {
-      setError('Add at least one candidate name.');
+    if (validCandidates.length < 2) {
+      setError('Add at least 2 valid candidates.');
       return;
     }
 
@@ -360,298 +380,514 @@ export default function CreateElectionView() {
     }
   };
 
+  const copySessionCode = async () => {
+    if (!createdSession?.code) return;
+    try {
+      await navigator.clipboard.writeText(createdSession.code);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+      pushToast({ type: 'info', title: 'Code Copied', message: 'Session code copied to clipboard.' });
+    } catch {
+      pushToast({ type: 'error', title: 'Copy Failed', message: 'Unable to copy session code.' });
+    }
+  };
+
+  const copyJoinLink = async () => {
+    if (!createdSession?.joinUrl) return;
+    try {
+      await navigator.clipboard.writeText(createdSession.joinUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+      pushToast({ type: 'info', title: 'Link Copied', message: 'Invite link copied to clipboard.' });
+    } catch {
+      pushToast({ type: 'error', title: 'Copy Failed', message: 'Unable to copy invite link.' });
+    }
+  };
+
   return (
     <>
-      <div className="min-h-screen text-[var(--primary)] relative z-10 -mt-24 pt-32 px-12 pb-24">
-        <div className="max-w-4xl">
-          <p className="label-md text-[var(--on-surface)] opacity-60 mb-2 tracking-[0.2em]">ADMIN</p>
-          <h2 className="font-muse font-bold text-6xl text-[var(--primary)]">Create Election</h2>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="mt-10 bg-[var(--surface-container-lowest)] text-[var(--primary)] p-10 shadow-2xl max-w-4xl grid grid-cols-1 gap-6"
-        >
-        <div>
-          <label className="label-md text-[var(--on-surface)] opacity-60 block mb-2">Title</label>
-          <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="e.g. General Election 2026"
-            className="w-full border border-[var(--outline-variant)] px-4 py-3"
-            disabled={isSubmitting}
-          />
-        </div>
-
-        <div>
-          <label className="label-md text-[var(--on-surface)] opacity-60 block mb-2">Description (Optional)</label>
-          <textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="Description or notes about this election"
-            rows={3}
-            className="w-full border border-[var(--outline-variant)] px-4 py-3"
-            disabled={isSubmitting}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="w-full max-w-4xl mx-auto px-6 md:px-12 py-10">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between gap-4 mb-8">
           <div>
-            <label className="label-md text-[var(--on-surface)] opacity-60 block mb-2">Start Date</label>
-            <input
-              type="datetime-local"
-              value={startDate}
-              onChange={(event) => setStartDate(event.target.value)}
-              className="w-full border border-[var(--outline-variant)] px-4 py-3"
-              disabled={isSubmitting}
-            />
+            <span className="text-[0.62rem] uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-50">
+              ELECTORAL COMMISSION
+            </span>
+            <h2 className="font-muse text-4xl text-[var(--primary)] font-bold mt-1">
+              Create New Election
+            </h2>
           </div>
-          <div>
-            <label className="label-md text-[var(--on-surface)] opacity-60 block mb-2">End Date</label>
-            <input
-              type="datetime-local"
-              value={endDate}
-              onChange={(event) => setEndDate(event.target.value)}
-              className="w-full border border-[var(--outline-variant)] px-4 py-3"
-              disabled={isSubmitting}
-            />
-          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate('/admin')}
+            className="border border-[var(--outline-variant)] px-4 py-2.5 text-xs uppercase tracking-widest hover:bg-[var(--surface-container)] transition-colors flex items-center gap-2"
+          >
+            <ArrowLeft size={14} />
+            <span>Dashboard</span>
+          </button>
         </div>
 
-        <div>
-          <label className="label-md text-[var(--on-surface)] opacity-60 block mb-2">Maximum Voters (Optional)</label>
-          <input
-            type="number"
-            min="1"
-            step="1"
-            value={maxVoters}
-            onChange={(event) => setMaxVoters(event.target.value)}
-            placeholder="Leave empty for unlimited"
-            className="w-full border border-[var(--outline-variant)] px-4 py-3"
-            disabled={isSubmitting}
-          />
-        </div>
+        {/* Success Modal / State */}
+        {createdSession ? (
+          <div className="bg-[var(--surface-container-lowest)] p-8 border border-[var(--on-surface)]/20 shadow-2xl space-y-6">
+            <div>
+              <span className="text-[0.58rem] uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-50">
+                ELECTION CREATED & READY
+              </span>
+              <h3 className="font-muse text-3xl font-bold text-[var(--primary)] mt-1">
+                {createdSession.title}
+              </h3>
+              <p className="text-xs text-[var(--on-surface)] opacity-70 mt-1">
+                The voting session is configured and ready for voter onboarding.
+              </p>
+            </div>
 
-        <div>
-          <label className="label-md text-[var(--on-surface)] opacity-60 block mb-4 border-b pb-2">Candidates</label>
-          <div className="flex flex-col gap-4">
-            {candidates.map((candidate, index) => (
-              <div key={index} className="flex flex-col md:flex-row gap-3 items-start border p-4 bg-[var(--surface-container-low)]/50">
-                <div className="flex-1 w-full flex flex-col gap-3">
+            {/* Session Code Card */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-[var(--surface)] p-5 border border-[var(--on-surface)]/10 space-y-3">
+                <span className="text-[0.58rem] uppercase tracking-[0.16em] text-[var(--on-surface)] opacity-50 font-bold">
+                  8-DIGIT SESSION CODE
+                </span>
+                <p className="font-mono text-3xl font-bold tracking-widest text-[var(--primary)]">
+                  {createdSession.code}
+                </p>
+                <button
+                  type="button"
+                  onClick={copySessionCode}
+                  className="px-4 py-2 text-xs uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] flex items-center gap-1.5"
+                >
+                  {copiedCode ? <Check size={14} /> : <Copy size={14} />}
+                  <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
+                </button>
+              </div>
+
+              <div className="bg-[var(--surface)] p-5 border border-[var(--on-surface)]/10 space-y-3">
+                <span className="text-[0.58rem] uppercase tracking-[0.16em] text-[var(--on-surface)] opacity-50 font-bold">
+                  DIRECT VOTER LINK
+                </span>
+                <input
+                  type="text"
+                  readOnly
+                  value={createdSession.joinUrl}
+                  className="w-full p-2 text-xs font-mono bg-[var(--surface-container)] border border-[var(--outline-variant)] text-[var(--on-surface)] select-all"
+                />
+                <button
+                  type="button"
+                  onClick={copyJoinLink}
+                  className="px-4 py-2 text-xs uppercase tracking-widest font-bold bg-[var(--primary)] text-[var(--on-primary)] hover:bg-[var(--primary)]/90 flex items-center gap-1.5"
+                >
+                  {copiedLink ? <Check size={14} /> : <Copy size={14} />}
+                  <span>{copiedLink ? 'Copied' : 'Copy Link'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => navigate('/admin')}
+                className="px-6 py-3 text-xs uppercase tracking-widest font-bold bg-[var(--primary)] text-[var(--on-primary)] hover:bg-[var(--primary)]/90 shadow-sm"
+              >
+                Go to Dashboard
+              </button>
+              <button
+                type="button"
+                onClick={() => window.open(createdSession.joinUrl, '_blank')}
+                className="px-5 py-3 text-xs uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] flex items-center gap-1.5"
+              >
+                <span>Test as Voter</span>
+                <ArrowUpRight size={14} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Form View */
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Error banner */}
+            {error && (
+              <div className="p-4 bg-[var(--surface-container-lowest)] border border-[var(--on-surface)]/20 shadow-sm">
+                <p className="text-xs font-bold text-[var(--on-surface)] uppercase tracking-wider">ERROR</p>
+                <p className="text-xs text-[var(--on-surface)] opacity-80 mt-0.5">{error}</p>
+              </div>
+            )}
+
+            {/* CARD 1: Identity & Description */}
+            <div className="bg-[var(--surface-container-lowest)] p-6 md:p-8 border border-[var(--on-surface)]/15 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b border-[var(--on-surface)]/10 pb-3">
+                <FileText size={16} className="text-[var(--primary)]" />
+                <h3 className="font-muse text-xl font-bold text-[var(--primary)]">
+                  Election Identity & Details
+                </h3>
+              </div>
+
+              <div>
+                <label className="text-[0.62rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
+                  Election Title *
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. Municipal City Council Election 2026"
+                  className="w-full p-3 text-sm bg-[var(--surface)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div>
+                <label className="text-[0.62rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
+                  Description & Context (Optional)
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Provide context, jurisdiction, or voting platform summary..."
+                  rows={3}
+                  className="w-full p-3 text-sm bg-[var(--surface)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+
+            {/* CARD 2: Timeline & Capacity */}
+            <div className="bg-[var(--surface-container-lowest)] p-6 md:p-8 border border-[var(--on-surface)]/15 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b border-[var(--on-surface)]/10 pb-3">
+                <Clock size={16} className="text-[var(--primary)]" />
+                <h3 className="font-muse text-xl font-bold text-[var(--primary)]">
+                  Timeline & Voter Limits
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[0.62rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
+                    Start Date & Time (Optional)
+                  </label>
                   <input
-                    value={candidate.name}
-                    onChange={(e) => updateCandidate(index, 'name', e.target.value)}
-                    placeholder={`Candidate ${index + 1} Name`}
-                    className="w-full border border-[var(--outline-variant)] px-4 py-2"
-                    disabled={isSubmitting}
-                  />
-                  <input
-                    value={candidate.description}
-                    onChange={(e) => updateCandidate(index, 'description', e.target.value)}
-                    placeholder="Description (Optional)"
-                    className="w-full border border-[var(--outline-variant)] px-4 py-2 text-sm text-[var(--on-surface)] opacity-80"
+                    type="datetime-local"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full p-2.5 text-xs bg-[var(--surface)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
                     disabled={isSubmitting}
                   />
                 </div>
-                {candidates.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeCandidate(index)}
+                <div>
+                  <label className="text-[0.62rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
+                    End Date & Time (Optional)
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full p-2.5 text-xs bg-[var(--surface)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
                     disabled={isSubmitting}
-                    className="text-red-600 hover:text-red-800 text-xs tracking-widest uppercase mt-2 md:mt-0 px-2 py-2 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[0.62rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
+                  Voter Capacity Limit (Optional)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={maxVoters}
+                  onChange={(e) => setMaxVoters(e.target.value)}
+                  placeholder="Leave empty for unlimited voter capacity"
+                  className="w-full p-2.5 text-xs bg-[var(--surface)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
+                  disabled={isSubmitting}
+                />
+                <p className="text-[0.6rem] text-[var(--on-surface)] opacity-50 mt-1">
+                  If set, registration closes automatically when this capacity is reached.
+                </p>
+              </div>
+            </div>
+
+            {/* CARD 3: Candidate Slate */}
+            <div className="bg-[var(--surface-container-lowest)] p-6 md:p-8 border border-[var(--on-surface)]/15 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-[var(--on-surface)]/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <Users size={16} className="text-[var(--primary)]" />
+                  <h3 className="font-muse text-xl font-bold text-[var(--primary)]">
+                    Candidate Slate
+                  </h3>
+                </div>
+                <span className="text-[0.58rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-60">
+                  {candidates.filter((c) => c.name.trim()).length} Candidates
+                </span>
+              </div>
+
+              {/* Dynamic Candidate Inputs */}
+              <div className="space-y-3">
+                {candidates.map((candidate, index) => (
+                  <div
+                    key={index}
+                    className="p-4 bg-[var(--surface)] border border-[var(--on-surface)]/10 flex flex-col md:flex-row gap-3 items-start"
                   >
-                    Remove
-                  </button>
+                    <span className="font-mono text-xs font-bold text-[var(--on-surface)] opacity-40 mt-2.5 shrink-0">
+                      #{String(index + 1).padStart(2, '0')}
+                    </span>
+                    <div className="flex-1 w-full space-y-2">
+                      <input
+                        type="text"
+                        value={candidate.name}
+                        onChange={(e) => updateCandidate(index, 'name', e.target.value)}
+                        placeholder={`Candidate ${index + 1} Full Name *`}
+                        className="w-full p-2.5 text-sm bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
+                        disabled={isSubmitting}
+                      />
+                      <input
+                        type="text"
+                        value={candidate.description}
+                        onChange={(e) => updateCandidate(index, 'description', e.target.value)}
+                        placeholder="Platform statement or biographical summary (optional)"
+                        className="w-full p-2 text-xs bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] text-[var(--on-surface)] opacity-80"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                    {candidates.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => removeCandidate(index)}
+                        disabled={isSubmitting}
+                        className="p-2 text-rose-700 hover:text-rose-900 border border-rose-300/40 hover:bg-rose-50 transition-colors shrink-0 mt-1"
+                        title="Remove candidate"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={addCandidate}
+                disabled={isSubmitting}
+                className="w-full py-2.5 border border-dashed border-[var(--outline-variant)] text-xs uppercase tracking-widest font-bold text-[var(--on-surface)] opacity-70 hover:opacity-100 hover:bg-[var(--surface)] transition-all flex items-center justify-center gap-1.5"
+              >
+                <Plus size={14} />
+                <span>Add Another Candidate</span>
+              </button>
+
+              {/* Candidate Bulk Import */}
+              <div className="mt-4 p-4 bg-[var(--surface)] border border-[var(--on-surface)]/10 space-y-3">
+                <div className="flex items-center gap-2">
+                  <UploadCloud size={15} className="text-[var(--primary)]" />
+                  <span className="text-xs uppercase tracking-wider font-bold text-[var(--on-surface)]">
+                    Bulk Import Candidates (CSV, TSV, JSON)
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="inline-flex items-center gap-2 text-xs text-[var(--on-surface)] opacity-80">
+                    <input
+                      type="checkbox"
+                      checked={candidateImportReplace}
+                      onChange={(e) => setCandidateImportReplace(e.target.checked)}
+                      disabled={isSubmitting}
+                    />
+                    <span>Replace current candidates</span>
+                  </label>
+                </div>
+                <input
+                  type="file"
+                  accept=".csv,.tsv,.json,.ndjson,.txt"
+                  onChange={(e) => handleCandidateFileImport(e.target.files?.[0] || null)}
+                  disabled={isSubmitting}
+                  className="w-full p-2 text-xs bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
+                />
+
+                {candidateImportPreview.length > 0 && (
+                  <div className="p-3 bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)] space-y-2">
+                    <p className="text-[0.6rem] uppercase tracking-widest font-bold text-[var(--on-surface)] opacity-70">
+                      Preview: {candidateImportFileName || 'Imported candidates'} (first 5 rows)
+                    </p>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-left border-b border-[var(--outline-variant)] text-[0.6rem] uppercase opacity-60">
+                          <th className="py-1">Name</th>
+                          <th className="py-1">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {candidateImportPreview.map((item, idx) => (
+                          <tr key={idx} className="border-b border-[var(--outline-variant)]/40">
+                            <td className="py-1 font-bold">{item.name}</td>
+                            <td className="py-1 opacity-70">{item.description || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={addCandidate}
-            disabled={isSubmitting}
-            className="mt-4 border border-dashed border-gray-400 text-[var(--on-surface)] opacity-80 w-full py-3 uppercase text-xs tracking-widest hover:bg-[var(--surface-container-low)] hover:text-[var(--on-surface)] transition-all duration-200"
-          >
-            + Add Candidate
-          </button>
+            </div>
 
-          <div className="mt-4 border border-[var(--outline-variant)] p-4 bg-[var(--surface-container-low)]/40">
-            <p className="label-md text-[var(--on-surface)] opacity-70 mb-2">Import Candidates (CSV, TSV, JSON)</p>
-            <label className="inline-flex items-center gap-2 text-sm text-[var(--on-surface)] opacity-80 mb-3">
+            {/* CARD 4: Voter Eligibility Rules */}
+            <div className="bg-[var(--surface-container-lowest)] p-6 md:p-8 border border-[var(--on-surface)]/15 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-[var(--on-surface)]/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <UploadCloud size={16} className="text-[var(--primary)]" />
+                  <h3 className="font-muse text-xl font-bold text-[var(--primary)]">
+                    Voter Eligibility List (Optional)
+                  </h3>
+                </div>
+                <span className="text-[0.58rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-60">
+                  {voterRules.length} Rules Loaded
+                </span>
+              </div>
+
+              <p className="text-xs text-[var(--on-surface)] opacity-75 leading-relaxed">
+                Upload a verified voter roster to restrict ballot casting to eligible citizens. Leave empty for open access.
+              </p>
+
+              {/* Supported Format Guide Box */}
+              <div className="p-4 bg-[var(--surface)] border border-[var(--on-surface)]/15 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[0.58rem] uppercase tracking-[0.16em] font-bold text-[var(--on-surface)] opacity-60">
+                    SUPPORTED FORMAT & COLUMNS
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const csvContent = "name,birthdate,id\nYacine Dahmani,1992-04-12,VTR-9941\nJohn Smith,1985-11-03,VTR-4402\nAlex Vance,,VTR-1029\nElena Rostova,1998-07-21,\n";
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.setAttribute('href', url);
+                      link.setAttribute('download', 'sample_voters_template.csv');
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    className="text-[0.62rem] uppercase tracking-widest font-bold text-[var(--primary)] hover:underline flex items-center gap-1"
+                  >
+                    <FileText size={12} />
+                    <span>Download Sample CSV</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-2.5 bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
+                    <p className="font-bold text-[var(--primary)] font-mono text-[0.68rem]">1. name</p>
+                    <p className="text-[0.62rem] text-[var(--on-surface)] opacity-70 mt-0.5">Citizen full name (e.g. Yacine Dahmani)</p>
+                  </div>
+                  <div className="p-2.5 bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
+                    <p className="font-bold text-[var(--primary)] font-mono text-[0.68rem]">2. birthdate</p>
+                    <p className="text-[0.62rem] text-[var(--on-surface)] opacity-70 mt-0.5">YYYY-MM-DD (e.g. 2005-13-11)</p>
+                  </div>
+                  <div className="p-2.5 bg-[var(--surface-container-lowest)] border border-[var(--outline-variant)]">
+                    <p className="font-bold text-[var(--primary)] font-mono text-[0.68rem]">3. id</p>
+                    <p className="text-[0.62rem] text-[var(--on-surface)] opacity-70 mt-0.5">Voter ID / National code (e.g. VTR-9941)</p>
+                  </div>
+                </div>
+
+                <div className="text-[0.62rem] text-[var(--on-surface)] opacity-70 space-y-1">
+                  <p>• <strong>Supported files:</strong> <code>.csv</code>, <code>.tsv</code>, <code>.json</code>, <code>.ndjson</code>, <code>.txt</code></p>
+                  <p>• <strong>Flexible fields:</strong> Columns can be in any order. If a field is missing (e.g. only ID is supplied or only Name + Birthdate), the system automatically validates against whichever fields are present.</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 pt-1">
+                <label className="inline-flex items-center gap-2 text-xs text-[var(--on-surface)] opacity-80">
+                  <input
+                    type="checkbox"
+                    checked={voterImportReplace}
+                    onChange={(e) => setVoterImportReplace(e.target.checked)}
+                    disabled={isSubmitting}
+                  />
+                  <span>Replace current voter list</span>
+                </label>
+              </div>
+
               <input
-                type="checkbox"
-                checked={candidateImportReplace}
-                onChange={(event) => setCandidateImportReplace(event.target.checked)}
+                type="file"
+                accept=".csv,.tsv,.json,.ndjson,.txt"
+                onChange={(e) => handleVoterFileImport(e.target.files?.[0] || null)}
                 disabled={isSubmitting}
+                className="w-full p-2 text-xs bg-[var(--surface)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
               />
-              Replace current candidates
-            </label>
-            <input
-              type="file"
-              accept=".csv,.tsv,.json,.ndjson,.txt"
-              onChange={(event) => handleCandidateFileImport(event.target.files?.[0] || null)}
-              disabled={isSubmitting}
-              className="w-full border border-[var(--outline-variant)] px-4 py-2 bg-[var(--surface-container-lowest)]"
-            />
 
-            {candidateImportPreview.length ? (
-              <div className="mt-3 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] p-3">
-                <p className="text-xs uppercase tracking-widest text-[var(--on-surface)] opacity-70 mb-2">
-                  Preview: {candidateImportFileName || 'Imported candidates'} (first 5 rows)
-                </p>
-                <div className="overflow-x-auto">
+              {voterImportPreview.length > 0 && (
+                <div className="p-3 bg-[var(--surface)] border border-[var(--outline-variant)] space-y-2">
+                  <p className="text-[0.6rem] uppercase tracking-widest font-bold text-[var(--on-surface)] opacity-70">
+                    Preview: {voterImportFileName || 'Imported voters'} (first 5 rows)
+                  </p>
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="text-left border-b border-[var(--outline-variant)]">
-                        <th className="py-1 pr-2">Name</th>
-                        <th className="py-1">Description</th>
+                      <tr className="text-left border-b border-[var(--outline-variant)] text-[0.6rem] uppercase opacity-60">
+                        <th className="py-1">Name</th>
+                        <th className="py-1">Identifier</th>
+                        <th className="py-1">Birthdate</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {candidateImportPreview.map((item, index) => (
-                        <tr key={`${item.name}-${index}`} className="border-b border-[var(--outline-variant)]/50">
-                          <td className="py-1 pr-2">{item.name || '-'}</td>
-                          <td className="py-1">{item.description || '-'}</td>
+                      {voterImportPreview.map((item, idx) => (
+                        <tr key={idx} className="border-b border-[var(--outline-variant)]/40">
+                          <td className="py-1 font-bold">{item.name || '—'}</td>
+                          <td className="py-1 font-mono">{item.identifier || '—'}</td>
+                          <td className="py-1">{item.birthdate || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
+              )}
+            </div>
 
-        <div className="border border-[var(--outline-variant)] p-4 bg-[var(--surface-container-low)]/30">
-          <label className="label-md text-[var(--on-surface)] opacity-70 block mb-2">Voter Eligibility List (Optional)</label>
-          <p className="text-xs text-[var(--on-surface)] opacity-70 mb-3">
-            Upload a CSV, JSON, or TSV with voter names, IDs, or birthdates.
-          </p>
-          <label className="inline-flex items-center gap-2 text-sm text-[var(--on-surface)] opacity-80 mb-3">
-            <input
-              type="checkbox"
-              checked={voterImportReplace}
-              onChange={(event) => setVoterImportReplace(event.target.checked)}
-              disabled={isSubmitting}
-            />
-            Replace current voter rules
-          </label>
-          <input
-            type="file"
-            accept=".csv,.tsv,.json,.ndjson,.txt"
-            onChange={(event) => handleVoterFileImport(event.target.files?.[0] || null)}
-            disabled={isSubmitting}
-            className="w-full border border-[var(--outline-variant)] px-4 py-2 bg-[var(--surface-container-lowest)]"
-          />
-          {voterImportPreview.length ? (
-            <div className="mt-3 border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] p-3">
-              <p className="text-xs uppercase tracking-widest text-[var(--on-surface)] opacity-70 mb-2">
-                Preview: {voterImportFileName || 'Imported voters'} (first 5 rows)
-              </p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-left border-b border-[var(--outline-variant)]">
-                      <th className="py-1 pr-2">Name</th>
-                      <th className="py-1 pr-2">Identifier</th>
-                      <th className="py-1">Birthdate</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {voterImportPreview.map((item, index) => (
-                      <tr key={`${item.identifier || item.name || 'rule'}-${index}`} className="border-b border-[var(--outline-variant)]/50">
-                        <td className="py-1 pr-2">{item.name || '-'}</td>
-                        <td className="py-1 pr-2">{item.identifier || '-'}</td>
-                        <td className="py-1">{item.birthdate || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* CARD 5: Launch Preferences & Submit */}
+            <div className="bg-[var(--surface-container-lowest)] p-6 md:p-8 border border-[var(--on-surface)]/15 shadow-sm space-y-6">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={openImmediately}
+                  onChange={(e) => setOpenImmediately(e.target.checked)}
+                  disabled={isSubmitting}
+                  className="mt-0.5"
+                />
+                <div>
+                  <p className="text-xs uppercase tracking-wider font-bold text-[var(--on-surface)]">
+                    Open election for voting immediately
+                  </p>
+                  <p className="text-xs text-[var(--on-surface)] opacity-60 mt-0.5">
+                    If unchecked, the election will be saved as a Draft so you can review candidates before opening.
+                  </p>
+                </div>
+              </label>
+
+              <div className="flex flex-wrap gap-4 pt-2 border-t border-[var(--on-surface)]/10">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-[var(--primary)] text-[var(--on-primary)] px-8 py-3 uppercase text-xs tracking-widest font-bold disabled:opacity-50 transition-transform duration-200 hover:-translate-y-0.5 shadow-md active:translate-y-0"
+                >
+                  {isSubmitting ? 'Creating Election...' : 'Create Election'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin')}
+                  disabled={isSubmitting}
+                  className="border border-[var(--outline-variant)] px-6 py-3 uppercase text-xs tracking-widest font-bold transition-all duration-200 hover:bg-[var(--surface-container)]"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
-          ) : null}
-          <p className="label-md text-[var(--on-surface)] opacity-70 mt-2">Loaded voter rules: {voterRules.length}</p>
-        </div>
-
-        <label className="inline-flex items-center gap-3">
-          <input
-            type="checkbox"
-            checked={openImmediately}
-            onChange={(event) => setOpenImmediately(event.target.checked)}
-            disabled={isSubmitting}
-          />
-          <span className="label-md text-[var(--on-surface)] opacity-90">Open election for voting immediately</span>
-        </label>
-
-        {error ? <p className="label-md text-black dark:text-red-100">{error}</p> : null}
-
-        <div className="flex gap-4">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="bg-[var(--primary)] text-[var(--on-primary)] px-8 py-3 uppercase text-xs tracking-widest disabled:opacity-50 transition-transform duration-200 hover:-translate-y-0.5 shadow-md hover:shadow-lg active:translate-y-0"
-          >
-            {isSubmitting ? 'Creating...' : 'Create Election'}
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/admin')}
-            disabled={isSubmitting}
-            className="border border-[var(--outline-variant)] px-8 py-3 uppercase text-xs tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] shadow-sm hover:shadow-md active:translate-y-0.5"
-          >
-            Cancel
-          </button>
-        </div>
-
-        {createdSession ? (
-          <div className="border border-l-4 border-green-300 border-l-green-700 bg-green-50 p-6 dark:border-green-500/30 dark:border-l-green-400 dark:bg-green-950/25">
-            <p className="label-md text-black tracking-widest dark:text-green-100">ELECTION CREATED</p>
-            <h3 className="font-muse text-3xl mt-2">{createdSession.title}</h3>
-            <p className="mt-3 text-sm text-[var(--on-surface)] opacity-90 dark:opacity-100">Session Code:</p>
-            <p className="font-bold text-2xl tracking-[0.2em] mt-1">{createdSession.code}</p>
-            <div className="mt-4 flex gap-3 flex-wrap">
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(createdSession.code);
-                    pushToast({
-                      type: 'info',
-                      title: 'Code Copied',
-                      message: 'Session code copied to clipboard.',
-                    });
-                  } catch {
-                    setError('Unable to copy session code');
-                    pushToast({
-                      type: 'error',
-                      title: 'Copy Failed',
-                      message: 'Unable to copy session code.',
-                    });
-                  }
-                }}
-                className="border border-[var(--outline-variant)] px-5 py-2 uppercase text-xs tracking-widest"
-              >
-                Copy Code
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/admin')}
-                className="bg-[var(--primary)] text-[var(--on-primary)] px-5 py-2 uppercase text-xs tracking-widest"
-              >
-                Go to Elections
-              </button>
-            </div>
-          </div>
-        ) : null}
-        </form>
+          </form>
+        )}
       </div>
 
       <ConfirmDialog
         open={!!replacePrompt}
         title="Replace Existing Session?"
-        message={replacePrompt?.duplicateSession
-          ? `A matching session already exists (${replacePrompt.duplicateSession.title}, code ${replacePrompt.duplicateSession.code}). Replace it with this new one?`
-          : 'A matching session already exists. Replace it with this new one?'}
+        message={
+          replacePrompt?.duplicateSession
+            ? `A matching session already exists (${replacePrompt.duplicateSession.title}, code ${replacePrompt.duplicateSession.code}). Replace it with this new one?`
+            : 'A matching session already exists. Replace it with this new one?'
+        }
         confirmLabel="Replace And Create"
         confirmTone="danger"
         busy={isSubmitting}
