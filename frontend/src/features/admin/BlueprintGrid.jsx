@@ -29,7 +29,6 @@ import {
   getCandidates,
   getFakeVoters,
   getIntegrityReport,
-  getResults,
   injectFakeVotes,
   regenerateElectionCode,
   updateElectionDetails,
@@ -106,7 +105,6 @@ export default function BlueprintGrid() {
   const [maxVotersInput, setMaxVotersInput] = useState('');
   const [newCandidateName, setNewCandidateName] = useState('');
   const [newCandidateDescription, setNewCandidateDescription] = useState('');
-  const [resultsData, setResultsData] = useState(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -181,22 +179,19 @@ export default function BlueprintGrid() {
       setCandidates([]);
       setIntegrity(null);
       setFakeVoterAudit([]);
-      setResultsData(null);
       return;
     }
 
-    const [candidateResponse, integrityResponse, fakeVoterResponse, electionResultsResponse] = await Promise.all([
+    const [candidateResponse, integrityResponse, fakeVoterResponse] = await Promise.all([
       getCandidates(electionId),
       getIntegrityReport(electionId),
       getFakeVoters(electionId),
-      getResults(electionId).catch(() => null),
     ]);
 
     const nextCandidates = candidateResponse.candidates || [];
     setCandidates(nextCandidates);
     setIntegrity(integrityResponse || null);
     setFakeVoterAudit(fakeVoterResponse?.records || []);
-    setResultsData(electionResultsResponse || null);
 
     setInjectionMap((previous) => {
       const next = { ...previous };
@@ -557,20 +552,20 @@ export default function BlueprintGrid() {
         <div className="flex items-center gap-3">
           <button
             type="button"
+            onClick={() => navigate('/results')}
+            className="border border-[var(--outline-variant)] px-4 py-2.5 text-xs uppercase tracking-widest font-bold hover:bg-[var(--surface-container)] transition-colors flex items-center gap-2"
+            title="View Results & Audit"
+          >
+            <BarChart3 size={14} />
+            <span>Results & Audit</span>
+          </button>
+          <button
+            type="button"
             onClick={() => navigate('/admin/create')}
             className="bg-[var(--primary)] text-[var(--on-primary)] px-5 py-2.5 text-xs uppercase tracking-widest font-bold hover:bg-[var(--primary)]/90 transition-all shadow-sm flex items-center gap-2"
           >
             <Plus size={14} />
             <span>Create Election</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="border border-[var(--outline-variant)] px-4 py-2.5 text-xs uppercase tracking-widest hover:bg-[var(--surface-container)] transition-colors flex items-center gap-2"
-            title="Log out of admin"
-          >
-            <LogOut size={14} />
-            <span>Exit</span>
           </button>
         </div>
       </div>
@@ -663,16 +658,12 @@ export default function BlueprintGrid() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setAdminTab('results')}
-                    className={`px-3 py-1.5 text-[0.62rem] uppercase tracking-wider font-bold border transition-colors flex items-center gap-1 ${
-                      adminTab === 'results'
-                        ? 'bg-[var(--primary)] text-[var(--on-primary)] border-[var(--primary)]'
-                        : 'border-[var(--outline-variant)] hover:bg-[var(--surface-container)] text-[var(--on-surface)]'
-                    }`}
-                    title="View live tally for this election"
+                    onClick={() => navigate(`/results?electionId=${selectedElection.id}`)}
+                    className="px-3 py-1.5 text-[0.62rem] uppercase tracking-wider font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] transition-colors flex items-center gap-1"
+                    title="View election results & audit"
                   >
                     <BarChart3 size={13} />
-                    <span>Live Results</span>
+                    <span>Results & Audit</span>
                   </button>
                   <button
                     type="button"
@@ -759,19 +750,6 @@ export default function BlueprintGrid() {
               >
                 <Share2 size={15} />
                 <span>Voter Access & Links</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAdminTab('results')}
-                className={`flex items-center gap-2 px-6 py-3 text-xs uppercase tracking-widest font-bold border-b-2 transition-all ${
-                  adminTab === 'results'
-                    ? 'border-[var(--primary)] text-[var(--primary)]'
-                    : 'border-transparent text-[var(--on-surface)] opacity-50 hover:opacity-100'
-                }`}
-              >
-                <BarChart3 size={15} />
-                <span>Live Results & Tally</span>
               </button>
 
               <button
@@ -1083,154 +1061,7 @@ export default function BlueprintGrid() {
               </div>
             )}
 
-            {/* TAB 3: Live Results & Analytics */}
-            {adminTab === 'results' && (
-              <div className="space-y-6">
-                {/* Header Strip */}
-                <div className="bg-[var(--surface-container-lowest)] p-6 border border-[var(--on-surface)]/15 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div>
-                    <span className="text-[0.58rem] uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-50">
-                      LIVE ELECTORAL AUDIT & TALLY
-                    </span>
-                    <h4 className="font-muse text-2xl font-bold text-[var(--primary)] mt-0.5">
-                      {selectedElection.title}
-                    </h4>
-                    <p className="text-xs text-[var(--on-surface)] opacity-60 mt-0.5">
-                      Status: <strong className="uppercase">{selectedElection.status}</strong> • Total Recorded Votes: <strong>{totalElectionVotes}</strong>
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (selectedElection?.id) {
-                        loadElectionDetails(selectedElection.id);
-                        pushToast({ type: 'info', title: 'Tallies Refreshed', message: 'Loaded latest voting metrics.' });
-                      }
-                    }}
-                    className="px-4 py-2 text-xs uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] flex items-center gap-1.5 shrink-0"
-                  >
-                    <span>Refresh Tallies</span>
-                  </button>
-                </div>
-
-                {/* Candidate Standings Leaderboard */}
-                <div className="bg-[var(--surface-container-lowest)] p-6 md:p-8 border border-[var(--on-surface)]/15 space-y-4">
-                  <div className="flex items-center justify-between border-b border-[var(--on-surface)]/10 pb-3">
-                    <h4 className="font-muse text-xl font-bold text-[var(--primary)]">
-                      Candidate Standings & Distribution
-                    </h4>
-                    <span className="text-[0.58rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-60">
-                      {candidates.length} Candidates
-                    </span>
-                  </div>
-
-                  <div className="space-y-4">
-                    {candidates
-                      .slice()
-                      .sort((a, b) => b.votes - a.votes)
-                      .map((candidate, idx) => {
-                        const pct = totalElectionVotes > 0 ? ((candidate.votes / totalElectionVotes) * 100).toFixed(1) : '0.0';
-                        const isLeading = idx === 0 && candidate.votes > 0;
-
-                        return (
-                          <div key={candidate.id} className="p-4 bg-[var(--surface)] border border-[var(--on-surface)]/10 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <span className="font-mono text-xs font-bold text-[var(--on-surface)] opacity-40">
-                                  #{idx + 1}
-                                </span>
-                                <span className="font-muse text-lg font-bold text-[var(--on-surface)]">
-                                  {candidate.name}
-                                </span>
-                                {isLeading && (
-                                  <span className="px-2 py-0.5 text-[0.52rem] uppercase tracking-widest font-bold border border-[var(--on-surface)]/20 text-[var(--on-surface)]">
-                                    Leader
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="text-right">
-                                <span className="text-sm font-mono font-bold text-[var(--primary)]">
-                                  {candidate.votes} votes
-                                </span>
-                                <span className="text-xs font-mono text-[var(--on-surface)] opacity-60 ml-2">
-                                  ({pct}%)
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Percentage Bar */}
-                            <div className="w-full h-2 bg-[var(--surface-container)] overflow-hidden">
-                              <div
-                                className="h-full bg-[var(--primary)] transition-all duration-500"
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-
-                {/* Demographic Age Group Breakdown */}
-                {resultsData?.ageGroups && resultsData.ageGroups.length > 0 && (
-                  <div className="bg-[var(--surface-container-lowest)] p-6 md:p-8 border border-[var(--on-surface)]/15 space-y-4">
-                    <div className="flex items-center justify-between border-b border-[var(--on-surface)]/10 pb-3">
-                      <h4 className="font-muse text-xl font-bold text-[var(--primary)]">
-                        Demographic Participation by Age
-                      </h4>
-                      <span className="text-[0.58rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-60">
-                        {resultsData.ageGroups.length} Age Groups
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                      {resultsData.ageGroups.map((group) => (
-                        <div key={group.age_group} className="p-3 bg-[var(--surface)] border border-[var(--on-surface)]/10 text-center">
-                          <p className="text-[0.58rem] uppercase tracking-wider text-[var(--on-surface)] opacity-50 font-bold">
-                            {group.age_group}
-                          </p>
-                          <p className="text-xl font-bold font-muse text-[var(--primary)] mt-1">
-                            {group.total}
-                          </p>
-                          <p className="text-[0.55rem] text-[var(--on-surface)] opacity-60">
-                            votes cast
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Audit & Integrity Metrics */}
-                <div className="bg-[var(--surface-container-lowest)] p-6 border border-[var(--on-surface)]/15">
-                  <h4 className="font-muse text-xl font-bold text-[var(--primary)] mb-4">Integrity & Audit Metrics</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-4 bg-[var(--surface)] border border-[var(--outline-variant)]">
-                      <p className="text-[0.58rem] uppercase tracking-wider text-[var(--on-surface)] opacity-60">TOTAL VOTES</p>
-                      <p className="text-2xl font-bold font-muse text-[var(--primary)]">{integrity?.totalVotes || totalElectionVotes || 0}</p>
-                    </div>
-                    <div className="p-4 bg-[var(--surface)] border border-[var(--outline-variant)]">
-                      <p className="text-[0.58rem] uppercase tracking-wider text-[var(--on-surface)] opacity-60">REAL CITIZEN VOTES</p>
-                      <p className="text-2xl font-bold font-muse text-[var(--on-surface)]">{integrity?.realVotes || 0}</p>
-                    </div>
-                    <div className="p-4 bg-[var(--surface)] border border-[var(--outline-variant)]">
-                      <p className="text-[0.58rem] uppercase tracking-wider text-[var(--on-surface)] opacity-60">SIMULATED VOTES</p>
-                      <p className="text-2xl font-bold font-muse text-[var(--on-surface)]">{integrity?.fakeVotes || 0}</p>
-                    </div>
-                    <div className="p-4 bg-[var(--surface)] border border-[var(--outline-variant)]">
-                      <p className="text-[0.58rem] uppercase tracking-wider text-[var(--on-surface)] opacity-60">INTEGRITY STATUS</p>
-                      <p className="text-lg font-bold font-muse text-[var(--on-surface)]">
-                        {integrity?.integrityStatus === 'clean' ? 'CLEAN' : 'SIMULATED DATA'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 4: Simulation Sandbox */}
+            {/* TAB 3: Simulation Sandbox */}
             {adminTab === 'sandbox' && (
               <div className="space-y-6">
                 {/* Sandbox Info Banner */}

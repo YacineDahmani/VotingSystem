@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { AlertTriangle, Info, Radio, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { getActiveElection, getAdminElections, getIntegrityReport, getResults } from '../../lib/api';
 import {
   VOTER_PHASES,
@@ -10,6 +11,7 @@ import {
   isVoterSession,
   setSession,
   setVoterPhase,
+  useSession,
 } from '../../store/session';
 
 function isElectionFinished(election) {
@@ -33,7 +35,7 @@ export default function ResultsView() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const MotionDiv = motion.div;
-  const session = useMemo(() => getSession(), []);
+  const session = useSession();
   const adminView = isAdminSession(session);
   const guestResultsView = !adminView && !session?.token && !!session?.resultsElectionId;
   const endedNotice = session?.resultsNotice || '';
@@ -74,6 +76,9 @@ export default function ResultsView() {
             const list = await getAdminElections().catch(() => []);
             const elections = Array.isArray(list) ? list : (list?.elections || []);
             electionId = elections[0]?.id;
+            if (electionId && mounted) {
+              setSelectedElectionId(electionId);
+            }
           } else {
             const active = await getActiveElection().catch(() => null);
             electionId = active?.election?.id;
@@ -81,7 +86,7 @@ export default function ResultsView() {
         }
 
         if (!electionId) {
-          throw new Error('No election available for results');
+          throw new Error('No election available for results. Please create or start an election.');
         }
 
         const response = await getResults(electionId);
@@ -132,14 +137,48 @@ export default function ResultsView() {
   }, [adminView, guestResultsView, navigate, selectedElectionId]);
 
   if (!results && !error) {
-    return <div className="min-h-screen flex items-center justify-center">Loading results...</div>;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[var(--surface)] text-[var(--on-surface)]">
+        <p className="font-muse text-2xl">Loading results & audit...</p>
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="label-md text-black dark:text-red-100">{error}</p>
-        <button onClick={() => navigate('/')} className="px-6 py-3 bg-[var(--primary)] text-[var(--on-primary)] label-md transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">Back to Sign In</button>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 p-8 bg-[var(--surface)] text-[var(--on-surface)]">
+        <div className="bg-[var(--surface-container-lowest)] p-8 border border-[var(--on-surface)]/20 shadow-lg text-center max-w-md">
+          <p className="text-xs uppercase tracking-[0.2em] font-bold opacity-60 mb-2">RESULTS UNAVAILABLE</p>
+          <p className="text-sm font-medium mb-6 opacity-90">{error}</p>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {adminView ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin')}
+                  className="px-5 py-2.5 bg-[var(--primary)] text-[var(--on-primary)] text-xs uppercase tracking-widest font-bold hover:bg-[var(--primary)]/90 transition-all shadow-sm"
+                >
+                  Admin Dashboard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin/create')}
+                  className="px-5 py-2.5 border border-[var(--outline-variant)] text-xs uppercase tracking-widest font-bold hover:bg-[var(--surface-container)] transition-all"
+                >
+                  Create Election
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="px-6 py-3 bg-[var(--primary)] text-[var(--on-primary)] text-xs uppercase tracking-widest font-bold hover:bg-[var(--primary)]/90 transition-all shadow-md"
+              >
+                Back to Sign In
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
@@ -186,7 +225,8 @@ export default function ResultsView() {
 
   const winnerName = results?.leader?.name || distribution[0]?.name || 'No winner yet';
   const runoffElection = results?.runoffElection || null;
-  const tiedTopCandidates = results?.isTie ? (results?.tiedCandidates || []) : [];
+  const isTieResult = Boolean(results?.isTie);
+  const tiedTopCandidates = isTieResult ? (results?.tiedCandidates || []) : [];
   const isOpenElection = results?.election?.status === 'open' && !isElectionFinished(results?.election);
   const heroLabel = isTieResult
     ? 'TIE'
@@ -221,30 +261,46 @@ export default function ResultsView() {
 
       <div className="w-full max-w-6xl mx-auto px-12 relative z-10">
         {adminView && isOpenElection ? (
-          <div className="mb-6 p-4 bg-[var(--surface-container)] border border-[var(--on-surface)]/15 text-xs text-[var(--on-surface)] flex items-center justify-between">
-            <span><strong>ADMIN LIVE PREVIEW</strong> — This election is currently ongoing. Displaying live interim votes.</span>
+          <div className="mb-6 p-4 bg-white dark:bg-[#15202b] border border-blue-200 dark:border-blue-900 border-l-4 border-l-blue-600 dark:border-l-blue-400 text-xs text-[var(--on-surface)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="px-2 py-0.5 font-mono text-[0.58rem] font-bold uppercase tracking-wider bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                LIVE PREVIEW
+              </span>
+              <span className="text-xs text-[var(--on-surface)] opacity-85">Voting is currently open. Showing live interim tallies.</span>
+            </div>
             <button
               type="button"
               onClick={() => navigate('/admin')}
-              className="px-3 py-1 text-[0.6rem] uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container-high)]"
+              className="px-3.5 py-1.5 text-[0.6rem] uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] transition-colors shrink-0"
             >
-              Return to Admin
+              Admin Dashboard
             </button>
           </div>
         ) : null}
 
         {endedNotice ? (
-          <div className="mb-8 border border-[var(--on-surface)]/15 bg-[var(--surface-container-lowest)] p-4 text-[var(--on-surface)] shadow-sm">
-            <p className="text-xs uppercase tracking-widest font-bold text-[var(--on-surface)]">NOTICE</p>
-            <p className="text-xs mt-1 text-[var(--on-surface)] opacity-80 leading-relaxed">{endedNotice}</p>
+          <div className="mb-8 p-4 bg-white dark:bg-[#262018] border border-amber-200 dark:border-amber-900 border-l-4 border-l-amber-600 dark:border-l-amber-400 text-[var(--on-surface)] shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2 py-0.5 font-mono text-[0.58rem] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                NOTICE
+              </span>
+              <p className="text-xs font-bold text-amber-950 dark:text-amber-100">
+                Voting Concluded
+              </p>
+            </div>
+            <p className="text-xs text-[var(--on-surface)] opacity-80 leading-relaxed mt-1">{endedNotice}</p>
           </div>
         ) : null}
 
         {adminView && integrity ? (
-          <div className="mb-10 border border-[var(--on-surface)]/15 p-4 bg-[var(--surface-container-lowest)] text-[var(--on-surface)] shadow-sm">
-            <p className="text-xs uppercase tracking-widest font-bold text-[var(--on-surface)]">INTEGRITY AUDIT</p>
-            <p className="text-xs mt-1 text-[var(--on-surface)] opacity-80">
-              Status: <strong>{integrity.integrityStatus === 'clean' ? 'CLEAN' : 'SIMULATED DATA DETECTED'}</strong> | Real Votes: {integrity.realVotes} | Simulated Votes: {integrity.fakeVotes}
+          <div className={`mb-8 p-4 bg-white ${integrity.integrityStatus === 'clean' ? 'dark:bg-[#16221c] border-emerald-200 dark:border-emerald-900 border-l-4 border-l-emerald-600 dark:border-l-emerald-400' : 'dark:bg-[#281a1c] border-rose-200 dark:border-rose-900 border-l-4 border-l-rose-600 dark:border-l-rose-400'} border text-[var(--on-surface)] shadow-sm`}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`px-2 py-0.5 font-mono text-[0.58rem] font-bold uppercase tracking-wider ${integrity.integrityStatus === 'clean' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800'}`}>
+                {integrity.integrityStatus === 'clean' ? 'INTEGRITY AUDIT: CLEAN' : 'INTEGRITY AUDIT: SIMULATED VOTES DETECTED'}
+              </span>
+            </div>
+            <p className="text-xs opacity-85 mt-1">
+              Verified Citizen Votes: <strong>{integrity.realVotes}</strong> • Simulated Sandbox Votes: <strong>{integrity.fakeVotes}</strong>
             </p>
           </div>
         ) : null}
@@ -276,8 +332,8 @@ export default function ResultsView() {
               </div>
             ) : <div />}
 
-            <div className="flex gap-3">
-              {adminView ? (
+            {adminView ? (
+              <div className="flex gap-3">
                 <button
                   type="button"
                   onClick={() => navigate('/admin')}
@@ -285,15 +341,8 @@ export default function ResultsView() {
                 >
                   Admin Dashboard
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={handleExitResults}
-                className="bg-[var(--primary)] text-[var(--on-primary)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
-              >
-                Exit
-              </button>
-            </div>
+              </div>
+            ) : null}
           </div>
 
           <p className="label-md text-[var(--secondary)] mb-12 tracking-widest font-bold">
