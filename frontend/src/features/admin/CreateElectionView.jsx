@@ -506,9 +506,13 @@ export default function CreateElectionView() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Error banner */}
             {error && (
-              <div className="p-4 bg-[var(--surface-container-lowest)] border border-[var(--on-surface)]/20 shadow-sm">
-                <p className="text-xs font-bold text-[var(--on-surface)] uppercase tracking-wider">ERROR</p>
-                <p className="text-xs text-[var(--on-surface)] opacity-80 mt-0.5">{error}</p>
+              <div className="p-4 bg-[#ffffff] dark:bg-[#1a1415] border border-rose-600/30 border-t-[3px] border-t-rose-600 shadow-md">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-1.5 py-0.5 font-mono text-[0.52rem] font-bold tracking-[0.2em] uppercase bg-rose-600/15 text-rose-800 dark:text-rose-300 border border-rose-600/30">
+                    VALIDATION FAULT
+                  </span>
+                </div>
+                <p className="text-xs text-rose-900/90 dark:text-rose-200/90 font-medium mt-0.5 leading-relaxed">{error}</p>
               </div>
             )}
 
