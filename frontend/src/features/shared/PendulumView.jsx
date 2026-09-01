@@ -361,13 +361,6 @@ export default function PendulumView() {
               {isSocketConnected ? 'LIVE' : 'RECONNECTING'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleLeaveWaiting}
-            className="mt-4 px-6 py-3 bg-[var(--primary)] text-[var(--on-primary)] text-[0.65rem] uppercase tracking-[0.2em] transition-all duration-200 hover:bg-[var(--primary)]/90 hover:-translate-y-0.5 shadow-md active:translate-y-0 font-bold"
-          >
-            Leave
-          </button>
         </div>
       </div>
 

@@ -50,24 +50,28 @@ const evaluatePasswordStrength = (password) => {
 
 const SESSION_STATUS_COPY = {
   open: {
-    label: 'OPEN',
-    detail: 'Voting is open.',
-    badgeClass: 'border border-[var(--on-surface)]/20 text-[var(--on-surface)]',
+    label: 'ACTIVE // OPEN',
+    detail: 'Voting session is active and open.',
+    badgeClass: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/40',
+    boxBorder: 'border-t-[3px] border-t-emerald-600 dark:border-t-emerald-400 border-emerald-600/30 dark:border-emerald-400/30',
   },
   waiting: {
-    label: 'WAITING',
+    label: 'PENDING // DRAFT',
     detail: 'Voting has not started yet.',
-    badgeClass: 'border border-[var(--on-surface)]/20 text-[var(--on-surface)]',
+    badgeClass: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/40',
+    boxBorder: 'border-t-[3px] border-t-amber-600 dark:border-t-amber-400 border-amber-600/30 dark:border-amber-400/30',
   },
   closed: {
-    label: 'CLOSED',
-    detail: 'Voting has ended.',
-    badgeClass: 'border border-[var(--on-surface)]/20 text-[var(--on-surface)]',
+    label: 'CONCLUDED // CLOSED',
+    detail: 'Voting window has ended.',
+    badgeClass: 'bg-rose-500/15 text-rose-800 dark:text-rose-300 border-rose-500/40',
+    boxBorder: 'border-t-[3px] border-t-rose-600 dark:border-t-rose-400 border-rose-600/30 dark:border-rose-500/30',
   },
   invalid: {
-    label: 'INVALID',
-    detail: 'Session code not found.',
-    badgeClass: 'border border-[var(--on-surface)]/20 text-[var(--on-surface)]',
+    label: 'NOT FOUND // INVALID',
+    detail: 'Session code not found in directory.',
+    badgeClass: 'bg-rose-500/15 text-rose-800 dark:text-rose-300 border-rose-500/40',
+    boxBorder: 'border-t-[3px] border-t-rose-600 dark:border-t-rose-400 border-rose-600/30 dark:border-rose-500/30',
   },
 };
 
@@ -641,10 +645,10 @@ export default function IdentityArchive() {
             </div>
 
             {entryMode === 'voter' && sessionStatus.isLoaded ? (
-              <div className="w-full bg-[var(--surface-container)]/75 border border-black/10 px-4 py-3">
+              <div className={`w-full bg-[#ffffff] dark:bg-[#161919] border ${statusMeta.boxBorder} px-4 py-3 shadow-sm`}>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="uppercase text-[0.58rem] tracking-[0.2em] text-[var(--on-surface)] opacity-60">Session</p>
-                  <span className={`px-2 py-1 text-[0.55rem] uppercase tracking-[0.18em] font-semibold ${statusMeta.badgeClass}`}>
+                  <p className="uppercase font-mono text-[0.55rem] tracking-[0.2em] text-[var(--on-surface)] opacity-50">SESSION REGISTRY</p>
+                  <span className={`px-2 py-0.5 text-[0.52rem] font-mono font-bold uppercase tracking-[0.18em] border ${statusMeta.badgeClass}`}>
                     {statusMeta.label}
                   </span>
                 </div>

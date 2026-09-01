@@ -213,13 +213,6 @@ export default function GravitySlot() {
               Voter: <strong className="text-[var(--on-surface)]">{session.voterName || 'Verified Citizen'}</strong>
             </span>
           </div>
-          <button
-            type="button"
-            onClick={exitBallot}
-            className="border border-[var(--outline-variant)] px-4 py-1.5 text-[0.62rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)] hover:-translate-y-0.5 shadow-sm active:translate-y-0"
-          >
-            Exit
-          </button>
         </div>
         <h2 className="font-muse text-4xl md:text-5xl text-[var(--primary)] max-w-2xl leading-[1.1]">
           Cast your vote.
