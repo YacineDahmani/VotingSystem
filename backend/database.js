@@ -1279,12 +1279,53 @@ async function verifyAdminCredentials(identifier, password) {
     };
 }
 
-function updateAdminLastLogin(id) {
+function getAllAdmins() {
     return new Promise((resolve, reject) => {
-        const now = new Date().toISOString();
-        db.run('UPDATE admins SET last_login_at = ? WHERE id = ?', [now, id], (err) => {
+        db.all(
+            'SELECT id, username, email, role, is_active, last_login_at, created_at FROM admins ORDER BY id ASC',
+            (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows || []);
+            }
+        );
+    });
+}
+
+function countSuperAdmins() {
+    return new Promise((resolve, reject) => {
+        db.get(
+            "SELECT COUNT(*) as count FROM admins WHERE role = 'super_admin' AND is_active = 1",
+            (err, row) => {
+                if (err) reject(err);
+                else resolve(row ? row.count : 0);
+            }
+        );
+    });
+}
+
+function updateAdminRole(id, role) {
+    return new Promise((resolve, reject) => {
+        db.run('UPDATE admins SET role = ? WHERE id = ?', [role, id], function (err) {
             if (err) reject(err);
-            else resolve(now);
+            else getAdminById(id).then(resolve).catch(reject);
+        });
+    });
+}
+
+function updateAdminStatus(id, isActive) {
+    return new Promise((resolve, reject) => {
+        db.run('UPDATE admins SET is_active = ? WHERE id = ?', [isActive ? 1 : 0, id], function (err) {
+            if (err) reject(err);
+            else getAdminById(id).then(resolve).catch(reject);
+        });
+    });
+}
+
+function deleteAdmin(id) {
+    return new Promise((resolve, reject) => {
+        db.run('DELETE FROM admins WHERE id = ?', [id], function (err) {
+            if (err) reject(err);
+            else resolve({ success: true, deletedId: id });
         });
     });
 }
@@ -1298,11 +1339,16 @@ module.exports = {
     setSetting,
     // Admin Auth
     countAdmins,
+    countSuperAdmins,
     createAdmin,
+    getAllAdmins,
     getAdminById,
     getAdminByUsernameOrEmail,
     verifyAdminCredentials,
     updateAdminLastLogin,
+    updateAdminRole,
+    updateAdminStatus,
+    deleteAdmin,
     // Elections
     createElection,
     getElectionByCode,

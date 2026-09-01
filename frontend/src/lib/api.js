@@ -201,3 +201,28 @@ export function updateElectionStatus(electionId, status) {
     body: JSON.stringify({ status }),
   });
 }
+
+export function getAdminOfficers() {
+  return request('/api/admin/officers');
+}
+
+export function createAdminOfficer(payload) {
+  return request('/api/admin/officers', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateAdminOfficer(officerId, payload) {
+  return request(`/api/admin/officers/${officerId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteAdminOfficer(officerId) {
+  return request(`/api/admin/officers/${officerId}`, {
+    method: 'DELETE',
+  });
+}
+

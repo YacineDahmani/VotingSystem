@@ -5,6 +5,7 @@ import GravitySlot from './features/voting/GravitySlot';
 import PendulumView from './features/shared/PendulumView';
 import BlueprintGrid from './features/admin/BlueprintGrid';
 import CreateElectionView from './features/admin/CreateElectionView';
+import OfficersView from './features/admin/OfficersView';
 import ResultsView from './features/results/ResultsView';
 import { AdminRoute, ResultsRoute, VoterRoute, WaitingRoute } from './lib/routeGuard';
 import { ToastProvider } from './components/ui/ToastProvider';
@@ -21,6 +22,7 @@ function AppContent() {
           <Route path="/admin" element={<AdminRoute><BlueprintGrid /></AdminRoute>} />
           <Route path="/admin/create" element={<AdminRoute><CreateElectionView /></AdminRoute>} />
           <Route path="/admin/new" element={<AdminRoute><CreateElectionView /></AdminRoute>} />
+          <Route path="/admin/officers" element={<AdminRoute><OfficersView /></AdminRoute>} />
           <Route path="/results" element={<ResultsRoute><ResultsView /></ResultsRoute>} />
         </Routes>
       </main>

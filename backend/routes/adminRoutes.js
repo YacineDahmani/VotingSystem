@@ -465,8 +465,164 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
                     id: req.auth?.adminId || 0,
                     username: req.auth?.username || 'Admin',
                     email: req.auth?.email || '',
-                    role: req.auth?.adminRole || 'admin',
+                    role: req.auth?.adminRole || 'super_admin',
                 },
+            });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
+    // Officer & Role Management
+    router.get('/officers', async (req, res) => {
+        try {
+            const officers = await db.getAllAdmins();
+            return res.json({ success: true, officers });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.post('/officers', async (req, res) => {
+        try {
+            const callerRole = req.auth?.adminRole;
+            if (callerRole !== 'super_admin') {
+                return res.status(403).json({ error: 'Only Super Administrators can register new officers.' });
+            }
+
+            const { username, email, password, role } = req.body;
+            const normalizedUsername = normalizeText(username);
+            const normalizedEmail = normalizeText(email).toLowerCase();
+            const rawPassword = typeof password === 'string' ? password : '';
+            const assignedRole = role || 'election_officer';
+
+            const allowedRoles = ['super_admin', 'election_officer', 'auditor'];
+            if (!allowedRoles.includes(assignedRole)) {
+                return res.status(400).json({ error: `Invalid role. Allowed roles: ${allowedRoles.join(', ')}` });
+            }
+
+            if (!normalizedUsername || normalizedUsername.length < 3) {
+                return res.status(400).json({ error: 'Username must be at least 3 characters long.' });
+            }
+
+            if (!normalizedEmail || !normalizedEmail.includes('@')) {
+                return res.status(400).json({ error: 'A valid email address is required.' });
+            }
+
+            const passwordStrength = validatePasswordStrength(rawPassword);
+            if (!passwordStrength.valid) {
+                return res.status(400).json({ error: passwordStrength.error });
+            }
+
+            // Check if username or email already exists
+            const existing = await db.getAdminByUsernameOrEmail(normalizedUsername);
+            if (existing) {
+                return res.status(409).json({ error: 'An officer with this username or email already exists.' });
+            }
+            const existingEmail = await db.getAdminByUsernameOrEmail(normalizedEmail);
+            if (existingEmail) {
+                return res.status(409).json({ error: 'An officer with this email address already exists.' });
+            }
+
+            const newOfficer = await db.createAdmin(normalizedUsername, normalizedEmail, rawPassword, assignedRole);
+            return res.status(201).json({
+                success: true,
+                message: `Officer ${newOfficer.username} registered successfully`,
+                officer: newOfficer,
+            });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.patch('/officers/:id', async (req, res) => {
+        try {
+            const callerRole = req.auth?.adminRole;
+            if (callerRole !== 'super_admin') {
+                return res.status(403).json({ error: 'Only Super Administrators can modify officer permissions.' });
+            }
+
+            const officerId = Number.parseInt(req.params.id, 10);
+            const targetOfficer = await db.getAdminById(officerId);
+            if (!targetOfficer) {
+                return res.status(404).json({ error: 'Officer not found.' });
+            }
+
+            const { role, is_active } = req.body;
+
+            // Role update
+            if (role !== undefined) {
+                const allowedRoles = ['super_admin', 'election_officer', 'auditor'];
+                if (!allowedRoles.includes(role)) {
+                    return res.status(400).json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` });
+                }
+
+                // If changing away from super_admin, check that another active super_admin exists
+                if (targetOfficer.role === 'super_admin' && role !== 'super_admin') {
+                    const superAdminCount = await db.countSuperAdmins();
+                    if (superAdminCount <= 1) {
+                        return res.status(400).json({ error: 'Cannot demote the last remaining active Super Administrator.' });
+                    }
+                }
+
+                await db.updateAdminRole(officerId, role);
+            }
+
+            // Status update (active/inactive)
+            if (is_active !== undefined) {
+                const activeState = Boolean(is_active);
+                if (targetOfficer.role === 'super_admin' && !activeState) {
+                    const superAdminCount = await db.countSuperAdmins();
+                    if (superAdminCount <= 1) {
+                        return res.status(400).json({ error: 'Cannot deactivate the last remaining active Super Administrator.' });
+                    }
+                }
+
+                await db.updateAdminStatus(officerId, activeState);
+            }
+
+            const updatedOfficer = await db.getAdminById(officerId);
+            return res.json({
+                success: true,
+                message: 'Officer record updated successfully',
+                officer: updatedOfficer,
+            });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.delete('/officers/:id', async (req, res) => {
+        try {
+            const callerRole = req.auth?.adminRole;
+            const callerId = req.auth?.adminId;
+
+            if (callerRole !== 'super_admin') {
+                return res.status(403).json({ error: 'Only Super Administrators can remove officer accounts.' });
+            }
+
+            const officerId = Number.parseInt(req.params.id, 10);
+            if (callerId === officerId) {
+                return res.status(400).json({ error: 'You cannot delete your own administrative account while logged in.' });
+            }
+
+            const targetOfficer = await db.getAdminById(officerId);
+            if (!targetOfficer) {
+                return res.status(404).json({ error: 'Officer not found.' });
+            }
+
+            if (targetOfficer.role === 'super_admin') {
+                const superAdminCount = await db.countSuperAdmins();
+                if (superAdminCount <= 1) {
+                    return res.status(400).json({ error: 'Cannot delete the last remaining active Super Administrator.' });
+                }
+            }
+
+            await db.deleteAdmin(officerId);
+            return res.json({
+                success: true,
+                message: `Officer ${targetOfficer.username} removed successfully.`,
+                deletedId: officerId,
             });
         } catch (err) {
             return res.status(500).json({ error: err.message });

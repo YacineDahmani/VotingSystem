@@ -29,6 +29,11 @@ export default function Header() {
           path: '/admin/create',
           active: location.pathname === '/admin/create' || location.pathname === '/admin/new',
         },
+        {
+          label: 'OFFICERS & ROLES',
+          path: '/admin/officers',
+          active: location.pathname === '/admin/officers',
+        },
         { label: 'RESULTS & AUDIT', path: '/results', active: location.pathname === '/results' },
       ];
 

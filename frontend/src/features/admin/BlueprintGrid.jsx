@@ -124,11 +124,6 @@ export default function BlueprintGrid() {
       .catch(() => null);
   }, []);
 
-  const handleLogout = () => {
-    clearSession();
-    navigate('/', { replace: true });
-  };
-
   const filteredElections = useMemo(() => {
     if (filter === 'all') return elections;
     return elections.filter((item) => item.status === filter);
@@ -550,6 +545,15 @@ export default function BlueprintGrid() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/admin/officers')}
+            className="border border-[var(--outline-variant)] px-4 py-2.5 text-xs uppercase tracking-widest font-bold hover:bg-[var(--surface-container)] transition-colors flex items-center gap-2"
+            title="Manage Officers & Roles"
+          >
+            <Users size={14} />
+            <span>Officers & Roles</span>
+          </button>
           <button
             type="button"
             onClick={() => navigate('/results')}
