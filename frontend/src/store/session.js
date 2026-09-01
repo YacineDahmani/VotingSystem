@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 const SESSION_KEY = 'analog-voting-session';
 const VOTER_PHASES = {
   BALLOT: 'ballot',
@@ -39,12 +41,19 @@ function readSession() {
   }
 }
 
+function notifySessionChange() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('session-update'));
+  }
+}
+
 function writeSession(next) {
   try {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
     if (next?.role === 'admin') {
       localStorage.setItem(SESSION_KEY, JSON.stringify(next));
     }
+    notifySessionChange();
   } catch {}
 }
 
@@ -63,6 +72,7 @@ export function clearSession() {
   try {
     sessionStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(SESSION_KEY);
+    notifySessionChange();
   } catch {}
 }
 
@@ -114,6 +124,26 @@ export function markWaitingDismissed() {
   return setSession({
     waitingDismissedAt: new Date().toISOString(),
   });
+}
+
+export function useSession() {
+  const [session, setSessionState] = useState(() => readSession());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setSessionState(readSession());
+    };
+
+    window.addEventListener('session-update', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    return () => {
+      window.removeEventListener('session-update', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  return session;
 }
 
 export { VOTER_PHASES };
