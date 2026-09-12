@@ -195,10 +195,14 @@ export function getFakeVoters(electionId) {
   return request(`/api/admin/elections/${electionId}/fake-voters`);
 }
 
-export function updateElectionStatus(electionId, status) {
+export function updateElectionStatus(electionId, status, endDate = null) {
+  const body = { status };
+  if (endDate) {
+    body.endDate = endDate;
+  }
   return request(`/api/admin/elections/${electionId}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(body),
   });
 }
 

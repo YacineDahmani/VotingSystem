@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 const SESSION_KEY = 'analog-voting-session';
 const VOTER_PHASES = {
-  BALLOT: 'ballot',
+  vote: 'vote',
   WAITING: 'waiting',
   RESULTS: 'results',
 };
@@ -97,7 +97,7 @@ export function getVoterPhase(session = readSession()) {
     return session.phase;
   }
 
-  return session.hasVoted ? VOTER_PHASES.WAITING : VOTER_PHASES.BALLOT;
+  return session.hasVoted ? VOTER_PHASES.WAITING : VOTER_PHASES.vote;
 }
 
 export function setVoterPhase(phase) {
@@ -112,7 +112,7 @@ export function markVoteSubmitted(candidateId, metadata = {}) {
   return setSession({
     selectedCandidateId: candidateId,
     votedCandidateName: metadata.candidateName || null,
-    ballotReceiptCode: metadata.receiptCode || null,
+    voteReceiptCode: metadata.receiptCode || null,
     hasVoted: true,
     phase: VOTER_PHASES.WAITING,
     waitingDismissedAt: null,

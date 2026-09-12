@@ -25,12 +25,12 @@ export function WaitingRoute({ children }) {
   }
 
   if (!session.hasVoted) {
-    return <Navigate to="/ballot" replace />;
+    return <Navigate to="/vote" replace />;
   }
 
   const phase = getVoterPhase(session);
-  if (phase === VOTER_PHASES.BALLOT) {
-    return <Navigate to="/ballot" replace />;
+  if (phase === VOTER_PHASES.vote) {
+    return <Navigate to="/vote" replace />;
   }
   if (phase === VOTER_PHASES.RESULTS) {
     return <Navigate to="/results" replace />;

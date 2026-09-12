@@ -81,7 +81,7 @@ function formatRemainingTime(endDateIso, nowMs) {
   return `${minutes}m ${seconds}s`;
 }
 
-export default function BlueprintGrid() {
+export default function AdminDashboardView() {
   const navigate = useNavigate();
   const session = useMemo(() => getSession(), []);
   const { pushToast } = useToast();
@@ -304,8 +304,25 @@ export default function BlueprintGrid() {
     });
   };
 
+  const [reopenModalState, setReopenModalState] = useState(null);
+
   const handleStatusChange = async (nextStatus) => {
     if (!selectedElection) return;
+
+    if (nextStatus === 'open') {
+      const endDate = selectedElection.end_date ? new Date(selectedElection.end_date) : null;
+      const isExpired = !endDate || Number.isNaN(endDate.getTime()) || endDate.getTime() <= Date.now();
+
+      if (isExpired) {
+        // Default to 1 hour from now for reopen
+        const defaultDate = new Date(Date.now() + 60 * 60 * 1000);
+        setReopenModalState({
+          election: selectedElection,
+          newEndDate: toLocalDateTimeInput(defaultDate.toISOString()),
+        });
+        return;
+      }
+    }
 
     openConfirm({
       title: 'Update Election Status',
@@ -320,6 +337,32 @@ export default function BlueprintGrid() {
           message: `Election status set to ${nextStatus}.`,
         });
       },
+    });
+  };
+
+  const handleConfirmReopen = async (customDateIso) => {
+    if (!reopenModalState?.election) return;
+    const election = reopenModalState.election;
+
+    if (!customDateIso) {
+      setError('Please choose a valid future end date and time.');
+      return;
+    }
+
+    const parsed = new Date(customDateIso);
+    if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) {
+      setError('New voting end time must be in the future.');
+      return;
+    }
+
+    setReopenModalState(null);
+
+    await withBusy('reopen-election', async () => {
+      await updateElectionStatus(election.id, 'open', parsed.toISOString());
+      await refreshAll(election.id);
+    }, {
+      title: 'Election Reopened',
+      message: `Voting is now active until ${parsed.toLocaleString()}.`,
     });
   };
 
@@ -445,7 +488,7 @@ export default function BlueprintGrid() {
       await refreshAll(selectedElection.id);
     }, {
       title: 'Candidate Added',
-      message: `${name} has been added to the ballot.`,
+      message: `${name} has been added to the vote.`,
     });
   };
 
@@ -1043,11 +1086,11 @@ export default function BlueprintGrid() {
 
                   <div className="bg-[var(--surface)] p-6 border border-[var(--on-surface)]/15 flex flex-col justify-between">
                     <div>
-                      <p className="text-[0.58rem] uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-50 mb-1">
+                      <p className="text-xs uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-60 mb-1">
                         TEST AS VOTER
                       </p>
-                      <h5 className="font-muse text-xl font-bold text-[var(--primary)]">Open Voter Chamber</h5>
-                      <p className="text-xs text-[var(--on-surface)] opacity-60 mt-1">
+                      <h5 className="font-muse text-xl font-bold text-[var(--primary)]">Open Voter View</h5>
+                      <p className="text-xs text-[var(--on-surface)] opacity-70 mt-1">
                         Opens a new window pre-loaded with this election's invite code to test the voter flow.
                       </p>
                     </div>
@@ -1188,6 +1231,106 @@ export default function BlueprintGrid() {
           }}
           busy={!!busyAction}
         />
+      )}
+
+      {/* Reopen Expired Election Modal */}
+      {reopenModalState && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-xs px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !busyAction) {
+              setReopenModalState(null);
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-lg bg-[var(--surface-container-lowest)] border border-[var(--on-surface)]/15 p-7 shadow-2xl space-y-5"
+          >
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 text-[0.55rem] uppercase tracking-widest font-bold bg-amber-600 text-white">
+                  SESSION EXPIRED
+                </span>
+              </div>
+              <h3 className="font-muse text-2xl font-bold text-[var(--primary)]">
+                Reopen Voting Session
+              </h3>
+              <p className="mt-2 text-xs text-[var(--on-surface)] opacity-80 leading-relaxed">
+                Voting for &quot;{reopenModalState.election?.title}&quot; has previously concluded. To reopen the election for voters, please specify a new end date and time.
+              </p>
+            </div>
+
+            {/* Quick Extension Buttons */}
+            <div>
+              <p className="text-[0.6rem] uppercase tracking-widest font-bold text-[var(--on-surface)] opacity-70 mb-2">
+                Quick Extend
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: '+15 Min', ms: 15 * 60 * 1000 },
+                  { label: '+1 Hour', ms: 60 * 60 * 1000 },
+                  { label: '+4 Hours', ms: 4 * 60 * 60 * 1000 },
+                  { label: '+1 Day', ms: 24 * 60 * 60 * 1000 },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      const next = new Date(Date.now() + preset.ms);
+                      setReopenModalState((prev) => ({
+                        ...prev,
+                        newEndDate: toLocalDateTimeInput(next.toISOString()),
+                      }));
+                    }}
+                    className="px-3 py-1.5 text-[0.62rem] uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* DateTime Input */}
+            <div>
+              <label className="block text-[0.6rem] uppercase tracking-widest font-bold text-[var(--on-surface)] opacity-70 mb-1.5">
+                New End Date &amp; Time
+              </label>
+              <input
+                type="datetime-local"
+                value={reopenModalState.newEndDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setReopenModalState((prev) => ({
+                    ...prev,
+                    newEndDate: val,
+                  }));
+                }}
+                className="w-full p-2.5 text-sm bg-[var(--surface-container)] border border-[var(--outline-variant)] text-[var(--on-surface)] font-mono"
+              />
+            </div>
+
+            <div className="pt-2 flex justify-end gap-3 border-t border-[var(--on-surface)]/10">
+              <button
+                type="button"
+                onClick={() => setReopenModalState(null)}
+                disabled={!!busyAction}
+                className="border border-[var(--outline-variant)] px-5 py-2 text-xs uppercase tracking-widest text-[var(--on-surface)] opacity-90 hover:bg-[var(--surface-container)] disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmReopen(reopenModalState.newEndDate)}
+                disabled={!!busyAction || !reopenModalState.newEndDate}
+                className="bg-emerald-600 text-white px-5 py-2 text-xs uppercase tracking-widest font-bold hover:bg-emerald-700 disabled:opacity-40 transition-colors shadow-sm"
+              >
+                {busyAction === 'reopen-election' ? 'Reopening...' : 'Reopen Voting'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -5,7 +5,7 @@ import { castVote, getCandidates, getResults } from '../../lib/api';
 import { useToast } from '../../components/ui/useToast';
 import { VOTER_PHASES, clearSession, getSession, getVoterPhase, markVoteSubmitted, setSession, setVoterPhase } from '../../store/session';
 
-export default function GravitySlot() {
+export default function BallotView() {
   const navigate = useNavigate();
   const session = useMemo(() => getSession(), []);
   const { pushToast } = useToast();
@@ -15,7 +15,7 @@ export default function GravitySlot() {
   const [error, setError] = useState('');
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showBallotReview, setShowBallotReview] = useState(false);
+  const [showvoteReview, setShowvoteReview] = useState(false);
   const [isDropping, setIsDropping] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
   const [copiedReceipt, setCopiedReceipt] = useState(false);
@@ -25,7 +25,7 @@ export default function GravitySlot() {
     [candidates, selectedCandidateId]
   );
 
-  const exitBallot = () => {
+  const exitvote = () => {
     clearSession();
     navigate('/');
   };
@@ -104,7 +104,7 @@ export default function GravitySlot() {
     if (!selectedCandidateId || isSubmitting) {
       return;
     }
-    setShowBallotReview(true);
+    setShowvoteReview(true);
   };
 
   const confirmVote = async () => {
@@ -132,7 +132,7 @@ export default function GravitySlot() {
       // Show receipt modal after drop animation completes
       setTimeout(() => {
         setIsDropping(false);
-        setShowBallotReview(false);
+        setShowvoteReview(false);
         setReceiptData({
           receiptCode,
           candidateName: selectedCandidate?.name,
@@ -161,7 +161,7 @@ export default function GravitySlot() {
         title: 'Vote Failed',
         message,
       });
-      setShowBallotReview(false);
+      setShowvoteReview(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -184,7 +184,7 @@ export default function GravitySlot() {
         <p className="font-muse text-xl text-[var(--on-surface)]">Loading voting session...</p>
         <button
           type="button"
-          onClick={exitBallot}
+          onClick={exitvote}
           className="border border-[var(--outline-variant)] px-4 py-2 text-[0.65rem] uppercase tracking-widest transition-all duration-200 hover:bg-[var(--surface-container)]"
         >
           Back
@@ -194,30 +194,23 @@ export default function GravitySlot() {
   }
 
   return (
-    <div className="relative min-h-[90vh] flex flex-col items-center pt-12 pb-40 overflow-hidden bg-[var(--surface)]">
-      {/* Background Watermark */}
-      <div className="absolute top-[35%] flex items-center justify-center pointer-events-none select-none z-0">
-        <span className="font-muse text-[25vw] leading-none text-[var(--on-surface)]/[0.03] whitespace-nowrap uppercase tracking-tighter">
-          VOTE
-        </span>
-      </div>
-
+    <div className="relative min-h-[90vh] flex flex-col items-center pt-8 pb-40 bg-[var(--surface)]">
       {/* Header Info */}
-      <div className="w-full max-w-[1400px] px-8 md:px-12 mb-8 z-10">
+      <div className="w-full max-w-[1400px] px-6 sm:px-8 md:px-12 mb-8 z-10">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="px-2.5 py-1 text-[0.58rem] uppercase tracking-[0.2em] font-bold bg-[var(--primary)] text-[var(--on-primary)] shadow-sm">
-              VOTING PHASE
+            <span className="px-2.5 py-1 text-xs uppercase tracking-wider font-bold bg-[var(--primary)] text-[var(--on-primary)] shadow-xs">
+              VOTING
             </span>
-            <span className="text-[0.65rem] uppercase tracking-[0.16em] text-[var(--on-surface)] opacity-60">
-              Voter: <strong className="text-[var(--on-surface)]">{session.voterName || 'Verified Citizen'}</strong>
+            <span className="text-xs uppercase tracking-wider text-[var(--on-surface)] opacity-70">
+              Voter: <strong className="text-[var(--on-surface)] font-bold">{session.voterName || 'Verified Citizen'}</strong>
             </span>
           </div>
         </div>
         <h2 className="font-muse text-4xl md:text-5xl text-[var(--primary)] max-w-2xl leading-[1.1]">
           Cast your vote.
         </h2>
-        <p className="text-[0.7rem] uppercase tracking-[0.14em] text-[var(--on-surface)] opacity-60 mt-2">
+        <p className="text-xs uppercase tracking-wider text-[var(--on-surface)] opacity-70 mt-2 font-medium">
           Choose a candidate below and confirm your choice.
         </p>
       </div>
@@ -232,10 +225,10 @@ export default function GravitySlot() {
               key={candidate.id}
               onClick={() => setSelectedCandidateId(candidate.id)}
               disabled={isSubmitting}
-              className={`group bg-[var(--surface-container-lowest)] p-8 aspect-[3/4] flex flex-col justify-between text-left transition-all duration-300 relative border ${
+              className={`group bg-[var(--surface-container-lowest)] p-8 aspect-[3/4] flex flex-col justify-between text-left transition-all duration-200 relative border ${
                 selected
-                  ? 'border-[var(--primary)] ring-2 ring-[var(--primary)]/20 shadow-xl -translate-y-1'
-                  : 'border-[var(--on-surface)]/15 hover:border-[var(--primary)]/50 hover:-translate-y-0.5 shadow-sm'
+                  ? 'border-red-600 dark:border-red-500 ring-2 ring-red-600/20 shadow-lg translate-y-[2px]'
+                  : 'border-[var(--on-surface)]/15 hover:border-[var(--primary)]/60 hover:-translate-y-0.5 shadow-sm'
               }`}
             >
               {/* Top Accent Stamp */}
@@ -246,7 +239,7 @@ export default function GravitySlot() {
                 <div
                   className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors border ${
                     selected
-                      ? 'bg-[var(--primary)] text-[var(--on-primary)] border-[var(--primary)]'
+                      ? 'bg-red-600 text-white border-red-600'
                       : 'border-[var(--on-surface)]/20 group-hover:border-[var(--primary)]'
                   }`}
                 >
@@ -265,7 +258,7 @@ export default function GravitySlot() {
                   </p>
                 )}
                 <div className="mt-6 pt-3 border-t border-[var(--on-surface)]/10 flex items-center justify-between">
-                  <span className={`text-[0.6rem] uppercase tracking-[0.16em] font-bold ${selected ? 'text-[var(--primary)]' : 'text-[var(--on-surface)] opacity-50'}`}>
+                  <span className={`text-xs uppercase tracking-wider font-bold ${selected ? 'text-red-600 dark:text-red-400' : 'text-[var(--on-surface)] opacity-60'}`}>
                     {selected ? 'SELECTED' : 'SELECT'}
                   </span>
                 </div>
@@ -277,11 +270,11 @@ export default function GravitySlot() {
 
       {/* Sticky Bottom Confirmation Bar */}
       <div className="fixed bottom-0 left-0 right-0 border-t border-[var(--on-surface)]/10 bg-[var(--surface)]/95 backdrop-blur-md py-4 z-30 shadow-2xl">
-        <div className="mx-auto w-full max-w-[1400px] px-8 md:px-12 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="mx-auto w-full max-w-[1400px] px-6 sm:px-8 md:px-12 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Stamp size={18} className="text-[var(--primary)]" />
             <div>
-              <p className="text-[0.68rem] uppercase tracking-[0.14em] text-[var(--on-surface)] opacity-60">CURRENT SELECTION</p>
+              <p className="text-xs uppercase tracking-wider text-[var(--on-surface)] opacity-60 font-bold">CURRENT SELECTION</p>
               <p className="font-muse text-lg font-bold text-[var(--primary)]">
                 {selectedCandidate ? selectedCandidate.name : 'No candidate selected'}
               </p>
@@ -291,7 +284,7 @@ export default function GravitySlot() {
             type="button"
             onClick={openConfirmation}
             disabled={!selectedCandidateId || isSubmitting}
-            className="w-full sm:w-auto bg-[var(--primary)] text-[var(--on-primary)] px-8 py-3.5 uppercase text-xs tracking-[0.2em] font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-3"
+            className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white px-8 py-3.5 uppercase text-xs tracking-wider font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 shadow-md flex items-center justify-center gap-3 active:translate-y-[1px]"
           >
             <span>REVIEW & CONFIRM VOTE</span>
             <ArrowRight size={14} />
@@ -299,45 +292,50 @@ export default function GravitySlot() {
         </div>
       </div>
 
-      {/* Ceremonial Ballot Review Modal */}
-      {showBallotReview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="relative w-full max-w-lg bg-[var(--surface-container-lowest)] p-8 md:p-10 border border-[var(--primary)]/30 shadow-2xl overflow-hidden flex flex-col items-center text-center">
+      {/* Ceremonial vote Review Modal */}
+      {showvoteReview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-title"
+            className="relative w-full max-w-lg bg-[var(--surface-container-lowest)] p-8 md:p-10 border border-[var(--on-surface)]/20 shadow-2xl flex flex-col items-center text-center"
+          >
             {/* Slot Indicator */}
-            <div className="w-48 h-2.5 bg-black/80 rounded-full mb-6 border border-white/20 shadow-inner flex items-center justify-center">
-              <span className="text-[0.45rem] tracking-[0.3em] uppercase text-white/50 font-mono">VOTE BOX</span>
+            <div className="w-48 h-3 bg-black/80 rounded-full mb-6 border border-white/20 shadow-inner flex items-center justify-center">
+              <span className="text-[0.65rem] tracking-widest uppercase text-white/70 font-mono font-bold">vote SLOT</span>
             </div>
 
-            {/* Ballot Sheet */}
+            {/* vote Sheet */}
             <div
               className={`w-full bg-[var(--surface)] border border-[var(--on-surface)]/20 p-6 md:p-8 text-left transition-transform duration-700 ${
                 isDropping ? '-translate-y-36 opacity-0 scale-95' : 'translate-y-0 opacity-100'
               }`}
             >
               <div className="flex items-center justify-between border-b border-[var(--on-surface)]/15 pb-3 mb-4">
-                <div className="flex items-center gap-2 text-[var(--primary)]">
+                <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                   <Shield size={14} />
-                  <span className="text-[0.58rem] tracking-[0.2em] uppercase font-bold">YOUR VOTE</span>
+                  <span id="review-title" className="text-xs tracking-wider uppercase font-bold">vote REVIEW</span>
                 </div>
-                <span className="text-[0.55rem] font-mono tracking-wider uppercase text-[var(--on-surface)] opacity-50">
-                  {session.sessionCode || 'ELEC-2026'}
+                <span className="text-xs font-mono tracking-wider uppercase text-[var(--on-surface)] opacity-70">
+                  {session.sessionCode || 'ELECTION'}
                 </span>
               </div>
 
               <div className="mb-6">
-                <p className="text-[0.6rem] uppercase tracking-[0.16em] text-[var(--on-surface)] opacity-50 mb-1">VOTER</p>
+                <p className="text-xs uppercase tracking-wider text-[var(--on-surface)] opacity-60 mb-1 font-bold">VOTER</p>
                 <p className="font-muse font-bold text-lg text-[var(--on-surface)]">{session.voterName || 'Citizen'}</p>
               </div>
 
-              <div className="mb-6 bg-[var(--surface-container)] p-4 border border-[var(--primary)]/20">
-                <p className="text-[0.58rem] uppercase tracking-[0.16em] text-[var(--primary)] font-bold mb-1">CANDIDATE</p>
+              <div className="mb-6 bg-[var(--surface-container)] p-4 border-l-4 border-l-red-600 border border-[var(--on-surface)]/10">
+                <p className="text-xs uppercase tracking-wider text-red-600 dark:text-red-400 font-bold mb-1">CANDIDATE SELECTED</p>
                 <p className="font-muse text-2xl font-bold text-[var(--primary)]">{selectedCandidate?.name}</p>
                 {selectedCandidate?.description && (
-                  <p className="text-xs text-[var(--on-surface)] opacity-70 mt-1">{selectedCandidate.description}</p>
+                  <p className="text-xs text-[var(--on-surface)] opacity-80 mt-1">{selectedCandidate.description}</p>
                 )}
               </div>
 
-              <p className="text-[0.58rem] uppercase tracking-[0.12em] text-[var(--on-surface)] opacity-60 text-center">
+              <p className="text-xs text-[var(--on-surface)] opacity-70 text-center">
                 Once submitted, your vote is recorded and cannot be changed.
               </p>
             </div>
@@ -346,9 +344,9 @@ export default function GravitySlot() {
             <div className="w-full flex items-center justify-between gap-4 mt-8">
               <button
                 type="button"
-                onClick={() => setShowBallotReview(false)}
+                onClick={() => setShowvoteReview(false)}
                 disabled={isSubmitting}
-                className="px-5 py-3 border border-[var(--on-surface)]/20 text-[var(--on-surface)] uppercase text-xs tracking-widest hover:bg-[var(--surface-container)] transition-colors disabled:opacity-50"
+                className="px-5 py-3 border border-[var(--on-surface)]/20 text-[var(--on-surface)] uppercase text-xs tracking-wider hover:bg-[var(--surface-container)] transition-colors disabled:opacity-50 font-bold"
               >
                 Cancel
               </button>
@@ -356,7 +354,7 @@ export default function GravitySlot() {
                 type="button"
                 onClick={confirmVote}
                 disabled={isSubmitting}
-                className="flex-1 bg-[var(--primary)] text-[var(--on-primary)] px-6 py-3.5 uppercase text-xs tracking-[0.2em] font-bold hover:bg-[var(--primary)]/90 transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-6 py-3.5 uppercase text-xs tracking-wider font-bold transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSubmitting ? 'SUBMITTING...' : 'CONFIRM VOTE'}
               </button>
@@ -365,30 +363,35 @@ export default function GravitySlot() {
         </div>
       )}
 
-      {/* Official Cryptographic Ballot Receipt Modal */}
+      {/* Official Cryptographic vote Receipt Modal */}
       {receiptData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in">
-          <div className="w-full max-w-md bg-[var(--surface-container-lowest)] p-8 md:p-10 border border-[var(--on-surface)]/20 shadow-2xl text-center flex flex-col items-center">
-            <p className="text-[0.62rem] uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-60 mb-1">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="receipt-title"
+            className="w-full max-w-md bg-[var(--surface-container-lowest)] p-8 md:p-10 border border-[var(--on-surface)]/20 shadow-2xl text-center flex flex-col items-center"
+          >
+            <p className="text-xs uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 mb-1">
               VOTE RECORDED
             </p>
-            <h3 className="font-muse text-3xl font-bold text-[var(--primary)] mb-2">Vote Receipt</h3>
-            <p className="text-xs text-[var(--on-surface)] opacity-70 mb-6">
+            <h3 id="receipt-title" className="font-muse text-3xl font-bold text-[var(--primary)] mb-2">Vote Receipt</h3>
+            <p className="text-xs text-[var(--on-surface)] opacity-75 mb-6">
               Your vote has been counted. Save this receipt code to verify your vote anytime.
             </p>
 
             {/* Receipt Hash Box */}
-            <div className="w-full bg-[var(--surface-container)] p-4 border border-[var(--on-surface)]/10 mb-6 text-left">
+            <div className="w-full bg-[var(--surface-container)] p-4 border border-[var(--on-surface)]/10 border-l-4 border-l-red-600 mb-6 text-left">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-[0.55rem] uppercase tracking-[0.18em] text-[var(--on-surface)] opacity-50 font-bold">
+                <span className="text-xs uppercase tracking-wider text-[var(--on-surface)] opacity-70 font-bold">
                   RECEIPT CODE
                 </span>
-                <span className="text-[0.55rem] font-mono font-bold text-[var(--on-surface)] opacity-70">VERIFIED</span>
+                <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400">VERIFIED</span>
               </div>
-              <p className="font-mono text-base font-bold tracking-wider text-[var(--primary)] select-all">
+              <p className="font-mono text-base font-bold tracking-wider text-[var(--primary)] select-all tabular-nums">
                 {receiptData.receiptCode}
               </p>
-              <div className="mt-3 pt-2 border-t border-[var(--on-surface)]/10 flex justify-between text-[0.6rem] text-[var(--on-surface)] opacity-60">
+              <div className="mt-3 pt-2 border-t border-[var(--on-surface)]/10 flex justify-between text-xs text-[var(--on-surface)] opacity-70 font-mono">
                 <span>Timestamp</span>
                 <span>{new Date(receiptData.votedAt).toLocaleTimeString()}</span>
               </div>
@@ -399,7 +402,7 @@ export default function GravitySlot() {
               <button
                 type="button"
                 onClick={copyReceiptCode}
-                className="w-full py-3 border border-[var(--primary)]/30 text-[var(--primary)] text-xs uppercase tracking-widest hover:bg-[var(--surface-container)] transition-colors flex items-center justify-center gap-2 font-bold"
+                className="w-full py-3 border border-[var(--primary)]/30 text-[var(--primary)] text-xs uppercase tracking-wider hover:bg-[var(--surface-container)] transition-colors flex items-center justify-center gap-2 font-bold"
               >
                 {copiedReceipt ? <Check size={14} /> : <Copy size={14} />}
                 <span>{copiedReceipt ? 'COPIED' : 'COPY CODE'}</span>
@@ -408,7 +411,7 @@ export default function GravitySlot() {
               <button
                 type="button"
                 onClick={proceedToWaitingRoom}
-                className="w-full bg-[var(--primary)] text-[var(--on-primary)] py-3.5 text-xs uppercase tracking-[0.2em] font-bold hover:bg-[var(--primary)]/90 transition-all shadow-md flex items-center justify-center gap-2"
+                className="w-full bg-[var(--primary)] text-[var(--on-primary)] py-3.5 text-xs uppercase tracking-wider font-bold hover:bg-[var(--primary)]/90 transition-all shadow-md flex items-center justify-center gap-2"
               >
                 <span>CONTINUE TO WAITING ROOM</span>
                 <ArrowRight size={14} />

@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Header from './components/shared/Header';
-import IdentityArchive from './features/auth/IdentityArchive';
-import GravitySlot from './features/voting/GravitySlot';
+import SignInView from './features/auth/SignInView';
+import BallotView from './features/voting/BallotView';
 import PendulumView from './features/shared/PendulumView';
-import BlueprintGrid from './features/admin/BlueprintGrid';
+import AdminDashboardView from './features/admin/AdminDashboardView';
 import CreateElectionView from './features/admin/CreateElectionView';
 import OfficersView from './features/admin/OfficersView';
 import ResultsView from './features/results/ResultsView';
@@ -16,10 +16,10 @@ function AppContent() {
       <Header />
       <main className="pt-24 h-full pb-20">
         <Routes>
-          <Route path="/" element={<IdentityArchive />} />
-          <Route path="/ballot" element={<VoterRoute><GravitySlot /></VoterRoute>} />
+          <Route path="/" element={<SignInView />} />
+          <Route path="/vote" element={<VoterRoute><BallotView /></VoterRoute>} />
           <Route path="/waiting" element={<WaitingRoute><PendulumView /></WaitingRoute>} />
-          <Route path="/admin" element={<AdminRoute><BlueprintGrid /></AdminRoute>} />
+          <Route path="/admin" element={<AdminRoute><AdminDashboardView /></AdminRoute>} />
           <Route path="/admin/create" element={<AdminRoute><CreateElectionView /></AdminRoute>} />
           <Route path="/admin/new" element={<AdminRoute><CreateElectionView /></AdminRoute>} />
           <Route path="/admin/officers" element={<AdminRoute><OfficersView /></AdminRoute>} />
