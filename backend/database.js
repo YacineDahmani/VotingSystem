@@ -1321,6 +1321,15 @@ function updateAdminStatus(id, isActive) {
     });
 }
 
+function updateAdminLastLogin(id) {
+    return new Promise((resolve, reject) => {
+        db.run('UPDATE admins SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', [id], function (err) {
+            if (err) reject(err);
+            else resolve({ success: true, id });
+        });
+    });
+}
+
 function deleteAdmin(id) {
     return new Promise((resolve, reject) => {
         db.run('DELETE FROM admins WHERE id = ?', [id], function (err) {

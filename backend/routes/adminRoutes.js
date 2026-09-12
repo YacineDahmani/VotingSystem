@@ -777,11 +777,35 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
     router.patch('/elections/:id/status', async (req, res) => {
         try {
             const id = Number.parseInt(req.params.id, 10);
-            const { status } = req.body;
+            const { status, endDate, end_date } = req.body;
+
+            const existingElection = await db.getElectionById(id);
+            if (!existingElection) {
+                return res.status(404).json({ error: 'Election not found' });
+            }
+
+            if (status === 'open') {
+                const requestedEndDate = endDate || end_date;
+                if (requestedEndDate) {
+                    const parsedEndDate = normalizeDateValue(requestedEndDate);
+                    if (!parsedEndDate) {
+                        return res.status(400).json({ error: 'Invalid end date provided.' });
+                    }
+                    if (new Date(parsedEndDate) <= new Date()) {
+                        return res.status(400).json({ error: 'End time must be in the future to open voting.' });
+                    }
+                    await db.updateElection(id, { end_date: parsedEndDate });
+                } else if (existingElection.end_date && new Date(existingElection.end_date) <= new Date()) {
+                    // Safe fallback: auto-extend by 1 hour if reopening an expired election without explicit endDate
+                    const autoExtended = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+                    await db.updateElection(id, { end_date: autoExtended });
+                }
+            }
 
             await db.updateElectionStatus(id, status);
             await emitElectionUpdate(id, 'election:status');
-            return res.json({ success: true, status });
+            const updatedElection = await db.getElectionById(id);
+            return res.json({ success: true, status, election: updatedElection });
         } catch (err) {
             return res.status(500).json({ error: err.message });
         }

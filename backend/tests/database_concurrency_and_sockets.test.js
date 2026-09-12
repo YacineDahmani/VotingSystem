@@ -41,7 +41,7 @@ describe('Database Optimization & Real-Time Socket Resilience Suite', () => {
 
         // Create test election
         testElection = await db.createElection(
-            'Concurrency & Socket Ballot 2026',
+            'Concurrency & Socket vote 2026',
             'Testing SQLite transactions and realtime socket rooms',
             new Date().toISOString(),
             new Date(Date.now() + 86400000).toISOString(),

@@ -85,7 +85,7 @@ function resolveVoterPhase(election, hasVoted) {
         return 'waiting';
     }
 
-    return 'ballot';
+    return 'vote';
 }
 
 function resolveSessionStatus(election) {
@@ -550,7 +550,7 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                 verified: true,
                 receiptCode: verification.receiptCode,
                 recordedAt: verification.recordedAt,
-                message: 'Ballot receipt cryptographically verified as recorded.',
+                message: 'vote receipt cryptographically verified as recorded.',
             });
         } catch (err) {
             return res.status(500).json({ error: err.message });

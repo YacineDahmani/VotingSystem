@@ -64,7 +64,7 @@ describe('Security & Privacy Test Suite', () => {
         const now = new Date();
         const end = new Date(now.getTime() + 24 * 3600 * 1000);
         testElection = await db.createElection(
-            'Security Audit Ballot 2026',
+            'Security Audit vote 2026',
             'Election for cryptographic and privacy verification',
             now.toISOString(),
             end.toISOString(),
@@ -122,7 +122,7 @@ describe('Security & Privacy Test Suite', () => {
         voterToken = data.token;
     });
 
-    it('should cast ballot and receive a verifiable cryptographic receipt code', async () => {
+    it('should cast vote and receive a verifiable cryptographic receipt code', async () => {
         const response = await fetch(`${baseUrl}/api/elections/${testElection.id}/vote`, {
             method: 'POST',
             headers: {
@@ -143,7 +143,7 @@ describe('Security & Privacy Test Suite', () => {
         castReceiptCode = data.receiptCode;
     });
 
-    it('should maintain secret ballot privacy upon subsequent identity verification', async () => {
+    it('should maintain secret vote privacy upon subsequent identity verification', async () => {
         const response = await fetch(`${baseUrl}/api/session/identity`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -159,11 +159,11 @@ describe('Security & Privacy Test Suite', () => {
         const data = await response.json();
         assert.strictEqual(data.hasVoted, true);
         // Voter choice must be secret and never exposed in voter identity queries
-        assert.strictEqual(data.selectedCandidateId, null, 'Ballot secrecy: candidate ID must not be leaked');
+        assert.strictEqual(data.selectedCandidateId, null, 'vote secrecy: candidate ID must not be leaked');
         assert.strictEqual(data.phase, 'waiting');
     });
 
-    it('should cryptographically verify cast ballot receipt without revealing candidate', async () => {
+    it('should cryptographically verify cast vote receipt without revealing candidate', async () => {
         const response = await fetch(`${baseUrl}/api/elections/${testElection.id}/receipts/${castReceiptCode}`);
         assert.strictEqual(response.status, 200);
         const data = await response.json();
@@ -174,7 +174,7 @@ describe('Security & Privacy Test Suite', () => {
         assert.strictEqual(data.candidateId, undefined, 'Receipt verification must be zero-knowledge (no candidate ID exposed)');
     });
 
-    it('should reject invalid or fraudulent ballot receipt codes with 404', async () => {
+    it('should reject invalid or fraudulent vote receipt codes with 404', async () => {
         const response = await fetch(`${baseUrl}/api/elections/${testElection.id}/receipts/SWISS-FFFF-0000-9999`);
         assert.strictEqual(response.status, 404);
         const data = await response.json();
