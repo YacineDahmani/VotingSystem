@@ -41,7 +41,7 @@ const ROLE_DEFINITIONS = [
     title: 'Integrity Auditor',
     badgeText: 'AUDITOR',
     badgeClass: 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800',
-    description: 'Read-only oversight: Inspect live vote tallies, review real vs simulated ballot distributions, and export cryptographic audit reports.',
+    description: 'Read-only oversight: Inspect live vote tallies, review real vs simulated vote distributions, and export cryptographic audit reports.',
   },
 ];
 

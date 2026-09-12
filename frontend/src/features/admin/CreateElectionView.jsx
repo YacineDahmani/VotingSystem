@@ -410,8 +410,8 @@ export default function CreateElectionView() {
         {/* Header Bar */}
         <div className="flex items-center justify-between gap-4 mb-8">
           <div>
-            <span className="text-[0.62rem] uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-50">
-              ELECTORAL COMMISSION
+            <span className="text-xs uppercase tracking-[0.2em] font-bold text-[var(--on-surface)] opacity-60">
+              ELECTION SETUP
             </span>
             <h2 className="font-muse text-4xl text-[var(--primary)] font-bold mt-1">
               Create New Election
@@ -506,10 +506,10 @@ export default function CreateElectionView() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Error banner */}
             {error && (
-              <div className="p-4 bg-[#ffffff] dark:bg-[#1a1415] border border-rose-600/30 border-t-[3px] border-t-rose-600 shadow-md">
+              <div role="alert" className="p-4 bg-[#ffffff] dark:bg-[#1a1415] border border-rose-600/30 border-t-[3px] border-t-rose-600 shadow-md">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="px-1.5 py-0.5 font-mono text-[0.52rem] font-bold tracking-[0.2em] uppercase bg-rose-600/15 text-rose-800 dark:text-rose-300 border border-rose-600/30">
-                    VALIDATION FAULT
+                  <span className="px-1.5 py-0.5 font-mono text-xs font-bold tracking-[0.15em] uppercase bg-rose-600/15 text-rose-800 dark:text-rose-300 border border-rose-600/30">
+                    FORM ERROR
                   </span>
                 </div>
                 <p className="text-xs text-rose-900/90 dark:text-rose-200/90 font-medium mt-0.5 leading-relaxed">{error}</p>
@@ -526,24 +526,27 @@ export default function CreateElectionView() {
               </div>
 
               <div>
-                <label className="text-[0.62rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
+                <label htmlFor="election-title" className="text-xs uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
                   Election Title *
                 </label>
                 <input
+                  id="election-title"
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Municipal City Council Election 2026"
                   className="w-full p-3 text-sm bg-[var(--surface)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
                   disabled={isSubmitting}
+                  required
                 />
               </div>
 
               <div>
-                <label className="text-[0.62rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
+                <label htmlFor="election-description" className="text-xs uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
                   Description & Context (Optional)
                 </label>
                 <textarea
+                  id="election-description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Provide context, jurisdiction, or voting platform summary..."
@@ -565,10 +568,11 @@ export default function CreateElectionView() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[0.62rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
+                  <label htmlFor="election-start-date" className="text-xs uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
                     Start Date & Time (Optional)
                   </label>
                   <input
+                    id="election-start-date"
                     type="datetime-local"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
@@ -577,10 +581,11 @@ export default function CreateElectionView() {
                   />
                 </div>
                 <div>
-                  <label className="text-[0.62rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
+                  <label htmlFor="election-end-date" className="text-xs uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
                     End Date & Time (Optional)
                   </label>
                   <input
+                    id="election-end-date"
                     type="datetime-local"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
@@ -591,10 +596,11 @@ export default function CreateElectionView() {
               </div>
 
               <div>
-                <label className="text-[0.62rem] uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
+                <label htmlFor="election-max-voters" className="text-xs uppercase tracking-wider font-bold text-[var(--on-surface)] opacity-70 block mb-1.5">
                   Voter Capacity Limit (Optional)
                 </label>
                 <input
+                  id="election-max-voters"
                   type="number"
                   min="1"
                   step="1"
@@ -604,7 +610,7 @@ export default function CreateElectionView() {
                   className="w-full p-2.5 text-xs bg-[var(--surface)] border border-[var(--outline-variant)] text-[var(--on-surface)]"
                   disabled={isSubmitting}
                 />
-                <p className="text-[0.6rem] text-[var(--on-surface)] opacity-50 mt-1">
+                <p className="text-xs text-[var(--on-surface)] opacity-60 mt-1">
                   If set, registration closes automatically when this capacity is reached.
                 </p>
               </div>
@@ -745,7 +751,7 @@ export default function CreateElectionView() {
               </div>
 
               <p className="text-xs text-[var(--on-surface)] opacity-75 leading-relaxed">
-                Upload a verified voter roster to restrict ballot casting to eligible citizens. Leave empty for open access.
+                Upload a verified voter roster to restrict vote casting to eligible citizens. Leave empty for open access.
               </p>
 
               {/* Supported Format Guide Box */}
