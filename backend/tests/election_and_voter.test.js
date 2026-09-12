@@ -232,4 +232,84 @@ describe('Elections & Voter Workflow Test Suite', () => {
         assert.strictEqual(joinAfterData.success, true);
         assert.strictEqual(joinAfterData.election.status, 'open');
     });
+
+    it('should handle tie, automatically spawn runoff, and allow voter to enter and vote in Round 2', async () => {
+        // Register a second voter to vote for Candidate Beta to create a 1-1 tie
+        const voter2IdCode = 'CH-RUNOFF-002';
+        const voter2Reg = await fetch(`${baseUrl}/api/session/identity`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sessionCode: testElection.code,
+                name: 'Marcus Vance',
+                age: 28,
+                voterIdCode: voter2IdCode,
+                birthdate: '1998-05-12',
+            }),
+        });
+        assert.strictEqual(voter2Reg.status, 200);
+        const voter2Data = await voter2Reg.json();
+
+        // Voter 2 votes for Candidate Beta
+        const vote2Res = await fetch(`${baseUrl}/api/elections/${testElection.id}/vote`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${voter2Data.token}`,
+            },
+            body: JSON.stringify({
+                candidateId: candidateBeta.id,
+            }),
+        });
+        assert.strictEqual(vote2Res.status, 200);
+
+        // Manually close election to trigger final tie calculation
+        await db.updateElectionStatus(testElection.id, 'closed');
+
+        // Results should show tie and auto-generated runoff
+        const resultsRes = await fetch(`${baseUrl}/api/elections/${testElection.id}/results`);
+        assert.strictEqual(resultsRes.status, 200);
+        const resultsData = await resultsRes.json();
+        assert.strictEqual(resultsData.isTie, true);
+        assert.strictEqual(resultsData.tiedCandidates.length, 2);
+        assert.ok(resultsData.runoffElection);
+        assert.strictEqual(resultsData.runoffElection.round, 2);
+
+        // Voter 1 enters runoff via /runoff/enter
+        const enterRes = await fetch(`${baseUrl}/api/elections/${testElection.id}/runoff/enter`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${voterToken}`,
+            },
+        });
+        assert.strictEqual(enterRes.status, 200);
+        const enterData = await enterRes.json();
+        assert.strictEqual(enterData.success, true);
+        assert.ok(enterData.token);
+        assert.strictEqual(enterData.round, 2);
+        assert.strictEqual(enterData.hasVoted, false);
+
+        // Get candidates for runoff election
+        const runoffCandidatesRes = await fetch(`${baseUrl}/api/elections/${enterData.election.id}/candidates`);
+        assert.strictEqual(runoffCandidatesRes.status, 200);
+        const runoffCandData = await runoffCandidatesRes.json();
+        assert.strictEqual(runoffCandData.candidates.length, 2);
+
+        // Voter 1 votes in Round 2!
+        const runoffVoteRes = await fetch(`${baseUrl}/api/elections/${enterData.election.id}/vote`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${enterData.token}`,
+            },
+            body: JSON.stringify({
+                candidateId: runoffCandData.candidates[0].id,
+            }),
+        });
+        assert.strictEqual(runoffVoteRes.status, 200);
+        const runoffVoteData = await runoffVoteRes.json();
+        assert.strictEqual(runoffVoteData.success, true);
+        assert.ok(runoffVoteData.receiptCode);
+    });
 });

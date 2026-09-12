@@ -926,11 +926,12 @@ function getElectionResults(electionId) {
 
             // Auto-Runoff Logic
             let runoffElection = null;
-            if (justClosed && isTie) {
-                console.log(`[Auto-Runoff] Tie detected in election ${electionId}, creating runoff...`);
-                runoffElection = await createRunoffElection(election, tiedCandidates);
-            } else if (election.status === 'closed' && isTie) {
+            if (isTie && tiedCandidates.length >= 2) {
                 runoffElection = await getRunoffElectionForSource(electionId);
+                if (!runoffElection && (justClosed || election.status === 'closed')) {
+                    console.log(`[Auto-Runoff] Tie detected in election ${electionId}, creating runoff...`);
+                    runoffElection = await createRunoffElection(election, tiedCandidates);
+                }
             }
 
             const ageGroups = await getAgeGroupStats(electionId);
@@ -990,12 +991,61 @@ function createRunoffElection(originalElection, tiedCandidates) {
                 await addCandidateToElection(runoff.id, cand.name, cand.description || '');
             }
 
+            // Copy eligibility rules if original election had any
+            await new Promise((resRules) => {
+                db.run(
+                    `INSERT INTO voter_eligibility_rules (election_id, name, birthdate, identifier)
+                     SELECT ?, name, birthdate, identifier FROM voter_eligibility_rules WHERE election_id = ?`,
+                    [runoff.id, originalElection.id],
+                    () => resRules()
+                );
+            });
+
             // Auto-open the runoff
             await updateElectionStatus(runoff.id, 'open');
             resolve(runoff);
         } catch (e) {
             console.error('Failed to create runoff', e);
             resolve(null); // Don't fail the results fetch
+        }
+    });
+}
+
+function enrollVoterInRunoff(sourceElectionId, runoffElectionId, sourceVoterId) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const sourceVoter = await getVoterByIdAndElection(sourceVoterId, sourceElectionId);
+            if (!sourceVoter) {
+                return resolve(null);
+            }
+
+            db.get(
+                'SELECT * FROM voters WHERE election_id = ? AND identifier = ? LIMIT 1',
+                [runoffElectionId, sourceVoter.identifier],
+                (err, existing) => {
+                    if (err) return reject(err);
+                    if (existing) return resolve(existing);
+
+                    db.run(
+                        'INSERT INTO voters (election_id, name, age, birthdate, identifier, is_fake, has_voted) VALUES (?, ?, ?, ?, ?, ?, 0)',
+                        [runoffElectionId, sourceVoter.name, sourceVoter.age, sourceVoter.birthdate, sourceVoter.identifier, sourceVoter.is_fake ? 1 : 0],
+                        function (insErr) {
+                            if (insErr) return reject(insErr);
+                            resolve({
+                                id: this.lastID,
+                                election_id: runoffElectionId,
+                                name: sourceVoter.name,
+                                age: sourceVoter.age,
+                                birthdate: sourceVoter.birthdate,
+                                identifier: sourceVoter.identifier,
+                                has_voted: 0
+                            });
+                        }
+                    );
+                }
+            );
+        } catch (e) {
+            reject(e);
         }
     });
 }
@@ -1366,6 +1416,7 @@ module.exports = {
     getActiveElection,
     getLatestElection,
     getRunoffElectionForSource,
+    createRunoffElection,
     updateElection,
     updateElectionStatus,
     regenerateElectionCode,
@@ -1389,6 +1440,7 @@ module.exports = {
     setVoterVoteState,
     getVoterProgress,
     getVoterByIdAndElection,
+    enrollVoterInRunoff,
     hasVoted,
     recordVote,
     verifyReceipt,

@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Check, CheckCircle2, Copy, Shield, ShieldCheck, Stamp } from 'lucide-react';
 import { castVote, getCandidates, getResults } from '../../lib/api';
 import { useToast } from '../../components/ui/useToast';
-import { VOTER_PHASES, clearSession, getSession, getVoterPhase, markVoteSubmitted, setSession, setVoterPhase } from '../../store/session';
+import { VOTER_PHASES, clearSession, getSession, getVoterPhase, markVoteSubmitted, setSession, setVoterPhase, useSession } from '../../store/session';
 
 export default function BallotView() {
   const navigate = useNavigate();
-  const session = useMemo(() => getSession(), []);
+  const session = useSession();
   const { pushToast } = useToast();
 
   const [candidates, setCandidates] = useState([]);
@@ -193,25 +193,35 @@ export default function BallotView() {
     );
   }
 
+  const isRunoffRound = Boolean(session?.round && session.round > 1) || (session?.electionTitle || '').toLowerCase().includes('runoff');
+
   return (
     <div className="relative min-h-[90vh] flex flex-col items-center pt-8 pb-40 bg-[var(--surface)]">
       {/* Header Info */}
       <div className="w-full max-w-[1400px] px-6 sm:px-8 md:px-12 mb-8 z-10">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="px-2.5 py-1 text-xs uppercase tracking-wider font-bold bg-[var(--primary)] text-[var(--on-primary)] shadow-xs">
-              VOTING
-            </span>
+            {isRunoffRound ? (
+              <span className="px-2.5 py-1 text-xs uppercase tracking-wider font-bold bg-amber-600 text-white shadow-xs">
+                ROUND {session.round || 2} · RUNOFF
+              </span>
+            ) : (
+              <span className="px-2.5 py-1 text-xs uppercase tracking-wider font-bold bg-[var(--primary)] text-[var(--on-primary)] shadow-xs">
+                VOTING
+              </span>
+            )}
             <span className="text-xs uppercase tracking-wider text-[var(--on-surface)] opacity-70">
               Voter: <strong className="text-[var(--on-surface)] font-bold">{session.voterName || 'Verified Citizen'}</strong>
             </span>
           </div>
         </div>
         <h2 className="font-muse text-4xl md:text-5xl text-[var(--primary)] max-w-2xl leading-[1.1]">
-          Cast your vote.
+          {isRunoffRound ? 'Cast your deciding vote.' : 'Cast your vote.'}
         </h2>
         <p className="text-xs uppercase tracking-wider text-[var(--on-surface)] opacity-70 mt-2 font-medium">
-          Choose a candidate below and confirm your choice.
+          {isRunoffRound
+            ? 'Round 1 ended in a tie. Select the winning candidate between the tied finalists below.'
+            : 'Choose a candidate below and confirm your choice.'}
         </p>
       </div>
 

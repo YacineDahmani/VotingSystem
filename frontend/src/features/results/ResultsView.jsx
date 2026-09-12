@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { AlertTriangle, Info, Radio, ShieldAlert, ShieldCheck } from 'lucide-react';
-import { getActiveElection, getAdminElections, getIntegrityReport, getResults } from '../../lib/api';
+import { AlertTriangle, ArrowRight, Info, Pause, Play, Radio, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { enterRunoff, getActiveElection, getAdminElections, getIntegrityReport, getResults } from '../../lib/api';
+import { useToast } from '../../components/ui/useToast';
 import {
   VOTER_PHASES,
   clearSession,
@@ -235,10 +236,85 @@ export default function ResultsView() {
       : 'WINNER';
   const heroTitle = isTieResult ? 'Runoff Required' : winnerName;
 
-  const handleRunoffContinue = () => {
-    clearSession();
-    navigate('/');
+  const { pushToast } = useToast();
+  const [countdown, setCountdown] = useState(6);
+  const [isAutoRedirectPaused, setIsAutoRedirectPaused] = useState(false);
+  const [isEnteringRunoff, setIsEnteringRunoff] = useState(false);
+  const [runoffError, setRunoffError] = useState('');
+
+  const isVoter = !adminView && isVoterSession(session);
+  const shouldAutoRedirect = isVoter && isTieResult && Boolean(runoffElection);
+
+  const handleRunoffContinue = async () => {
+    if (isEnteringRunoff) return;
+    setIsEnteringRunoff(true);
+    setRunoffError('');
+
+    try {
+      const sourceId = results?.election?.id || selectedElectionId || session?.electionId;
+      const data = await enterRunoff(sourceId);
+      if (data?.token && data?.election) {
+        setSession({
+          electionId: data.election.id,
+          electionTitle: data.election.title,
+          electionStatus: data.election.status || 'open',
+          electionEndAt: data.election.end_date || null,
+          token: data.token,
+          voterId: data.voter.id,
+          hasVoted: false,
+          selectedCandidateId: null,
+          votedCandidateName: null,
+          voteReceiptCode: null,
+          round: data.round || (results?.election?.round ? results.election.round + 1 : 2),
+          phase: VOTER_PHASES.vote,
+          resultsElectionId: null,
+          resultsNotice: null,
+        });
+        setVoterPhase(VOTER_PHASES.vote);
+        pushToast({
+          type: 'info',
+          title: 'Round 2 Runoff',
+          message: 'Redirected to runoff ballot. Cast your deciding vote.',
+        });
+        navigate('/vote');
+      } else {
+        throw new Error('Runoff session credentials could not be issued.');
+      }
+    } catch (err) {
+      setIsEnteringRunoff(false);
+      setIsAutoRedirectPaused(true);
+      setRunoffError(err?.message || 'Failed to enter runoff round. Please try again.');
+      pushToast({
+        type: 'error',
+        title: 'Runoff Error',
+        message: err?.message || 'Failed to enter runoff round.',
+      });
+    }
   };
+
+  useEffect(() => {
+    if (!shouldAutoRedirect || isAutoRedirectPaused || isEnteringRunoff) {
+      return;
+    }
+
+    if (countdown <= 0) {
+      handleRunoffContinue();
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleRunoffContinue();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [shouldAutoRedirect, isAutoRedirectPaused, countdown, isEnteringRunoff]);
 
   const handleExitResults = () => {
     clearSession();
@@ -296,6 +372,79 @@ export default function ResultsView() {
             </p>
           </div>
         ) : null}
+
+        {/* Voter Tie & Automatic Runoff Staging Banner */}
+        {isVoter && isTieResult && (
+          <div className="mb-12 border-l-4 border-l-amber-500 border border-[var(--outline-variant)] bg-[var(--surface-container)] p-6 sm:p-8 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="px-2.5 py-1 text-[0.65rem] font-mono font-bold uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                    ROUND 1 ENDED IN A TIE
+                  </span>
+                  {runoffElection && (
+                    <span className="text-xs font-mono text-[var(--on-surface)] opacity-70">
+                      Round 2 Active
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-muse text-2xl font-bold text-[var(--on-surface)]">
+                  {tiedTopCandidates.length > 0
+                    ? `${tiedTopCandidates.map((c) => c.name).join(' and ')} are tied with ${tiedTopCandidates[0]?.votes} votes each.`
+                    : 'The election ended in a tie.'}
+                </h3>
+                <p className="text-xs text-[var(--on-surface)] opacity-80 max-w-2xl leading-relaxed">
+                  A second round (Runoff) has been opened to determine the winner. You can proceed directly to cast your deciding vote in Round 2, or pause to review the first round breakdown below.
+                </p>
+
+                {runoffError && (
+                  <p className="text-xs font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5 mt-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    {runoffError}
+                  </p>
+                )}
+              </div>
+
+              {runoffElection ? (
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsAutoRedirectPaused((prev) => !prev)}
+                    className="px-4 py-2.5 text-xs font-mono uppercase tracking-wider border border-[var(--outline-variant)] bg-[var(--surface)] text-[var(--on-surface)] hover:bg-[var(--surface-container-high)] transition-colors flex items-center justify-center gap-2 min-h-[44px]"
+                  >
+                    {isAutoRedirectPaused ? (
+                      <>
+                        <Play className="w-3.5 h-3.5" />
+                        Resume Countdown
+                      </>
+                    ) : (
+                      <>
+                        <Pause className="w-3.5 h-3.5" />
+                        Pause ({countdown}s)
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRunoffContinue}
+                    disabled={isEnteringRunoff}
+                    className="px-6 py-2.5 text-xs font-mono uppercase tracking-wider font-bold bg-[var(--primary)] text-[var(--on-primary)] hover:bg-[var(--primary)]/90 transition-transform active:scale-[0.98] flex items-center justify-center gap-2 min-h-[44px]"
+                  >
+                    {isEnteringRunoff ? (
+                      'Entering Round 2...'
+                    ) : (
+                      <>
+                        Vote in Round 2 {!isAutoRedirectPaused && `(${countdown}s)`}
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
 
         {/* Header section */}
         <div className="mb-24">
@@ -474,16 +623,37 @@ export default function ResultsView() {
                    </p>
                  </div>
                ) : null}
-               {!adminView ? (
-                 <button
-                   onClick={handleRunoffContinue}
-                   className="bg-[var(--primary)] text-[var(--on-primary)] px-6 py-3 uppercase text-xs tracking-widest transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
-                 >
-                   Go to Runoff
-                 </button>
-               ) : (
-                 <p className="label-md text-[var(--on-surface)] opacity-80">Use the admin console to manage the runoff session.</p>
-               )}
+                {!adminView ? (
+                  <div className="flex flex-wrap items-center gap-4">
+                    <button
+                      onClick={handleRunoffContinue}
+                      disabled={isEnteringRunoff}
+                      className="bg-[var(--primary)] text-[var(--on-primary)] px-6 py-3 uppercase text-xs tracking-widest font-bold transition-all duration-200 hover:bg-[var(--primary)]/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 min-h-[44px] flex items-center gap-2"
+                    >
+                      {isEnteringRunoff ? (
+                        'Entering Round 2...'
+                      ) : (
+                        <>
+                          Vote in Second Round
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                    {!isAutoRedirectPaused && shouldAutoRedirect && (
+                      <span className="text-xs font-mono text-[var(--on-surface)] opacity-70">
+                        Auto-redirecting in {countdown}s
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin')}
+                    className="bg-[var(--primary)] text-[var(--on-primary)] px-6 py-3 uppercase text-xs tracking-widest font-bold transition-all duration-200 hover:bg-[var(--primary)]/90 min-h-[44px]"
+                  >
+                    Manage Runoff in Admin Console
+                  </button>
+                )}
              </div>
            ) : results?.isTie ? (
              <div className="mt-16 p-8 bg-[var(--surface-container-low)] border border-[var(--outline-variant)]">

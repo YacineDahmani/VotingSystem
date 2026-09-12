@@ -97,6 +97,12 @@ export function getResults(electionId) {
   return request(`/api/elections/${electionId}/results`);
 }
 
+export function enterRunoff(electionId) {
+  return request(`/api/elections/${electionId}/runoff/enter`, {
+    method: 'POST',
+  });
+}
+
 export function getAdminSetupStatus() {
   return request('/api/admin/setup-status');
 }

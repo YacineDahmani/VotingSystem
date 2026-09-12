@@ -529,6 +529,57 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
         }
     });
 
+    router.post('/elections/:id/runoff/enter', requireVoterAuth, async (req, res) => {
+        try {
+            const electionId = Number.parseInt(req.params.id, 10);
+            const voterId = Number.parseInt(req.auth?.voterId, 10);
+            const tokenElectionId = Number.parseInt(req.auth?.electionId, 10);
+
+            if (Number.isNaN(electionId) || Number.isNaN(voterId) || tokenElectionId !== electionId) {
+                return res.status(403).json({ error: 'Invalid voter session for this election' });
+            }
+
+            const election = await db.getElectionById(electionId);
+            if (!election) {
+                return res.status(404).json({ error: 'Election not found' });
+            }
+
+            let runoff = await db.getRunoffElectionForSource(electionId);
+            if (!runoff) {
+                const results = await db.getElectionResults(electionId);
+                if (results.isTie && results.tiedCandidates?.length >= 2) {
+                    runoff = await db.createRunoffElection(election, results.tiedCandidates);
+                }
+            }
+
+            if (!runoff) {
+                return res.status(400).json({ error: 'No runoff election found for this session' });
+            }
+
+            const runoffVoter = await db.enrollVoterInRunoff(electionId, runoff.id, voterId);
+            if (!runoffVoter) {
+                return res.status(403).json({ error: 'Unable to enroll voter into runoff' });
+            }
+
+            const token = issueAuthToken({
+                role: 'voter',
+                voterId: runoffVoter.id,
+                electionId: runoff.id,
+            });
+
+            return res.json({
+                success: true,
+                token,
+                voter: runoffVoter,
+                election: runoff,
+                round: runoff.round || 2,
+                hasVoted: !!runoffVoter.has_voted,
+            });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
     router.get('/elections/:id/receipts/:receiptCode', async (req, res) => {
         try {
             const electionId = Number.parseInt(req.params.id, 10);
