@@ -242,6 +242,16 @@ export default function SignInView() {
     navigate('/results', { replace: true });
   }, [navigate]);
 
+  const clearSessionStatus = useCallback(() => {
+    setSessionStatus({
+      state: 'waiting',
+      electionTitle: null,
+      electionCode: null,
+      message: '',
+      isLoaded: false,
+    });
+  }, []);
+
   const applySessionStatusFromCode = useCallback((state, election, message = '') => {
     const normalizedState = SESSION_STATUS_COPY[state] ? state : 'invalid';
     setSessionStatus({
@@ -257,13 +267,13 @@ export default function SignInView() {
     const normalizedCode = sessionCode.trim().toUpperCase();
 
     if (normalizedCode.length !== 8) {
-      showValidationError('Session code must be exactly 8 characters.');
+      setError('Session code must be exactly 8 characters.');
       setSessionStatus({
         state: 'invalid',
         electionTitle: null,
         electionCode: normalizedCode || null,
-        message: '',
-        isLoaded: false,
+        message: 'Session code must be exactly 8 characters.',
+        isLoaded: true,
       });
       return { ok: false, state: 'invalid' };
     }
@@ -278,8 +288,9 @@ export default function SignInView() {
       const election = err?.data?.election;
 
       if (reason === 'draft') {
-        applySessionStatusFromCode('waiting', election, err?.message || 'This session has not started yet.');
-        showValidationError(err?.message || 'This session has not started yet.');
+        const msg = err?.message || 'This session has not started yet.';
+        applySessionStatusFromCode('waiting', election, msg);
+        setError(msg);
         return { ok: false, state: 'waiting', election };
       }
 
@@ -290,17 +301,18 @@ export default function SignInView() {
         if (routeClosedToResults && election?.id) {
           routeClosedSessionToResults(election, message);
         } else {
-          showValidationError(message);
+          setError(message);
         }
 
         return { ok: false, state: 'closed', election };
       }
 
-      applySessionStatusFromCode('invalid', election, err?.message || 'Session code not found.');
-      showValidationError(err?.message || 'Unable to validate session code.');
+      const msg = err?.message || 'Session code not found in directory.';
+      applySessionStatusFromCode('invalid', election, msg);
+      setError(msg);
       return { ok: false, state: 'invalid', election };
     }
-  }, [applySessionStatusFromCode, routeClosedSessionToResults, sessionCode, showValidationError]);
+  }, [applySessionStatusFromCode, routeClosedSessionToResults, sessionCode]);
 
   const ensureSessionCodeIsOpen = useCallback(async () => {
     const check = await checkSessionCodeStatus({ routeClosedToResults: true });
@@ -646,16 +658,26 @@ export default function SignInView() {
 
                 {/* Session Status Banner */}
                 {entryMode === 'voter' && sessionStatus.isLoaded ? (
-                  <div className={`mt-5 w-full bg-[var(--surface)] border ${statusMeta.boxBorder} p-3.5 shadow-xs`}>
+                  <div className={`mt-5 w-full bg-[var(--surface)] border ${statusMeta.boxBorder} p-3.5 shadow-xs relative`}>
                     <div className="flex items-center justify-between gap-3">
                       <span className="uppercase font-mono text-xs tracking-wider text-[var(--on-surface)] opacity-70 font-semibold">
                         Session Status
                       </span>
-                      <span className={`px-2 py-0.5 text-xs font-mono font-bold uppercase tracking-wider border ${statusMeta.badgeClass}`}>
-                        {statusMeta.label}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-xs font-mono font-bold uppercase tracking-wider border ${statusMeta.badgeClass}`}>
+                          {statusMeta.label}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={clearSessionStatus}
+                          className="p-1 text-[var(--on-surface)]/50 hover:text-[var(--on-surface)] hover:bg-[var(--on-surface)]/10 transition-colors rounded"
+                          aria-label="Dismiss session status"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
                     </div>
-                    <p className="mt-1.5 text-xs text-[var(--on-surface)] opacity-85 leading-relaxed font-sans">
+                    <p className="mt-1.5 text-xs text-[var(--on-surface)] opacity-85 leading-relaxed font-sans pr-6">
                       {sessionStatus.message || statusMeta.detail}
                     </p>
                     {sessionStatus.electionTitle ? (
@@ -690,7 +712,15 @@ export default function SignInView() {
                         aria-invalid={error && error.toLowerCase().includes('session') ? 'true' : 'false'}
                         className="w-full p-3.5 text-base sm:text-lg font-mono tracking-[0.25em] uppercase bg-[var(--surface-container)] border border-[var(--outline-variant)] text-[var(--on-surface)] focus:bg-[var(--surface-container-high)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-all placeholder:tracking-normal placeholder:font-sans placeholder:text-sm"
                         value={sessionCode}
-                        onChange={(e) => setSessionCode(e.target.value.toUpperCase())}
+                        onChange={(e) => {
+                          setSessionCode(e.target.value.toUpperCase());
+                          if (sessionStatus.isLoaded) {
+                            clearSessionStatus();
+                          }
+                          if (error && (error.toLowerCase().includes('session') || error.toLowerCase().includes('election') || error.toLowerCase().includes('code'))) {
+                            setError('');
+                          }
+                        }}
                         onKeyDown={handleKeyDown}
                         maxLength={8}
                         disabled={isSubmitting}
