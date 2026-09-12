@@ -22,7 +22,7 @@
 
   /* Typographic Constants */
   --font-serif: "Noto Serif", "Playfair Display", serif;
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-sans: "Helvetica Neue", Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   
   /* Depth Layering */
   --layer-recessed: inset 0px 2px 4px rgba(0,0,0,0.05); /* Carved state */

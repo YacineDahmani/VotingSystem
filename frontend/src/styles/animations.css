@@ -98,6 +98,15 @@
   animation: pendulumBobGlow var(--pendulum-duration, 2.2s) ease-in-out infinite;
 }
 
+@keyframes shrinkWidth {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pendulum-swing,
   .pendulum-bob,
