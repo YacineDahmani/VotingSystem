@@ -10,7 +10,7 @@ A digital voting platform inspired by the Swiss design aesthetic. Features a str
 - **Simple Onboarding**: Join using an 8-character session code, direct invite link (`/?code=XXXX`), or scannable mobile QR code.
 - **Voter Verification**: Optional voter eligibility lists supporting Name, Birthdate, and Voter ID.
 - **Vote Confirmation**: Clear selection review modal before casting.
-- **Cryptographic Receipt**: Receive a unique verification code (`SWISS-XXXX-XXXX-XXXX`) upon ballot submission.
+- **Cryptographic Receipt**: Receive a unique verification code (`SWISS-XXXX-XXXX-XXXX`) upon vote submission.
 - **Waiting Room**: Real-time pendulum waiting screen with receipt badge until polls close.
 
 ### ⚙️ Admin Operations
