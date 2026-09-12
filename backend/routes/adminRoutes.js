@@ -994,6 +994,50 @@ function createAdminRoutes({ db, issueAuthToken, requireAdminAuth, emitElectionU
         }
     });
 
+    router.post('/elections/:id/notice', async (req, res) => {
+        try {
+            const electionId = Number.parseInt(req.params.id, 10);
+            const { notice } = req.body;
+
+            const election = await db.getElectionById(electionId);
+            if (!election) {
+                return res.status(404).json({ error: 'Election not found' });
+            }
+
+            const updated = await db.setElectionNotice(electionId, notice);
+            await emitElectionUpdate(electionId, 'election:notice');
+
+            return res.json({
+                success: true,
+                notice: updated.admin_notice,
+                message: updated.admin_notice ? 'Notice broadcasted to voters' : 'Notice cleared',
+            });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.delete('/elections/:id/notice', async (req, res) => {
+        try {
+            const electionId = Number.parseInt(req.params.id, 10);
+            const election = await db.getElectionById(electionId);
+            if (!election) {
+                return res.status(404).json({ error: 'Election not found' });
+            }
+
+            await db.setElectionNotice(electionId, null);
+            await emitElectionUpdate(electionId, 'election:notice');
+
+            return res.json({
+                success: true,
+                notice: null,
+                message: 'Notice removed; voters returned to silent view',
+            });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
     return router;
 }
 

@@ -312,4 +312,62 @@ describe('Elections & Voter Workflow Test Suite', () => {
         assert.strictEqual(runoffVoteData.success, true);
         assert.ok(runoffVoteData.receiptCode);
     });
+
+    it('should maintain public stealth for simulated sessions until admin publishes an official notice', async () => {
+        const adminToken = auth.issueAuthToken({ role: 'admin', adminId: 1, username: 'admin' });
+
+        // 1. Inject fake/simulated votes into candidateAlpha
+        const fakeRes = await fetch(`${baseUrl}/api/admin/elections/${testElection.id}/fake-votes`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${adminToken}`,
+            },
+            body: JSON.stringify({
+                candidateId: candidateAlpha.id,
+                count: 5,
+            }),
+        });
+        assert.strictEqual(fakeRes.status, 200);
+
+        // 2. Public results should NOT expose fraud_suspected and admin_notice should be null
+        const publicResultsRes = await fetch(`${baseUrl}/api/elections/${testElection.id}/results`);
+        assert.strictEqual(publicResultsRes.status, 200);
+        const publicResults = await publicResultsRes.json();
+        assert.strictEqual(publicResults.admin_notice, null);
+        for (const c of publicResults.candidates) {
+            assert.strictEqual(c.fraud_suspected, undefined, 'fraud_suspected must not leak to voters');
+        }
+
+        // 3. Admin publishes simulation notice
+        const noticeText = 'Simulation Disclosure: This session was conducted as a test simulation with mock votes.';
+        const postNoticeRes = await fetch(`${baseUrl}/api/admin/elections/${testElection.id}/notice`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${adminToken}`,
+            },
+            body: JSON.stringify({ notice: noticeText }),
+        });
+        assert.strictEqual(postNoticeRes.status, 200);
+        const postNoticeData = await postNoticeRes.json();
+        assert.strictEqual(postNoticeData.success, true);
+        assert.strictEqual(postNoticeData.notice, noticeText);
+
+        // 4. Now public results reveal the official admin notice
+        const notifiedResultsRes = await fetch(`${baseUrl}/api/elections/${testElection.id}/results`);
+        const notifiedResults = await notifiedResultsRes.json();
+        assert.strictEqual(notifiedResults.admin_notice, noticeText);
+
+        // 5. Admin clears/silences the notice
+        const delNoticeRes = await fetch(`${baseUrl}/api/admin/elections/${testElection.id}/notice`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${adminToken}` },
+        });
+        assert.strictEqual(delNoticeRes.status, 200);
+
+        const silencedResultsRes = await fetch(`${baseUrl}/api/elections/${testElection.id}/results`);
+        const silencedResults = await silencedResultsRes.json();
+        assert.strictEqual(silencedResults.admin_notice, null);
+    });
 });

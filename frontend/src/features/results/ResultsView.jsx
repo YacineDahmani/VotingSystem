@@ -353,10 +353,28 @@ export default function ResultsView() {
                 NOTICE
               </span>
               <p className="text-xs font-bold text-amber-950 dark:text-amber-100">
-                Voting Concluded
+                Voting ENDED
               </p>
             </div>
             <p className="text-xs text-[var(--on-surface)] opacity-80 leading-relaxed mt-1">{endedNotice}</p>
+          </div>
+        ) : null}
+
+        {/* Official Administrative Disclosure / Simulation Notice */}
+        {(results?.admin_notice || results?.election?.admin_notice) ? (
+          <div className="mb-8 p-6 bg-[var(--surface-container-high)] border border-amber-500/40 border-l-4 border-l-amber-500 shadow-sm">
+            <div className="flex items-center gap-2.5 mb-2">
+              <span className="px-2 py-0.5 font-mono text-[0.6rem] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                OFFICIAL ADMINISTRATIVE NOTICE
+              </span>
+              <span className="text-[0.62rem] font-mono text-[var(--on-surface)] opacity-60">
+                Published by Election Administration
+              </span>
+            </div>
+            <p className="text-sm font-medium text-[var(--on-surface)] leading-relaxed">
+              {results?.admin_notice || results?.election?.admin_notice}
+            </p>
           </div>
         ) : null}
 

@@ -19,6 +19,7 @@ export default function BallotView() {
   const [isDropping, setIsDropping] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
   const [copiedReceipt, setCopiedReceipt] = useState(false);
+  const [adminNotice, setAdminNotice] = useState(null);
 
   const selectedCandidate = useMemo(
     () => candidates.find((item) => item.id === selectedCandidateId) || null,
@@ -68,6 +69,8 @@ export default function BallotView() {
       try {
         const results = await getResults(session.electionId);
         if (!mounted) return;
+
+        setAdminNotice(results?.admin_notice || results?.election?.admin_notice || null);
 
         const endDate = results?.election?.end_date ? new Date(results.election.end_date) : null;
         const hasEndedByTime = !!endDate && !Number.isNaN(endDate.getTime()) && Date.now() >= endDate.getTime();
@@ -199,6 +202,19 @@ export default function BallotView() {
     <div className="relative min-h-[90vh] flex flex-col items-center pt-8 pb-40 bg-[var(--surface)]">
       {/* Header Info */}
       <div className="w-full max-w-[1400px] px-6 sm:px-8 md:px-12 mb-8 z-10">
+        {adminNotice && (
+          <div className="mb-6 p-4 bg-[var(--surface-container-high)] border border-amber-500/40 border-l-4 border-l-amber-500 shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2 py-0.5 font-mono text-[0.58rem] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                OFFICIAL ADMINISTRATIVE NOTICE
+              </span>
+            </div>
+            <p className="text-xs font-medium text-[var(--on-surface)] leading-relaxed">
+              {adminNotice}
+            </p>
+          </div>
+        )}
+
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {isRunoffRound ? (

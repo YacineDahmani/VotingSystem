@@ -5,13 +5,17 @@ import {
   ArrowRight,
   ArrowUpRight,
   BarChart3,
+  Bell,
   Check,
   CheckCircle2,
   Clock,
   Copy,
   ExternalLink,
+  Eye,
+  EyeOff,
   FlaskConical,
   LogOut,
+  Megaphone,
   Plus,
   QrCode,
   Share2,
@@ -22,6 +26,7 @@ import {
 } from 'lucide-react';
 import {
   addCandidate,
+  clearElectionNotice,
   deleteCandidate,
   deleteElection,
   getAdminElections,
@@ -31,6 +36,7 @@ import {
   getIntegrityReport,
   injectFakeVotes,
   regenerateElectionCode,
+  setElectionNotice,
   updateElectionDetails,
   updateElectionStatus,
 } from '../../lib/api';
@@ -107,6 +113,7 @@ export default function AdminDashboardView() {
   const [newCandidateDescription, setNewCandidateDescription] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [noticeDraft, setNoticeDraft] = useState('');
 
   const [adminProfile, setAdminProfile] = useState(() => ({
     username: session?.adminUsername || 'Electoral Officer',
@@ -133,6 +140,10 @@ export default function AdminDashboardView() {
     () => elections.find((item) => item.id === selectedElectionId) || null,
     [elections, selectedElectionId]
   );
+
+  useEffect(() => {
+    setNoticeDraft(selectedElection?.admin_notice || '');
+  }, [selectedElection?.id, selectedElection?.admin_notice]);
 
   const totalElectionVotes = useMemo(() => {
     return candidates.reduce((sum, c) => sum + (c.votes || 0), 0);
@@ -561,6 +572,65 @@ export default function AdminDashboardView() {
       });
     } catch {
       setError('Unable to copy invite link.');
+    }
+  };
+
+  const handlePublishNotice = async (textToPublish) => {
+    const text = (textToPublish ?? noticeDraft).trim();
+    if (!selectedElectionId) return;
+    if (!text) {
+      pushToast({
+        type: 'error',
+        title: 'Notice Required',
+        message: 'Please enter a message to broadcast to voters.',
+      });
+      return;
+    }
+
+    setBusyAction('notice');
+    try {
+      const res = await setElectionNotice(selectedElectionId, text);
+      pushToast({
+        type: 'success',
+        title: 'Notice Broadcasted',
+        message: 'Administrative disclosure is now live on voter screens.',
+      });
+      setElections((prev) =>
+        prev.map((el) => (el.id === selectedElectionId ? { ...el, admin_notice: res.notice } : el))
+      );
+    } catch (err) {
+      pushToast({
+        type: 'error',
+        title: 'Failed to Broadcast Notice',
+        message: err.message || 'Unable to update notice.',
+      });
+    } finally {
+      setBusyAction('');
+    }
+  };
+
+  const handleClearNotice = async () => {
+    if (!selectedElectionId) return;
+    setBusyAction('notice');
+    try {
+      await clearElectionNotice(selectedElectionId);
+      pushToast({
+        type: 'info',
+        title: 'Notice Withdrawn',
+        message: 'Voter screens returned to silent normal mode.',
+      });
+      setNoticeDraft('');
+      setElections((prev) =>
+        prev.map((el) => (el.id === selectedElectionId ? { ...el, admin_notice: null } : el))
+      );
+    } catch (err) {
+      pushToast({
+        type: 'error',
+        title: 'Failed to Clear Notice',
+        message: err.message || 'Unable to remove notice.',
+      });
+    } finally {
+      setBusyAction('');
     }
   };
 
@@ -1143,6 +1213,124 @@ export default function AdminDashboardView() {
                       <p className="text-lg font-bold font-muse text-[var(--on-surface)]">
                         {integrity?.integrityStatus === 'clean' ? 'CLEAN' : 'SIMULATED DATA'}
                       </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Voter Disclosure & Administrative Notice Card */}
+                <div className="bg-[var(--surface-container-lowest)] p-6 border border-[var(--on-surface)]/15 space-y-4 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--outline-variant)] pb-4">
+                    <div>
+                      <div className="flex items-center gap-2.5">
+                        <Megaphone className="w-4 h-4 text-[var(--primary)]" />
+                        <h4 className="font-muse text-xl font-bold text-[var(--primary)]">
+                          Voter Disclosure & Simulation Notice
+                        </h4>
+                      </div>
+                      <p className="text-xs text-[var(--on-surface)] opacity-70 mt-1">
+                        Control whether voters are notified that this session is simulated or rigged.
+                      </p>
+                    </div>
+
+                    <div>
+                      {selectedElection?.admin_notice ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.62rem] font-mono font-bold uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                          <Eye className="w-3.5 h-3.5" />
+                          Notice Visible to Voters
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.62rem] font-mono font-bold uppercase tracking-wider bg-[var(--surface-container)] text-[var(--on-surface)] opacity-70 border border-[var(--outline-variant)]">
+                          <EyeOff className="w-3.5 h-3.5" />
+                          Silent Mode · Voters Unaware
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-[var(--on-surface)] opacity-80 leading-relaxed">
+                    {selectedElection?.admin_notice ? (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/30 space-y-1">
+                        <span className="block text-[0.6rem] font-mono font-bold uppercase tracking-widest text-amber-700 dark:text-amber-300">
+                          Current Active Broadcast:
+                        </span>
+                        <p className="font-medium text-amber-900 dark:text-amber-100 italic">
+                          "{selectedElection.admin_notice}"
+                        </p>
+                      </div>
+                    ) : (
+                      <p>
+                        By default, voters experience this session as a <strong>completely real, organic election</strong>. Mock votes and simulations remain silent. If you want voters to know that this session is rigged, stress-tested, or simulated, publish an official notice below.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Preset Buttons */}
+                  <div className="space-y-1.5 pt-1">
+                    <span className="block text-[0.6rem] font-mono uppercase tracking-wider text-[var(--on-surface)] opacity-60">
+                      Quick Disclosure Presets
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNoticeDraft('Notice: This voting session has been conducted as a test simulation. Vote counts include simulated data.')}
+                        className="px-2.5 py-1.5 text-[0.62rem] uppercase font-mono tracking-wider border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] transition-colors"
+                      >
+                        Simulation Test
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNoticeDraft('Administrative Notice: An integrity audit has detected simulated/unverified vote patterns in this election.')}
+                        className="px-2.5 py-1.5 text-[0.62rem] uppercase font-mono tracking-wider border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] transition-colors"
+                      >
+                        Integrity Audit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNoticeDraft('Official Notice: This election session is voided due to procedural sandbox testing.')}
+                        className="px-2.5 py-1.5 text-[0.62rem] uppercase font-mono tracking-wider border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] transition-colors"
+                      >
+                        Session Voided
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Notice Input & Actions */}
+                  <div className="space-y-3 pt-2">
+                    <div className="relative">
+                      <textarea
+                        rows={3}
+                        value={noticeDraft}
+                        onChange={(e) => setNoticeDraft(e.target.value)}
+                        placeholder="Enter official disclosure message to display to voters on their screens..."
+                        className="w-full p-3 text-xs bg-[var(--surface-container)] border border-[var(--outline-variant)] text-[var(--on-surface)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] resize-none"
+                      />
+                      <span className="absolute bottom-2 right-2 text-[0.6rem] font-mono text-[var(--on-surface)] opacity-50">
+                        {noticeDraft.length} chars
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handlePublishNotice()}
+                        disabled={busyAction === 'notice' || !noticeDraft.trim()}
+                        className="min-h-[44px] px-5 py-2 text-xs font-mono uppercase tracking-wider font-bold bg-[var(--primary)] text-[var(--on-primary)] hover:bg-[var(--primary)]/90 transition-transform active:scale-[0.98] disabled:opacity-50 flex items-center gap-2"
+                      >
+                        <Megaphone className="w-3.5 h-3.5" />
+                        {selectedElection?.admin_notice ? 'Update Notice on Voter Screens' : 'Broadcast Notice to Voters'}
+                      </button>
+
+                      {selectedElection?.admin_notice && (
+                        <button
+                          type="button"
+                          onClick={handleClearNotice}
+                          disabled={busyAction === 'notice'}
+                          className="min-h-[44px] px-4 py-2 text-xs font-mono uppercase tracking-wider border border-[var(--outline-variant)] hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 transition-colors flex items-center gap-2"
+                        >
+                          <EyeOff className="w-3.5 h-3.5" />
+                          Withdraw Notice (Return to Silent Mode)
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

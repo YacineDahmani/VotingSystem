@@ -83,6 +83,7 @@ function createElectionEmitter({ io, db }) {
             electionId,
             totalVotes: results.totalVotes,
             status: results.election.status,
+            admin_notice: results.election.admin_notice || null,
             serverTime: new Date().toISOString(),
             ...(isClosed ? { candidates: results.candidates, isTie: results.isTie, runoffElection: results.runoffElection } : {}),
         };
@@ -95,6 +96,7 @@ function createElectionEmitter({ io, db }) {
             candidates: results.candidates,
             isTie: results.isTie,
             runoffElection: results.runoffElection,
+            admin_notice: results.election.admin_notice || null,
             serverTime: new Date().toISOString(),
         };
 

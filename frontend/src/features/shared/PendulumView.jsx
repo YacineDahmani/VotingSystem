@@ -17,6 +17,7 @@ export default function PendulumView() {
   const [timeRemainingLabel, setTimeRemainingLabel] = useState('Schedule pending');
   const [timerEnded, setTimerEnded] = useState(false);
   const [displayAngle, setDisplayAngle] = useState(0);
+  const [adminNotice, setAdminNotice] = useState(null);
 
   const anchorRef = useRef(null);
   const armRef = useRef(null);
@@ -179,6 +180,12 @@ export default function PendulumView() {
           electionEndAt: results.election?.end_date || null,
         });
 
+        if (results?.admin_notice || results?.election?.admin_notice) {
+          setAdminNotice(results.admin_notice || results.election.admin_notice);
+        } else {
+          setAdminNotice(null);
+        }
+
         const endAt = results.election?.end_date ? new Date(results.election.end_date) : null;
         const hasEndedByTime = !!endAt && !Number.isNaN(endAt.getTime()) && Date.now() >= endAt.getTime();
 
@@ -209,6 +216,18 @@ export default function PendulumView() {
     socket.on('election:update', (payload) => {
       if (payload?.electionId !== session.electionId) return;
       setTotalVotes(payload.totalVotes || 0);
+      if (payload.admin_notice !== undefined) {
+        setAdminNotice((prev) => {
+          if (payload.admin_notice && payload.admin_notice !== prev) {
+            pushToast({
+              type: 'warning',
+              title: 'Administrative Notice',
+              message: payload.admin_notice,
+            });
+          }
+          return payload.admin_notice || null;
+        });
+      }
     });
 
     socket.on('vote:kick', (payload) => {
@@ -348,6 +367,22 @@ export default function PendulumView() {
         </div>
       </div>
 
+      {adminNotice && (
+        <div className="w-full max-w-4xl mx-auto px-6 relative z-30 mt-4">
+          <div className="p-4 bg-[var(--surface-container-high)] border border-amber-500/40 border-l-4 border-l-amber-500 shadow-md">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2 py-0.5 font-mono text-[0.58rem] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                OFFICIAL ADMINISTRATIVE NOTICE
+              </span>
+            </div>
+            <p className="text-xs font-medium text-[var(--on-surface)] leading-relaxed">
+              {adminNotice}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Physics Container */}
       <div className="flex-1 flex flex-col items-center justify-center mt-16 w-full relative z-10" style={{ touchAction: 'none' }}>
         <div className="relative flex flex-col items-center h-[350px] w-full z-10">
           <div ref={anchorRef} className="w-4 h-4 bg-[var(--primary)] z-20 shadow-md rounded-sm" />

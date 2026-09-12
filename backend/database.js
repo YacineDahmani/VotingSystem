@@ -36,10 +36,18 @@ function initializeDatabase() {
                     max_voters INTEGER,
                     source_election_id INTEGER,
                     round INTEGER DEFAULT 1,
+                    admin_notice TEXT DEFAULT NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (source_election_id) REFERENCES elections(id) ON DELETE SET NULL
                 )
             `);
+
+            // Try to add admin_notice column if it doesn't exist (for existing databases)
+            try {
+                db.run("ALTER TABLE elections ADD COLUMN admin_notice TEXT DEFAULT NULL", (err) => {
+                    // Ignore errors if column already exists
+                });
+            } catch (e) {}
 
             db.run(`
                 CREATE TABLE IF NOT EXISTS candidates (
@@ -944,11 +952,25 @@ function getElectionResults(electionId) {
                 tiedCandidates,
                 leader,
                 runoffElection,
-                ageGroups
+                ageGroups,
+                admin_notice: election.admin_notice || null
             });
         } catch (err) {
             reject(err);
         }
+    });
+}
+
+function setElectionNotice(electionId, noticeText) {
+    return new Promise((resolve, reject) => {
+        db.run(
+            'UPDATE elections SET admin_notice = ? WHERE id = ?',
+            [noticeText ? String(noticeText).trim() : null, electionId],
+            function (err) {
+                if (err) reject(err);
+                else resolve({ id: electionId, admin_notice: noticeText ? String(noticeText).trim() : null });
+            }
+        );
     });
 }
 
@@ -1419,6 +1441,7 @@ module.exports = {
     createRunoffElection,
     updateElection,
     updateElectionStatus,
+    setElectionNotice,
     regenerateElectionCode,
     deleteElection,
     getElectionStats,

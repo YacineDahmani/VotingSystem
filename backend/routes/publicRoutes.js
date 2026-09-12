@@ -409,7 +409,8 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
         try {
             const electionId = Number.parseInt(req.params.id, 10);
             const candidates = await db.getCandidatesByElection(electionId);
-            res.json({ candidates });
+            const sanitized = candidates.map(({ fraud_suspected, ...rest }) => rest);
+            res.json({ candidates: sanitized });
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -619,6 +620,12 @@ function createPublicRoutes({ db, ensureDefaultElection, issueAuthToken, require
                     results.runoffElection = runoffElection;
                 }
             }
+
+            if (Array.isArray(results?.candidates)) {
+                results.candidates = results.candidates.map(({ fraud_suspected, ...rest }) => rest);
+            }
+
+            results.admin_notice = results.election?.admin_notice || null;
 
             return res.json(results);
         } catch (err) {

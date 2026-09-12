@@ -201,6 +201,19 @@ export function getFakeVoters(electionId) {
   return request(`/api/admin/elections/${electionId}/fake-voters`);
 }
 
+export function setElectionNotice(electionId, notice) {
+  return request(`/api/admin/elections/${electionId}/notice`, {
+    method: 'POST',
+    body: JSON.stringify({ notice }),
+  });
+}
+
+export function clearElectionNotice(electionId) {
+  return request(`/api/admin/elections/${electionId}/notice`, {
+    method: 'DELETE',
+  });
+}
+
 export function updateElectionStatus(electionId, status, endDate = null) {
   const body = { status };
   if (endDate) {
