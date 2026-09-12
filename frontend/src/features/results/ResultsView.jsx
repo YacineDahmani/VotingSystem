@@ -232,7 +232,7 @@ export default function ResultsView() {
     ? 'TIE'
     : isOpenElection
       ? 'LIVE STANDINGS (ELECTION IN PROGRESS)'
-      : 'FINAL RESULTS';
+      : 'WINNER';
   const heroTitle = isTieResult ? 'Runoff Required' : winnerName;
 
   const handleRunoffContinue = () => {
@@ -251,19 +251,11 @@ export default function ResultsView() {
       animate={{ opacity: 1 }}
       className="min-h-screen bg-[var(--surface-container-lowest)] text-[var(--primary)] font-grotesque overflow-x-hidden pt-20"
     >
-      
-      {/* Subtle background letter */}
-      <div className="absolute top-[20%] right-[-5%] overflow-hidden max-h-screen z-0">
-          <span className="font-muse text-[50vw] leading-none text-gray-100 select-none pointer-events-none">
-            V
-          </span>
-      </div>
-
-      <div className="w-full max-w-6xl mx-auto px-12 relative z-10">
+      <div className="w-full max-w-6xl mx-auto px-6 sm:px-12 relative z-10">
         {adminView && isOpenElection ? (
           <div className="mb-6 p-4 bg-white dark:bg-[#15202b] border border-blue-200 dark:border-blue-900 border-l-4 border-l-blue-600 dark:border-l-blue-400 text-xs text-[var(--on-surface)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
             <div className="flex items-center gap-3">
-              <span className="px-2 py-0.5 font-mono text-[0.58rem] font-bold uppercase tracking-wider bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+              <span className="px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-wider bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                 LIVE PREVIEW
               </span>
               <span className="text-xs text-[var(--on-surface)] opacity-85">Voting is currently open. Showing live interim tallies.</span>
@@ -271,7 +263,7 @@ export default function ResultsView() {
             <button
               type="button"
               onClick={() => navigate('/admin')}
-              className="px-3.5 py-1.5 text-[0.6rem] uppercase tracking-widest font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] transition-colors shrink-0"
+              className="px-3.5 py-1.5 text-xs uppercase tracking-wider font-bold border border-[var(--outline-variant)] hover:bg-[var(--surface-container)] transition-colors shrink-0"
             >
               Admin Dashboard
             </button>
@@ -357,7 +349,7 @@ export default function ResultsView() {
             <p>
               {isTieResult
                 ? 'The final count ended in a tie. A runoff election is required to determine the winner.'
-                : 'Certified final election count.'}
+                : 'Final results.'}
             </p>
           </div>
         </div>

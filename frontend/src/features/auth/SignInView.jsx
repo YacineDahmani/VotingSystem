@@ -12,6 +12,7 @@ import {
   Lock,
   ShieldCheck,
   Vote,
+  X,
 } from 'lucide-react';
 import { adminLogin, getAdminSetupStatus, setupInitialAdmin, submitIdentity, validateElectionCode } from '../../lib/api';
 import { clearSession, getSession, getVoterPhase, isAdminSession, isVoterSession, setSession } from '../../store/session';
@@ -205,15 +206,13 @@ export default function SignInView() {
     setBirthdate(value);
 
     if (!value) {
-      setError('Birthdate is required.');
+      setError('');
       return;
     }
 
     const years = calculateAge(value);
     if (years !== null && years < 18) {
       setError('You must be at least 18 years of age to vote.');
-      setIsShaking(true);
-      setTimeout(() => setIsShaking(false), 420);
       return;
     }
 

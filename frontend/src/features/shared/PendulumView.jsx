@@ -322,32 +322,16 @@ export default function PendulumView() {
         }}
       />
 
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none overflow-hidden z-0 pl-12 -space-y-12 opacity-40">
-        <span className="font-muse text-[clamp(8rem,18vw,26rem)] leading-[0.8] text-[var(--on-surface)]/[0.015] whitespace-nowrap uppercase tracking-tighter mix-blend-multiply ml-24">
-          WAITING
-        </span>
-        <span className="font-muse text-[clamp(8rem,18vw,26rem)] leading-[0.8] text-[var(--on-surface)]/[0.015] whitespace-nowrap uppercase tracking-tighter mix-blend-multiply -ml-24">
-          ROOM
-        </span>
-      </div>
-
-      <div className="absolute bottom-0 right-0 w-64 h-64 md:w-96 md:h-96 pointer-events-none z-0 overflow-hidden floating-paper">
-        <div className="absolute inset-0 bg-gradient-to-tl from-black/10 via-black/5 to-transparent transform rotate-12 scale-150 translate-x-1/4 translate-y-1/4 shadow-2xl skew-x-12 mix-blend-multiply" />
-        <div className="absolute inset-0 bg-gradient-to-tr from-white/40 via-transparent to-transparent shadow-inner" />
-        <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_40%,rgba(255,255,255,0.8)_45%,rgba(0,0,0,0.05)_50%,transparent_55%)] blur-[2px]" />
-        <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_60%,rgba(255,255,255,0.6)_62%,rgba(0,0,0,0.03)_65%,transparent_70%)] blur-[3px]" />
-      </div>
-
       <div className="w-full flex justify-between items-start px-6 md:px-12 relative z-20 mt-4 md:mt-0">
         <div>
           <h2 className="font-muse text-[2.5rem] italic text-[var(--primary)] mb-2 font-normal leading-none">Waiting Room</h2>
           <div className="flex flex-wrap items-center gap-3 mt-3">
-            <span className="text-[0.65rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-50">Live Updates</span>
-            {session?.ballotReceiptCode && (
+            <span className="text-xs uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-60">Live Updates</span>
+            {session?.voteReceiptCode && (
               <div className="px-2.5 py-1 bg-[var(--surface-container)] border border-[var(--primary)]/20 flex items-center gap-1.5 shadow-sm">
-                <ShieldCheck size={12} className="text-emerald-600" />
-                <span className="text-[0.55rem] font-mono tracking-wider uppercase text-[var(--on-surface)] opacity-80">
-                  {session.ballotReceiptCode}
+                <ShieldCheck size={13} className="text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-mono tracking-wider uppercase text-[var(--on-surface)] opacity-80">
+                  {session.voteReceiptCode}
                 </span>
               </div>
             )}
@@ -356,8 +340,8 @@ export default function PendulumView() {
 
         <div className="flex flex-col items-end gap-3">
           <div className="flex items-center gap-2 mt-2">
-            <span className={`w-1.5 h-1.5 rounded-full ${isSocketConnected ? 'bg-black' : 'bg-red-600 animate-pulse'}`} />
-            <p className="text-[0.55rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-50">
+            <span className={`w-2 h-2 rounded-full ${isSocketConnected ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-red-600 animate-pulse'}`} />
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-70 font-mono">
               {isSocketConnected ? 'LIVE' : 'RECONNECTING'}
             </p>
           </div>
@@ -386,24 +370,24 @@ export default function PendulumView() {
         </div>
 
         <div className="z-10 w-full text-center -mt-8 flex flex-col items-center">
-          <div className="font-muse font-bold text-[10rem] md:text-[14rem] leading-none text-[var(--primary)] tracking-tighter">
+          <div className="font-muse font-bold text-[10rem] md:text-[14rem] leading-none text-[var(--primary)] tracking-tighter tabular-nums">
             {totalVotes}
           </div>
           <div className="flex flex-col items-center mt-2 border-t border-[var(--on-surface)]/10 pt-4 px-12">
-            <p className="text-[0.65rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-60 font-bold mb-6">
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-70 font-bold mb-4">
               Votes Cast
             </p>
-            <p className="text-[0.55rem] uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-50">
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--on-surface)] opacity-60">
               TIME REMAINING
             </p>
-            <p className="text-sm mt-1 font-bold uppercase tracking-[0.15em] text-[var(--primary)]">
+            <p className="text-sm mt-1 font-bold uppercase tracking-[0.15em] text-[var(--primary)] font-mono">
               {timeRemainingLabel}
             </p>
             {timerEnded ? (
               <button
                 type="button"
                 onClick={handleGoToResults}
-                className="mt-4 px-6 py-3 border border-[var(--primary)] text-[var(--primary)] text-[0.65rem] uppercase tracking-[0.2em] transition-all duration-200 hover:bg-[var(--primary)] hover:text-[var(--on-primary)] hover:-translate-y-0.5 shadow-sm active:translate-y-0 font-bold"
+                className="mt-4 px-6 py-3 border border-[var(--primary)] text-[var(--primary)] text-xs uppercase tracking-[0.2em] transition-all duration-200 hover:bg-[var(--primary)] hover:text-[var(--on-primary)] hover:-translate-y-0.5 shadow-sm active:translate-y-0 font-bold"
               >
                 View Results
               </button>
