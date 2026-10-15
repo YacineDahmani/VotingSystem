@@ -31,23 +31,6 @@ A digital voting platform inspired by the Swiss design aesthetic. Features a str
 ---
 
 ## Getting Started
-
-### 1. Configure Environment Variables
-
-The backend requires `ADMIN_MASTER_KEY` at startup.
-
-**PowerShell:**
-```powershell
-$env:ADMIN_MASTER_KEY='your-admin-password'
-$env:JWT_SECRET='your-jwt-secret' # optional
-```
-
-**Bash / Linux / macOS:**
-```bash
-export ADMIN_MASTER_KEY='your-admin-password'
-export JWT_SECRET='your-jwt-secret' # optional
-```
-
 ### 2. Start the Backend
 
 ```bash
