@@ -62,6 +62,3 @@ npm test
 
 ---
 
-## Credits
-
-Developed by **Yacine Dahmani**
