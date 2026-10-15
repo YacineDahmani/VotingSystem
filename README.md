@@ -31,7 +31,7 @@ A digital voting platform inspired by the Swiss design aesthetic. Features a str
 ---
 
 ## Getting Started
-### 2. Start the Backend
+### 1. Start the Backend
 
 ```bash
 cd backend
