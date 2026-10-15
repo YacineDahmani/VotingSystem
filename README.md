@@ -40,7 +40,7 @@ npm start
 ```
 API runs on `http://localhost:3000`.
 
-### 3. Start the Frontend
+### 2. Start the Frontend
 
 ```bash
 cd frontend
