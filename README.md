@@ -6,7 +6,7 @@ A digital voting platform inspired by the Swiss design aesthetic. Features a str
 
 ## Features
 
-### 🗳️ Voter Experience
+###  Voter Experience
 - **Simple Onboarding**: Join using an 8-character session code, direct invite link (`/?code=XXXX`), or scannable mobile QR code.
 - **Voter Verification**: Optional voter eligibility lists supporting Name, Birthdate, and Voter ID.
 - **Vote Confirmation**: Clear selection review modal before casting.
