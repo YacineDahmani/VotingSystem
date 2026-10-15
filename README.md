@@ -13,7 +13,7 @@ A digital voting platform inspired by the Swiss design aesthetic. Features a str
 - **Cryptographic Receipt**: Receive a unique verification code (`SWISS-XXXX-XXXX-XXXX`) upon vote submission.
 - **Waiting Room**: Real-time pendulum waiting screen with receipt badge until polls close.
 
-### ⚙️ Admin Operations
+###  Admin Operations
 - **Election Management**: Create, open, close, draft, and delete multiple elections.
 - **Roster Configuration**: Add and remove candidates with platform statements or import via CSV/JSON.
 - **Voter Eligibility Import**: Upload voter rosters (CSV/TSV/JSON) with sample template download.
